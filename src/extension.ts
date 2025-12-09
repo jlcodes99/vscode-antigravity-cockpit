@@ -224,7 +224,7 @@ function updateStatusBar(snapshot: QuotaSnapshot, config: CockpitConfig): void {
         });
 
         if (lowestModel) {
-            statusTextParts.push(`${t('statusBar.lowest')}: ${lowestPct.toFixed(0)}%`);
+            statusTextParts.push(`${t('statusBar.lowest')}: ${Math.floor(lowestPct)}%`);
             minPercentage = lowestPct;
         }
     }
@@ -259,12 +259,12 @@ function updateStatusBar(snapshot: QuotaSnapshot, config: CockpitConfig): void {
 function formatStatusBarText(label: string, percentage: number, format: string): string {
     switch (format) {
         case STATUS_BAR_FORMAT.COMPACT:
-            return `${percentage.toFixed(0)}%`;
+            return `${Math.floor(percentage)}%`;
         case STATUS_BAR_FORMAT.DETAILED:
             return `${label}: ${percentage.toFixed(1)}%`;
         case STATUS_BAR_FORMAT.STANDARD:
         default:
-            return `${label}: ${percentage.toFixed(0)}%`;
+            return `${label}: ${Math.floor(percentage)}%`;
     }
 }
 

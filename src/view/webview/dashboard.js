@@ -279,7 +279,7 @@
                 <span class="status-dot" style="background-color: ${color}"></span>
             </div>
             <div class="progress-circle" style="background: conic-gradient(${color} ${credits.remainingPercentage}%, var(--border-color) ${credits.remainingPercentage}%);">
-                <div class="percentage">${credits.remainingPercentage.toFixed(0)}%</div>
+                <div class="percentage">${Math.floor(credits.remainingPercentage)}%</div>
             </div>
             <div class="info-row">
                 <span>${i18n['dashboard.available'] || 'Available'}</span>
@@ -325,7 +325,7 @@
                 </div>
             </div>
             <div class="progress-circle" style="background: conic-gradient(${color} ${pct}%, var(--border-color) ${pct}%);">
-                <div class="percentage">${pct.toFixed(0)}%</div>
+                <div class="percentage">${Math.floor(pct)}%</div>
             </div>
             <div class="info-row">
                 <span>${i18n['dashboard.resetIn'] || 'Reset In'}</span>
