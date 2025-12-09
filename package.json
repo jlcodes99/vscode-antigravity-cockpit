@@ -3,7 +3,7 @@
   "displayName": "Antigravity Cockpit",
   "icon": "assets/icon.png",
   "description": "A premium, dashboard-style quota monitor for Antigravity AI.",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "publisher": "jlcodes",
   "engines": {
     "vscode": "^1.90.0"
@@ -11,6 +11,13 @@
   "categories": [
     "Other",
     "Visualization"
+  ],
+  "keywords": [
+    "antigravity",
+    "ai",
+    "quota",
+    "dashboard",
+    "monitor"
   ],
   "repository": {
     "type": "git",
@@ -25,7 +32,23 @@
     "commands": [
       {
         "command": "agCockpit.open",
-        "title": "Open Antigravity Cockpit"
+        "title": "Open Antigravity Cockpit",
+        "category": "Antigravity"
+      },
+      {
+        "command": "agCockpit.refresh",
+        "title": "Refresh Quota Data",
+        "category": "Antigravity"
+      },
+      {
+        "command": "agCockpit.showLogs",
+        "title": "Show Logs",
+        "category": "Antigravity"
+      },
+      {
+        "command": "agCockpit.retry",
+        "title": "Retry Connection",
+        "category": "Antigravity"
       }
     ],
     "configuration": {
@@ -34,7 +57,9 @@
         "agCockpit.refreshInterval": {
           "type": "number",
           "default": 60,
-          "description": "Interval in seconds to refresh quota data."
+          "minimum": 10,
+          "maximum": 3600,
+          "description": "Interval in seconds to refresh quota data (10-3600)."
         },
         "agCockpit.showPromptCredits": {
           "type": "boolean",
@@ -47,7 +72,7 @@
             "type": "string"
           },
           "default": [],
-          "description": "Specific models to monitor in the status bar (e.g. 'gpt-4', 'gemini-1.5-pro'). If empty, monitors all models."
+          "description": "Specific models to monitor in the status bar (e.g. 'gpt-4', 'gemini-1.5-pro'). If empty, monitors the lowest quota model."
         },
         "agCockpit.modelOrder": {
           "type": "array",
@@ -56,19 +81,74 @@
           },
           "default": [],
           "description": "User-defined order of models in the dashboard."
+        },
+        "agCockpit.logLevel": {
+          "type": "string",
+          "default": "info",
+          "enum": ["debug", "info", "warn", "error"],
+          "enumDescriptions": [
+            "Show all logs including debug information",
+            "Show info, warnings and errors",
+            "Show warnings and errors only",
+            "Show errors only"
+          ],
+          "description": "Log level for the output channel."
+        },
+        "agCockpit.notificationEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show notifications when quota is exhausted or running low."
+        },
+        "agCockpit.statusBarFormat": {
+          "type": "string",
+          "default": "standard",
+          "enum": ["compact", "standard", "detailed"],
+          "enumDescriptions": [
+            "Show percentage only (e.g. '95%')",
+            "Show model name and percentage (e.g. 'Gemini: 95%')",
+            "Show model name and detailed percentage (e.g. 'Gemini: 95.5%')"
+          ],
+          "description": "Format of the status bar display."
         }
       }
+    },
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "agCockpit.open",
+          "when": "true"
+        },
+        {
+          "command": "agCockpit.refresh",
+          "when": "true"
+        },
+        {
+          "command": "agCockpit.showLogs",
+          "when": "true"
+        },
+        {
+          "command": "agCockpit.retry",
+          "when": "true"
+        }
+      ]
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "tsc -p ./ && npm run copy-webview",
+    "copy-webview": "mkdir -p out/view/webview && cp src/view/webview/*.css src/view/webview/*.js out/view/webview/ 2>/dev/null || true",
     "watch": "tsc -watch -p ./",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "lint:fix": "eslint src --ext ts --fix",
+    "package": "vsce package",
+    "pretest": "npm run compile"
   },
   "devDependencies": {
     "@types/vscode": "^1.90.0",
     "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
     "typescript": "^5.3.0"
   }
 }

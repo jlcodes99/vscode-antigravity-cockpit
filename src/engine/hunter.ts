@@ -1,140 +1,170 @@
 /**
- * Process Hunter Service
+ * Antigravity Cockpit - 进程猎手
+ * 自动检测 Antigravity 进程并提取连接信息
  */
 
-import {exec} from 'child_process';
-import {promisify} from 'util';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import * as https from 'https';
-import {WindowsStrategy, UnixStrategy, platform_strategy} from './strategies';
 import * as process from 'process';
-import {logger} from '../shared/log_service';
+import { WindowsStrategy, UnixStrategy } from './strategies';
+import { logger } from '../shared/log_service';
+import { EnvironmentScanResult, PlatformStrategy } from '../shared/types';
+import { TIMING, PROCESS_NAMES, API_ENDPOINTS } from '../shared/constants';
 
-const exec_async = promisify(exec);
+const execAsync = promisify(exec);
 
-export interface environment_scan_result {
-	extension_port: number;
-	connect_port: number;
-	csrf_token: string;
-}
-
+/**
+ * 进程猎手类
+ * 负责扫描系统进程，找到 Antigravity Language Server
+ */
 export class ProcessHunter {
-	private strategy: platform_strategy;
-	private target_process: string;
+    private strategy: PlatformStrategy;
+    private targetProcess: string;
 
-	constructor() {
-		logger.debug('Initializing ProcessHunter...');
-		logger.debug(`Platform: ${process.platform}, Arch: ${process.arch}`);
-		
-		if (process.platform === 'win32') {
-			this.strategy = new WindowsStrategy();
-			this.target_process = 'language_server_windows_x64.exe';
-			logger.debug('Using Windows Strategy');
-		} else if (process.platform === 'darwin') {
-			this.strategy = new UnixStrategy('darwin');
-			this.target_process = `language_server_macos${process.arch === 'arm64' ? '_arm' : ''}`;
-			logger.debug('Using macOS Strategy');
-		} else {
-			this.strategy = new UnixStrategy('linux');
-			this.target_process = 'language_server_linux';
-			logger.debug('Using Linux Strategy');
-		}
-		
-		logger.debug(`Target Process: ${this.target_process}`);
-	}
+    constructor() {
+        logger.debug('Initializing ProcessHunter...');
+        logger.debug(`Platform: ${process.platform}, Arch: ${process.arch}`);
 
-	async scan_environment(max_attempts: number = 1): Promise<environment_scan_result | null> {
-		logger.info(`Scanning environment, max attempts: ${max_attempts}`);
-		
-		for (let i = 0; i < max_attempts; i++) {
-			logger.debug(`Attempt ${i + 1}/${max_attempts}...`);
-			
-			try {
-				const cmd = this.strategy.get_process_list_command(this.target_process);
-				logger.debug(`Executing: ${cmd}`);
-				
-				const {stdout, stderr} = await exec_async(cmd, {timeout: 2000});
-				
-				if (stderr) {
-					logger.warn(`StdErr: ${stderr}`);
-				}
-				
-				const info = this.strategy.parse_process_info(stdout);
-				
-				if (info) {
-					logger.info(`✅ Found Process: PID=${info.pid}, ExtPort=${info.extension_port}`);
-					
-					const ports = await this.identify_ports(info.pid);
-					logger.debug(`Listening Ports: ${ports.join(', ')}`);
-					
-					if (ports.length > 0) {
-						const valid_port = await this.verify_connection(ports, info.csrf_token);
-						
-						if (valid_port) {
-							logger.info(`✅ Connection Logic Verified: ${valid_port}`);
-							return {
-								extension_port: info.extension_port,
-								connect_port: valid_port,
-								csrf_token: info.csrf_token,
-							};
-						}
-					}
-				}
-			} catch (e: any) {
-				logger.error(`Attempt ${i + 1} failed:`, e.message);
-			}
-			
-			if (i < max_attempts - 1) {
-				await new Promise(r => setTimeout(r, 100));
-			}
-		}
-		
-		return null;
-	}
+        if (process.platform === 'win32') {
+            this.strategy = new WindowsStrategy();
+            this.targetProcess = PROCESS_NAMES.windows;
+            logger.debug('Using Windows Strategy');
+        } else if (process.platform === 'darwin') {
+            this.strategy = new UnixStrategy('darwin');
+            this.targetProcess = process.arch === 'arm64' 
+                ? PROCESS_NAMES.darwin_arm 
+                : PROCESS_NAMES.darwin_x64;
+            logger.debug('Using macOS Strategy');
+        } else {
+            this.strategy = new UnixStrategy('linux');
+            this.targetProcess = PROCESS_NAMES.linux;
+            logger.debug('Using Linux Strategy');
+        }
 
-	private async identify_ports(pid: number): Promise<number[]> {
-		try {
-			const cmd = this.strategy.get_port_list_command(pid);
-			const {stdout} = await exec_async(cmd);
-			return this.strategy.parse_listening_ports(stdout);
-		} catch (e: any) {
-			logger.error('Port identification failed:', e.message);
-			return [];
-		}
-	}
+        logger.debug(`Target Process: ${this.targetProcess}`);
+    }
 
-	private async verify_connection(ports: number[], token: string): Promise<number | null> {
-		for (const port of ports) {
-			if (await this.ping_port(port, token)) {
-				return port;
-			}
-		}
-		return null;
-	}
+    /**
+     * 扫描环境，查找 Antigravity 进程
+     * @param maxAttempts 最大尝试次数
+     */
+    async scanEnvironment(maxAttempts: number = 1): Promise<EnvironmentScanResult | null> {
+        logger.info(`Scanning environment, max attempts: ${maxAttempts}`);
 
-	private ping_port(port: number, token: string): Promise<boolean> {
-		return new Promise(resolve => {
-			const options = {
-				hostname: '127.0.0.1',
-				port,
-				path: '/exa.language_server_pb.LanguageServerService/GetUnleashData',
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'X-Codeium-Csrf-Token': token,
-					'Connect-Protocol-Version': '1',
-				},
-				rejectUnauthorized: false,
-				timeout: 2000,
-			};
+        for (let i = 0; i < maxAttempts; i++) {
+            logger.debug(`Attempt ${i + 1}/${maxAttempts}...`);
 
-			const req = https.request(options, res => resolve(res.statusCode === 200));
-			req.on('error', () => resolve(false));
-			req.on('timeout', () => {
-				req.destroy();
-				resolve(false);
-			});
-			req.write(JSON.stringify({wrapper_data: {}}));
-			req.end();
-		});
-	}
+            try {
+                const cmd = this.strategy.getProcessListCommand(this.targetProcess);
+                logger.debug(`Executing: ${cmd}`);
+
+                const { stdout, stderr } = await execAsync(cmd, { 
+                    timeout: TIMING.PROCESS_CMD_TIMEOUT_MS, 
+                });
+
+                if (stderr) {
+                    logger.warn(`StdErr: ${stderr}`);
+                }
+
+                const info = this.strategy.parseProcessInfo(stdout);
+
+                if (info) {
+                    logger.info(`✅ Found Process: PID=${info.pid}, ExtPort=${info.extensionPort}`);
+
+                    const ports = await this.identifyPorts(info.pid);
+                    logger.debug(`Listening Ports: ${ports.join(', ')}`);
+
+                    if (ports.length > 0) {
+                        const validPort = await this.verifyConnection(ports, info.csrfToken);
+
+                        if (validPort) {
+                            logger.info(`✅ Connection Logic Verified: ${validPort}`);
+                            return {
+                                extensionPort: info.extensionPort,
+                                connectPort: validPort,
+                                csrfToken: info.csrfToken,
+                            };
+                        }
+                    }
+                }
+            } catch (e) {
+                const error = e instanceof Error ? e : new Error(String(e));
+                logger.error(`Attempt ${i + 1} failed: ${error.message}`);
+            }
+
+            if (i < maxAttempts - 1) {
+                await new Promise(r => setTimeout(r, TIMING.PROCESS_SCAN_RETRY_MS));
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 识别进程监听的端口
+     */
+    private async identifyPorts(pid: number): Promise<number[]> {
+        try {
+            const cmd = this.strategy.getPortListCommand(pid);
+            const { stdout } = await execAsync(cmd);
+            return this.strategy.parseListeningPorts(stdout);
+        } catch (e) {
+            const error = e instanceof Error ? e : new Error(String(e));
+            logger.error(`Port identification failed: ${error.message}`);
+            return [];
+        }
+    }
+
+    /**
+     * 验证端口连接
+     */
+    private async verifyConnection(ports: number[], token: string): Promise<number | null> {
+        for (const port of ports) {
+            if (await this.pingPort(port, token)) {
+                return port;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 测试端口是否可用
+     */
+    private pingPort(port: number, token: string): Promise<boolean> {
+        return new Promise(resolve => {
+            const options: https.RequestOptions = {
+                hostname: '127.0.0.1',
+                port,
+                path: API_ENDPOINTS.GET_UNLEASH_DATA,
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Codeium-Csrf-Token': token,
+                    'Connect-Protocol-Version': '1',
+                },
+                rejectUnauthorized: false,
+                timeout: TIMING.PROCESS_CMD_TIMEOUT_MS,
+            };
+
+            const req = https.request(options, res => resolve(res.statusCode === 200));
+            req.on('error', () => resolve(false));
+            req.on('timeout', () => {
+                req.destroy();
+                resolve(false);
+            });
+            req.write(JSON.stringify({ wrapper_data: {} }));
+            req.end();
+        });
+    }
+
+    /**
+     * 获取错误信息
+     */
+    getErrorMessages(): { processNotFound: string; commandNotAvailable: string; requirements: string[] } {
+        return this.strategy.getErrorMessages();
+    }
 }
+
+// 保持向后兼容
+export type environment_scan_result = EnvironmentScanResult;
