@@ -253,8 +253,8 @@ function setupMessageHandling(): void {
  * 设置遥测数据处理
  */
 function setupTelemetryHandling(): void {
-    reactor.onTelemetry((snapshot: QuotaSnapshot) => {
-        const config = configService.getConfig();
+    reactor.onTelemetry(async (snapshot: QuotaSnapshot) => {
+        let config = configService.getConfig();
 
         // 成功获取数据，重置错误状态
         statusBarItem.backgroundColor = undefined;
@@ -271,6 +271,19 @@ function setupTelemetryHandling(): void {
             pinnedGroups: config.pinnedGroups,
             groupOrder: config.groupOrder,
         });
+
+        // 自动将新分组添加到 pinnedGroups（第一次开启分组时默认全部显示在状态栏）
+        if (config.groupingEnabled && snapshot.groups && snapshot.groups.length > 0) {
+            const currentPinnedGroups = config.pinnedGroups;
+            const allGroupIds = snapshot.groups.map(g => g.groupId);
+            
+            // 如果 pinnedGroups 为空，说明是第一次开启分组，自动 pin 全部
+            if (currentPinnedGroups.length === 0) {
+                await configService.updateConfig('pinnedGroups', allGroupIds);
+                // 重新获取配置用于状态栏更新
+                config = configService.getConfig();
+            }
+        }
 
         // 更新状态栏
         updateStatusBar(snapshot, config);
