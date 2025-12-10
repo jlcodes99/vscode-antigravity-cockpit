@@ -83,7 +83,7 @@ const translations: Record<SupportedLocale, TranslationMap> = {
         'profile.description': 'Description',
         'profile.upgrade': 'Upgrade Info',
         'profile.teamsTier': 'Teams Tier',
-        'profile.userId': 'User ID',
+        'profile.userId': 'Internal Tier ID',
         'profile.tabToJump': 'Tab To Jump',
         'profile.stickyModels': 'Sticky Models',
         'profile.commandModels': 'Command Models',
