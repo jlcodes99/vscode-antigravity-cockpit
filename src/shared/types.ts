@@ -280,6 +280,8 @@ export interface DashboardConfig {
     pinnedGroups: string[];
     /** 分组顺序 */
     groupOrder: string[];
+    /** 刷新冷却时间（秒） */
+    refreshInterval: number;
 }
 
 /** 状态栏更新数据 */

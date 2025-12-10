@@ -7,10 +7,10 @@
 export const QUOTA_THRESHOLDS = {
     /** 健康状态阈值 (> 50%) */
     HEALTHY: 50,
-    /** 警告状态阈值 (> 20%) */
-    WARNING: 20,
-    /** 低于此值为危险状态 (<= 20%) */
-    CRITICAL: 20,
+    /** 警告状态阈值 (> 30%) - 黄色 */
+    WARNING: 30,
+    /** 危险状态阈值 (<= 10%) - 红色 */
+    CRITICAL: 10,
 } as const;
 
 /** 时间相关常量 (毫秒) */

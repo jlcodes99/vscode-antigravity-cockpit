@@ -23,16 +23,19 @@
     let isRefreshing = false;
     let dragSrcEl = null;
 
+    // 刷新冷却时间（秒），默认 120 秒
+    let refreshCooldown = 120;
+
     // ============ 初始化 ============
 
     function init() {
         // 恢复状态
         const state = vscode.getState() || {};
-        if (state.lastRefresh) {
+        if (state.lastRefresh && state.refreshCooldown) {
             const now = Date.now();
             const diff = Math.floor((now - state.lastRefresh) / 1000);
-            if (diff < 60) {
-                startCooldown(60 - diff);
+            if (diff < state.refreshCooldown) {
+                startCooldown(state.refreshCooldown - diff);
             }
         }
         
@@ -132,8 +135,8 @@
         vscode.postMessage({ command: 'refresh' });
 
         const now = Date.now();
-        vscode.setState({ ...vscode.getState(), lastRefresh: now });
-        startCooldown(60);
+        vscode.setState({ ...vscode.getState(), lastRefresh: now, refreshCooldown: refreshCooldown });
+        startCooldown(refreshCooldown);
     }
 
 
@@ -149,6 +152,12 @@
         if (message.type === 'telemetry_update') {
             isRefreshing = false;
             updateRefreshButton();
+            
+            // 从配置更新刷新冷却时间
+            if (message.config && message.config.refreshInterval) {
+                refreshCooldown = message.config.refreshInterval;
+            }
+            
             render(message.data, message.config);
         }
     }

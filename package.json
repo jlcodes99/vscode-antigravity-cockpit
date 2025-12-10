@@ -3,7 +3,7 @@
   "displayName": "Antigravity Cockpit",
   "icon": "assets/icon.png",
   "description": "A premium, dashboard-style quota monitor for Antigravity AI.",
-  "version": "1.2.1",
+  "version": "1.2.11",
   "publisher": "jlcodes",
   "engines": {
     "vscode": "^1.90.0"
@@ -107,7 +107,7 @@
         },
         "agCockpit.groupingEnabled": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Enable quota grouping feature. Models sharing the same quota pool will be grouped together."
         },
         "agCockpit.groupingCustomNames": {
@@ -117,7 +117,7 @@
         },
         "agCockpit.groupingShowInStatusBar": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Show quota groups in the status bar instead of individual models."
         },
         "agCockpit.pinnedGroups": {

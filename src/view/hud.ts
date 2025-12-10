@@ -89,6 +89,7 @@ export class CockpitHUD {
                 groupingShowInStatusBar: config.groupingShowInStatusBar,
                 pinnedGroups: config.pinnedGroups,
                 groupOrder: config.groupOrder,
+                refreshInterval: config.refreshInterval,
             });
         }
     }

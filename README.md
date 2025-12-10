@@ -22,7 +22,7 @@ Know *exactly* when to get back to work. Displays both a countdown (e.g., `4h 40
 ### 👆 Interactive Control
 - **Drag & Drop**: Arrange models exactly how you want them. Your layout is saved automatically.
 - **Pin to Bar**: Toggle which models appear in your VS Code status bar directly from the card.
-- **One-Click Refresh**: Need data now? Hit the refresh button (60s cooldown).
+- **One-Click Refresh**: Need data now? Hit the refresh button (120s cooldown).
 
 ### 📊 Smart Status Bar
 - Shows pinned models side-by-side (e.g., `🚀 Gemini 3 Pro (High): 100% | Claude Sonnet 4.5: 86%`).
@@ -30,7 +30,7 @@ Know *exactly* when to get back to work. Displays both a countdown (e.g., `4h 40
 - Customizable display formats: compact, standard, or detailed.
 
 ### 🔔 Smart Notifications
-- Get notified when a model's quota is **exhausted** or running **low** (< 20%).
+- Get notified when a model's quota is **exhausted** or running **low** (< 30%).
 - Notifications can be disabled in settings if you prefer a quiet experience.
 
 ### 🌐 Multi-language Support
@@ -69,7 +69,7 @@ We believe in **Interactivity over Configuration**. All major preferences (Sorti
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `agCockpit.refreshInterval` | `60` | Polling frequency in seconds (10-3600) |
+| `agCockpit.refreshInterval` | `120` | Polling frequency in seconds (10-3600) |
 | `agCockpit.showPromptCredits` | `false` | Show prompt credits in dashboard |
 | `agCockpit.pinnedModels` | `[]` | Models to show in status bar |
 | `agCockpit.logLevel` | `info` | Log verbosity: debug, info, warn, error |
@@ -103,7 +103,7 @@ We believe in **Interactivity over Configuration**. All major preferences (Sorti
 
 ```bash
 # Download or build the .vsix file first, then:
-code --install-extension antigravity-cockpit-1.1.0.vsix
+code --install-extension antigravity-cockpit-1.2.11.vsix
 ```
 
 ### Method 3: From VSIX File (拖拽安装)
@@ -159,7 +159,7 @@ npm run package
 
 **Option A: Command Line**
 ```bash
-code --install-extension antigravity-cockpit-1.1.0.vsix
+code --install-extension antigravity-cockpit-1.2.11.vsix
 ```
 
 **Option B: Drag & Drop**
@@ -228,6 +228,15 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ---
 
 ## 📝 Changelog
+
+### v1.2.0
+- ✨ Added quota grouping feature - models sharing the same quota pool are grouped together
+- ✨ Added anchor consensus naming mechanism for groups
+- ✨ Added drag-and-drop sorting for groups
+- ✨ Added status bar support for group display
+- ✨ Added 3-tier status bar color (green/yellow/red)
+- 🔧 Fixed refresh cooldown to respect user configuration
+- 🔧 Updated threshold: WARNING=30%, CRITICAL=10%
 
 ### v1.1.0
 - ✨ Added quota exhaustion notifications

@@ -270,6 +270,7 @@ function setupTelemetryHandling(): void {
             groupingShowInStatusBar: config.groupingShowInStatusBar,
             pinnedGroups: config.pinnedGroups,
             groupOrder: config.groupOrder,
+            refreshInterval: config.refreshInterval,
         });
 
         // 自动将新分组添加到 pinnedGroups（第一次开启分组时默认全部显示在状态栏）
@@ -423,10 +424,15 @@ function updateStatusBar(snapshot: QuotaSnapshot, config: CockpitConfig): void {
         statusBarItem.text = `$(rocket) ${t('statusBar.ready')}`;
     }
 
-    // 设置背景颜色
-    if (minPercentage < QUOTA_THRESHOLDS.WARNING) {
+    // 设置背景颜色（三档区分）
+    if (minPercentage <= QUOTA_THRESHOLDS.CRITICAL) {
+        // 危险：红色背景
         statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+    } else if (minPercentage <= QUOTA_THRESHOLDS.WARNING) {
+        // 警告：黄色背景
+        statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
     } else {
+        // 正常：无背景
         statusBarItem.backgroundColor = undefined;
     }
 }
@@ -527,6 +533,7 @@ function handleOfflineState(): void {
         groupingShowInStatusBar: false,
         pinnedGroups: [],
         groupOrder: [],
+        refreshInterval: 120,
     });
 }
 
