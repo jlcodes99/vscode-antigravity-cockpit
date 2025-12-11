@@ -22,7 +22,7 @@ export const TIMING = {
     /** HTTP 请求超时 */
     HTTP_TIMEOUT_MS: 5000,
     /** 进程命令执行超时 */
-    PROCESS_CMD_TIMEOUT_MS: 2000,
+    PROCESS_CMD_TIMEOUT_MS: 15000,
     /** 刷新冷却时间 (秒) */
     REFRESH_COOLDOWN_SECONDS: 60,
 } as const;
