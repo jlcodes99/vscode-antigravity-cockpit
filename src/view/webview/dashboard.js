@@ -209,9 +209,11 @@
     // ============ 工具函数 ============
 
     function getHealthColor(percentage) {
-        if (percentage > 50) return 'var(--success)';
-        if (percentage > 20) return 'var(--warning)';
-        return 'var(--danger)';
+        // 与 QUOTA_THRESHOLDS 保持一致 (HEALTHY=50, WARNING=30, CRITICAL=10)
+        if (percentage > 50) return 'var(--success)';  // 绿色 > 50%
+        if (percentage > 30) return 'var(--warning)';  // 黄色 30-50%
+        if (percentage > 10) return 'var(--danger)';   // 红色 10-30%
+        return 'var(--text-secondary)';                // 灰色 ≤ 10% (耗尽)
     }
 
     function togglePin(modelId) {
@@ -378,14 +380,7 @@
             <div class="icon">🚀</div>
             <h2>${i18n['dashboard.offline'] || 'Systems Offline'}</h2>
             <p>${errorMessage || i18n['dashboard.offlineDesc'] || 'Could not detect Antigravity process. Please ensure Antigravity is running.'}</p>
-            <div class="offline-actions">
-                <button class="btn-primary" onclick="retryConnection()">
-                    ${i18n['help.retry'] || 'Retry Connection'}
-                </button>
-                <button class="btn-secondary" onclick="openLogs()">
-                    ${i18n['help.openLogs'] || 'Open Logs'}
-                </button>
-            </div>
+            <p class="offline-hint">${i18n['dashboard.offlineHint'] || 'Use the status bar button to retry connection.'}</p>
         `;
         dashboard.appendChild(card);
     }

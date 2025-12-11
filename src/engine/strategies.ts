@@ -189,64 +189,154 @@ export class WindowsStrategy implements PlatformStrategy {
 export class UnixStrategy implements PlatformStrategy {
     private platform: string;
     private targetPid: number = 0;
+    /** 可用的端口检测命令: 'lsof', 'ss', 或 'netstat' */
+    private availablePortCommand: 'lsof' | 'ss' | 'netstat' | null = null;
+    /** 是否已检测过命令可用性 */
+    private portCommandChecked: boolean = false;
 
     constructor(platform: string) {
         this.platform = platform;
         logger.debug(`[UnixStrategy] Initialized, platform: ${platform}`);
     }
 
+    /**
+     * 检测系统上可用的端口检测命令
+     * 优先顺序: lsof > ss > netstat
+     */
+    private async detectAvailablePortCommand(): Promise<void> {
+        if (this.portCommandChecked) {
+            return;
+        }
+        this.portCommandChecked = true;
+
+        const { exec } = require('child_process');
+        const { promisify } = require('util');
+        const execAsync = promisify(exec);
+
+        const commands = ['lsof', 'ss', 'netstat'] as const;
+        
+        for (const cmd of commands) {
+            try {
+                await execAsync(`which ${cmd}`, { timeout: 3000 });
+                this.availablePortCommand = cmd;
+                logger.info(`[UnixStrategy] Port command available: ${cmd}`);
+                return;
+            } catch {
+                // 命令不可用，继续尝试下一个
+            }
+        }
+
+        logger.warn('[UnixStrategy] No port detection command available (lsof/ss/netstat)');
+    }
+
+    /**
+     * 判断命令行是否属于 Antigravity 进程
+     */
+    private isAntigravityProcess(commandLine: string): boolean {
+        const lowerCmd = commandLine.toLowerCase();
+        // 检查 --app_data_dir antigravity 参数
+        if (/--app_data_dir\s+antigravity\b/i.test(commandLine)) {
+            return true;
+        }
+        // 检查路径中是否包含 antigravity
+        if (lowerCmd.includes('/antigravity/') || lowerCmd.includes('\\antigravity\\')) {
+            return true;
+        }
+        return false;
+    }
+
     getProcessListCommand(processName: string): string {
-        return `pgrep -fl ${processName}`;
+        // 使用 ps -ww 保证命令行不被截断
+        // -ww: 无限宽度
+        // -eo: 自定义输出格式
+        // pid,ppid,args: 进程ID、父进程ID、完整命令行
+        return `ps -ww -eo pid,ppid,args | grep "${processName}" | grep -v grep`;
     }
 
     parseProcessInfo(stdout: string): ProcessInfo | null {
         logger.debug('[UnixStrategy] Parsing process info...');
 
-        const lines = stdout.split('\n');
+        const lines = stdout.split('\n').filter(line => line.trim());
         logger.debug(`[UnixStrategy] Output contains ${lines.length} lines`);
 
+        const currentPid = process.pid;
+        const candidates: Array<{ pid: number; ppid: number; extensionPort: number; csrfToken: string }> = [];
+
         for (const line of lines) {
-            if (line.includes('--extension_server_port')) {
-                logger.debug(`[UnixStrategy] Found matching line: ${line.substring(0, 100)}...`);
+            // ps -ww -eo pid,ppid,args 格式: "  PID  PPID COMMAND..."
+            const parts = line.trim().split(/\s+/);
+            if (parts.length < 3) {
+                continue;
+            }
 
-                const parts = line.trim().split(/\s+/);
-                const pid = parseInt(parts[0], 10);
-                const cmd = line.substring(parts[0].length).trim();
+            const pid = parseInt(parts[0], 10);
+            const ppid = parseInt(parts[1], 10);
+            const cmd = parts.slice(2).join(' ');
 
-                const portMatch = cmd.match(/--extension_server_port[=\s]+(\d+)/);
-                const tokenMatch = cmd.match(/--csrf_token[=\s]+([a-zA-Z0-9-]+)/);
+            if (isNaN(pid) || isNaN(ppid)) {
+                continue;
+            }
 
-                if (!tokenMatch?.[1]) {
-                    logger.warn('[UnixStrategy] Cannot extract CSRF Token from command line');
-                    continue;
-                }
+            const portMatch = cmd.match(/--extension_server_port[=\s]+(\d+)/);
+            const tokenMatch = cmd.match(/--csrf_token[=\s]+([a-zA-Z0-9-]+)/i);
 
-                logger.debug(`[UnixStrategy] Parse success: PID=${pid}, ExtPort=${portMatch?.[1] || 0}`);
-
-                // Save target PID for later port filtering
-                this.targetPid = pid;
-
-                return {
-                    pid,
-                    extensionPort: portMatch ? parseInt(portMatch[1], 10) : 0,
-                    csrfToken: tokenMatch[1],
-                };
+            // 必须同时满足：有 csrf_token 且是 Antigravity 进程
+            if (tokenMatch?.[1] && this.isAntigravityProcess(cmd)) {
+                const extensionPort = portMatch?.[1] ? parseInt(portMatch[1], 10) : 0;
+                const csrfToken = tokenMatch[1];
+                candidates.push({ pid, ppid, extensionPort, csrfToken });
+                logger.debug(`[UnixStrategy] Found candidate: PID=${pid}, PPID=${ppid}, ExtPort=${extensionPort}`);
             }
         }
 
-        logger.warn('[UnixStrategy] No line containing --extension_server_port found in output');
-        return null;
+        if (candidates.length === 0) {
+            logger.warn('[UnixStrategy] No Antigravity process found');
+            return null;
+        }
+
+        // 1. 优先选择当前 VSCode 进程的子进程
+        const child = candidates.find(c => c.ppid === currentPid);
+        if (child) {
+            logger.info(`[UnixStrategy] Found child process: PID=${child.pid}`);
+            this.targetPid = child.pid;
+            return { pid: child.pid, extensionPort: child.extensionPort, csrfToken: child.csrfToken };
+        }
+
+        // 2. 回退到第一个候选进程
+        const first = candidates[0];
+        logger.info(`[UnixStrategy] Using first candidate: PID=${first.pid}`);
+        this.targetPid = first.pid;
+        return { pid: first.pid, extensionPort: first.extensionPort, csrfToken: first.csrfToken };
     }
 
     getPortListCommand(pid: number): string {
         // Save target PID
         this.targetPid = pid;
 
+        // macOS: 优先使用 lsof
         if (this.platform === 'darwin') {
-            // macOS: Use lsof to list all TCP LISTEN ports, then filter by PID with grep
             return `lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | grep -E "^\\S+\\s+${pid}\\s"`;
         }
-        return `ss -tlnp 2>/dev/null | grep "pid=${pid}" || lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | grep -E "^\\S+\\s+${pid}\\s"`;
+
+        // Linux: 根据检测到的可用命令选择
+        switch (this.availablePortCommand) {
+            case 'lsof':
+                return `lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | grep -E "^\\S+\\s+${pid}\\s"`;
+            case 'ss':
+                return `ss -tlnp 2>/dev/null | grep "pid=${pid},"`;
+            case 'netstat':
+                return `netstat -tulpn 2>/dev/null | grep ${pid}`;
+            default:
+                // 回退：尝试多个命令
+                return `ss -tlnp 2>/dev/null | grep "pid=${pid}," || lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | grep -E "^\\S+\\s+${pid}\\s" || netstat -tulpn 2>/dev/null | grep ${pid}`;
+        }
+    }
+
+    /**
+     * 确保端口检测命令可用（在获取端口列表前调用）
+     */
+    async ensurePortCommandAvailable(): Promise<void> {
+        await this.detectAvailablePortCommand();
     }
 
     parseListeningPorts(stdout: string): number[] {

@@ -125,8 +125,18 @@ body {
 
 .offline-card p {
     color: var(--text-secondary);
-    margin-bottom: 25px;
+    margin-bottom: 15px;
     line-height: 1.6;
+}
+
+.offline-card .offline-hint {
+    font-size: 13px;
+    color: var(--accent);
+    margin-top: 20px;
+    padding: 10px 16px;
+    background: rgba(47, 129, 247, 0.1);
+    border-radius: 8px;
+    border: 1px dashed rgba(47, 129, 247, 0.3);
 }
 
 .offline-actions {

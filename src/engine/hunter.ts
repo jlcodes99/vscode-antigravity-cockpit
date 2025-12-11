@@ -47,9 +47,9 @@ export class ProcessHunter {
 
     /**
      * 扫描环境，查找 Antigravity 进程
-     * @param maxAttempts 最大尝试次数
+     * @param maxAttempts 最大尝试次数（默认 3 次）
      */
-    async scanEnvironment(maxAttempts: number = 1): Promise<EnvironmentScanResult | null> {
+    async scanEnvironment(maxAttempts: number = 3): Promise<EnvironmentScanResult | null> {
         logger.info(`Scanning environment, max attempts: ${maxAttempts}`);
 
         for (let i = 0; i < maxAttempts; i++) {
@@ -91,6 +91,21 @@ export class ProcessHunter {
             } catch (e) {
                 const error = e instanceof Error ? e : new Error(String(e));
                 logger.error(`Attempt ${i + 1} failed: ${error.message}`);
+                
+                // Windows: WMIC 失败时自动切换到 PowerShell
+                if (process.platform === 'win32' && this.strategy instanceof WindowsStrategy) {
+                    const winStrategy = this.strategy as WindowsStrategy;
+                    if (!winStrategy.isUsingPowershell() && 
+                        (error.message.includes('not recognized') || 
+                         error.message.includes('not found') ||
+                         error.message.includes('不是内部或外部命令'))) {
+                        logger.warn('WMIC command failed, switching to PowerShell...');
+                        winStrategy.setUsePowershell(true);
+                        // 不消耗重试次数，立即重试
+                        i--;
+                        continue;
+                    }
+                }
             }
 
             if (i < maxAttempts - 1) {
@@ -106,6 +121,11 @@ export class ProcessHunter {
      */
     private async identifyPorts(pid: number): Promise<number[]> {
         try {
+            // 确保端口检测命令可用（Unix 平台）
+            if ('ensurePortCommandAvailable' in this.strategy) {
+                await (this.strategy as any).ensurePortCommandAvailable();
+            }
+            
             const cmd = this.strategy.getPortListCommand(pid);
             const { stdout } = await execAsync(cmd);
             return this.strategy.parseListeningPorts(stdout);

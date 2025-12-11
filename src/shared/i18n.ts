@@ -49,6 +49,7 @@ const translations: Record<SupportedLocale, TranslationMap> = {
         'dashboard.resetOrder': 'Reset Order',
         'profile.planDetails': 'Plan',
         'profile.togglePlan': 'Toggle Plan Details',
+        'dashboard.offlineHint': 'Use the status bar button to retry connection.',
 
         // 通知
         'notify.refreshing': 'Refreshing quota data...',
@@ -149,6 +150,7 @@ const translations: Record<SupportedLocale, TranslationMap> = {
         'dashboard.resetOrder': '重置排序',
         'profile.planDetails': '计划',
         'profile.togglePlan': '切换计划详情显示',
+        'dashboard.offlineHint': '请重试连接。',
 
         // 通知
         'notify.refreshing': '正在刷新配额数据...',
