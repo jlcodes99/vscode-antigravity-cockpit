@@ -496,12 +496,19 @@ function generateQuotaTooltip(snapshot: QuotaSnapshot, config: CockpitConfig): v
     const planInfo = snapshot.userInfo?.planName ? ` | ${snapshot.userInfo.planName}` : '';
     md.appendMarkdown(`**🚀 ${t('dashboard.title')}${planInfo}**\n\n`);
 
-    // 按配额百分比排序
-    const sortedModels = [...snapshot.models].sort((a, b) => {
-        const pctA = a.remainingPercentage ?? 100;
-        const pctB = b.remainingPercentage ?? 100;
-        return pctA - pctB;
-    });
+    // 排序逻辑与仪表盘保持一致
+    let sortedModels = [...snapshot.models];
+    if (config.modelOrder && config.modelOrder.length > 0) {
+        // 有自定义顺序时，按用户拖拽设置的顺序排序
+        const orderMap = new Map<string, number>();
+        config.modelOrder.forEach((id, index) => orderMap.set(id, index));
+        sortedModels.sort((a, b) => {
+            const idxA = orderMap.has(a.modelId) ? orderMap.get(a.modelId)! : 99999;
+            const idxB = orderMap.has(b.modelId) ? orderMap.get(b.modelId)! : 99999;
+            return idxA - idxB;
+        });
+    }
+    // 没有自定义顺序时，保持 API 返回的原始顺序
 
     // 构建 Markdown 表格
     // 表头留空以保持整洁，或者使用简单的符号
