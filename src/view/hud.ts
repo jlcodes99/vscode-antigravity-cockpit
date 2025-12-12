@@ -90,6 +90,8 @@ export class CockpitHUD {
                 pinnedGroups: config.pinnedGroups,
                 groupOrder: config.groupOrder,
                 refreshInterval: config.refreshInterval,
+                warningThreshold: config.warningThreshold,
+                criticalThreshold: config.criticalThreshold,
             });
         }
     }
