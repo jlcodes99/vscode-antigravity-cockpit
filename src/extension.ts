@@ -418,6 +418,7 @@ function setupTelemetryHandling(): void {
             pinnedGroups: config.pinnedGroups,
             groupOrder: config.groupOrder,
             refreshInterval: config.refreshInterval,
+            notificationEnabled: config.notificationEnabled,
             warningThreshold: config.warningThreshold,
             criticalThreshold: config.criticalThreshold,
             lastSuccessfulUpdate: lastSuccessfulUpdate,
@@ -873,6 +874,7 @@ function handleOfflineState(): void {
         pinnedGroups: [],
         groupOrder: [],
         refreshInterval: 120,
+        notificationEnabled: false,
     });
 }
 

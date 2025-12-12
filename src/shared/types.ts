@@ -325,6 +325,8 @@ export interface DashboardConfig {
     groupOrder: string[];
     /** 刷新冷却时间（秒） */
     refreshInterval: number;
+    /** 是否启用通知 */
+    notificationEnabled: boolean;
     /** 警告阈值 (%) */
     warningThreshold?: number;
     /** 危险阈值 (%) */
