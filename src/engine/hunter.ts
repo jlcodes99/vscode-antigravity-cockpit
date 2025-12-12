@@ -75,6 +75,8 @@ export class ProcessHunter {
      * 按进程名扫描
      */
     private async scanByProcessName(maxAttempts: number): Promise<EnvironmentScanResult | null> {
+        let powershellTimeoutRetried = false; // 追踪 PowerShell 超时是否已重试过
+
         for (let i = 0; i < maxAttempts; i++) {
             logger.debug(`Attempt ${i + 1}/${maxAttempts} (by process name)...`);
 
@@ -82,8 +84,8 @@ export class ProcessHunter {
                 const cmd = this.strategy.getProcessListCommand(this.targetProcess);
                 logger.debug(`Executing: ${cmd}`);
 
-                const { stdout, stderr } = await execAsync(cmd, { 
-                    timeout: TIMING.PROCESS_CMD_TIMEOUT_MS, 
+                const { stdout, stderr } = await execAsync(cmd, {
+                    timeout: TIMING.PROCESS_CMD_TIMEOUT_MS,
                 });
 
                 if (stderr) {
@@ -99,18 +101,31 @@ export class ProcessHunter {
             } catch (e) {
                 const error = e instanceof Error ? e : new Error(String(e));
                 logger.error(`Attempt ${i + 1} failed: ${error.message}`);
-                
+
                 // Windows: WMIC 失败时自动切换到 PowerShell
                 if (process.platform === 'win32' && this.strategy instanceof WindowsStrategy) {
                     const winStrategy = this.strategy as WindowsStrategy;
-                    if (!winStrategy.isUsingPowershell() && 
-                        (error.message.includes('not recognized') || 
+                    if (!winStrategy.isUsingPowershell() &&
+                        (error.message.includes('not recognized') ||
                          error.message.includes('not found') ||
                          error.message.includes('不是内部或外部命令'))) {
                         logger.warn('WMIC command failed, switching to PowerShell...');
                         winStrategy.setUsePowershell(true);
                         // 不消耗重试次数，立即重试
                         i--;
+                        continue;
+                    }
+
+                    // PowerShell 超时特殊处理：首次超时不消耗重试次数
+                    if (winStrategy.isUsingPowershell() &&
+                        !powershellTimeoutRetried &&
+                        (error.message.toLowerCase().includes('timeout') ||
+                         error.message.toLowerCase().includes('timed out'))) {
+                        logger.warn('PowerShell command timed out (likely cold start), retrying...');
+                        powershellTimeoutRetried = true;
+                        // 不消耗重试次数，给 PowerShell 预热时间后重试
+                        i--;
+                        await new Promise(r => setTimeout(r, 1000)); // 等待 1 秒让 PowerShell 预热
                         continue;
                     }
                 }

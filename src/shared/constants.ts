@@ -24,8 +24,8 @@ export const TIMING = {
     PROCESS_SCAN_RETRY_MS: 100,
     /** HTTP 请求超时 */
     HTTP_TIMEOUT_MS: 5000,
-    /** 进程命令执行超时 */
-    PROCESS_CMD_TIMEOUT_MS: 2000,
+    /** 进程命令执行超时（增加到 8000ms 以兼容 PowerShell 冷启动） */
+    PROCESS_CMD_TIMEOUT_MS: 8000,
     /** 刷新冷却时间 (秒) */
     REFRESH_COOLDOWN_SECONDS: 60,
 } as const;
