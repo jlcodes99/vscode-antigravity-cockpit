@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.19] - 2025-12-13
+
+### Security
+- 诊断日志中的敏感信息（csrf_token）脱敏处理，防止信息泄露
+
+---
+
 ## [1.4.18] - 2025-12-13
 
 ### Added

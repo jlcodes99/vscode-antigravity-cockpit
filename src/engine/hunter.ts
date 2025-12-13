@@ -286,15 +286,17 @@ export class ProcessHunter {
             
             const { stdout, stderr } = await execAsync(diagCmd, { timeout: 10000 });
             
+            // 脱敏处理：隐藏 csrf_token，防止在日志中泄露敏感信息
+            const sanitize = (text: string) => text.replace(/(--csrf_token[=\s]+)([a-f0-9-]+)/gi, '$1***REDACTED***');
             if (stdout && stdout.trim()) {
-                logger.info(`📋 Related processes found:\n${stdout.substring(0, 2000)}`);
+                logger.info(`📋 Related processes found:\n${sanitize(stdout).substring(0, 2000)}`);
             } else {
                 logger.warn('❌ No related processes found (language_server/antigravity)');
                 logger.info('💡 This usually means Antigravity is not running or the process name has changed.');
             }
             
             if (stderr && stderr.trim()) {
-                logger.warn(`Diagnostic stderr: ${stderr.substring(0, 500)}`);
+                logger.warn(`Diagnostic stderr: ${sanitize(stderr).substring(0, 500)}`);
             }
         } catch (e) {
             const error = e instanceof Error ? e : new Error(String(e));
