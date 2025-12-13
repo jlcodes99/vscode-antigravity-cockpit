@@ -231,28 +231,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 Changelog
 
-### v1.2.0
-- ✨ Added quota grouping feature - models sharing the same quota pool are grouped together
-- ✨ Added anchor consensus naming mechanism for groups
-- ✨ Added drag-and-drop sorting for groups
-- ✨ Added status bar support for group display
-- ✨ Added 3-tier status bar color (green/yellow/red)
-- 🔧 Fixed refresh cooldown to respect user configuration
-- 🔧 Updated threshold: WARNING=30%, CRITICAL=10%
-
-### v1.1.0
-- ✨ Added quota exhaustion notifications
-- ✨ Added multi-language support (English, Chinese)
-- ✨ Added offline status handling with retry button
-- ✨ Added VS Code theme integration
-- ✨ Added drag handle visual indicator
-- 🔧 Refactored codebase for better maintainability
-- 🔧 Separated HTML/CSS/JS into external files
-- 🔧 Added ESLint configuration
-- 🐛 Fixed various type safety issues
-
-### v1.0.2
-- Initial public release
+For a complete list of changes and version history, see [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
