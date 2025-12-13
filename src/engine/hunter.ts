@@ -76,6 +76,8 @@ export class ProcessHunter {
      */
     private async scanByProcessName(maxAttempts: number): Promise<EnvironmentScanResult | null> {
         let powershellTimeoutRetried = false; // 追踪 PowerShell 超时是否已重试过
+        let strategySwitchCount = 0; // 追踪 PowerShell/WMIC 切换次数，防止无限循环
+        const MAX_STRATEGY_SWITCHES = 2; // 最多切换 2 次（PowerShell → WMIC → PowerShell）
 
         for (let i = 0; i < maxAttempts; i++) {
             logger.debug(`Attempt ${i + 1}/${maxAttempts} (by process name)...`);
@@ -88,8 +90,15 @@ export class ProcessHunter {
                     timeout: TIMING.PROCESS_CMD_TIMEOUT_MS,
                 });
 
-                if (stderr) {
-                    logger.warn(`StdErr: ${stderr}`);
+                // 记录 stderr 以便调试
+                if (stderr && stderr.trim()) {
+                    logger.warn(`Command stderr: ${stderr.substring(0, 500)}`);
+                }
+
+                // 检查 stdout 是否为空或仅包含空白
+                if (!stdout || !stdout.trim()) {
+                    logger.debug('Command returned empty output, process may not be running');
+                    continue;
                 }
 
                 const candidates = this.strategy.parseProcessInfo(stdout);
@@ -109,32 +118,67 @@ export class ProcessHunter {
                 }
             } catch (e) {
                 const error = e instanceof Error ? e : new Error(String(e));
-                logger.error(`Attempt ${i + 1} failed: ${error.message}`);
+                const errorMsg = error.message.toLowerCase();
+                
+                // 构建详细的错误信息
+                const detailMsg = `Attempt ${i + 1} failed: ${error.message}`;
+                logger.error(detailMsg);
 
-                // Windows: WMIC 失败时自动切换到 PowerShell
+                // Windows 特定处理
                 if (process.platform === 'win32' && this.strategy instanceof WindowsStrategy) {
                     const winStrategy = this.strategy as WindowsStrategy;
-                    if (!winStrategy.isUsingPowershell() &&
-                        (error.message.includes('not recognized') ||
-                         error.message.includes('not found') ||
-                         error.message.includes('不是内部或外部命令'))) {
-                        logger.warn('WMIC command failed, switching to PowerShell...');
-                        winStrategy.setUsePowershell(true);
-                        // 不消耗重试次数，立即重试
-                        i--;
-                        continue;
+                    const currentlyUsingPowershell = winStrategy.isUsingPowershell();
+                    
+                    // 检测 PowerShell 执行策略问题
+                    if (errorMsg.includes('cannot be loaded because running scripts is disabled') ||
+                        errorMsg.includes('executionpolicy') ||
+                        errorMsg.includes('禁止运行脚本')) {
+                        logger.error('⚠️ PowerShell execution policy may be blocking scripts. Try running: Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned');
+                    }
+                    
+                    // 检测 WMI 服务问题
+                    if (errorMsg.includes('rpc server') || 
+                        errorMsg.includes('wmi') ||
+                        errorMsg.includes('invalid class') ||
+                        errorMsg.includes('无效类')) {
+                        logger.error('⚠️ WMI service may not be running. Try: net start winmgmt');
+                    }
+
+                    // 策略切换逻辑（防止无限循环）
+                    if (strategySwitchCount < MAX_STRATEGY_SWITCHES) {
+                        // 检测需要切换策略的错误
+                        const needsSwitch = 
+                            errorMsg.includes('not recognized') ||
+                            errorMsg.includes('not found') ||
+                            errorMsg.includes('不是内部或外部命令') ||
+                            errorMsg.includes('无法识别') ||
+                            errorMsg.includes('cmdlet') ||
+                            errorMsg.includes('get-ciminstance') ||
+                            errorMsg.includes('exception') ||
+                            errorMsg.includes('异常');
+                        
+                        if (needsSwitch) {
+                            const newStrategy = !currentlyUsingPowershell;
+                            logger.warn(`${currentlyUsingPowershell ? 'PowerShell' : 'WMIC'} command failed, switching to ${newStrategy ? 'PowerShell' : 'WMIC'}...`);
+                            winStrategy.setUsePowershell(newStrategy);
+                            strategySwitchCount++;
+                            // 不消耗重试次数，立即重试
+                            i--;
+                            continue;
+                        }
                     }
 
                     // PowerShell 超时特殊处理：首次超时不消耗重试次数
-                    if (winStrategy.isUsingPowershell() &&
+                    if (currentlyUsingPowershell &&
                         !powershellTimeoutRetried &&
-                        (error.message.toLowerCase().includes('timeout') ||
-                         error.message.toLowerCase().includes('timed out'))) {
-                        logger.warn('PowerShell command timed out (likely cold start), retrying...');
+                        (errorMsg.includes('timeout') ||
+                         errorMsg.includes('timed out') ||
+                         errorMsg.includes('超时'))) {
+                        logger.warn('PowerShell command timed out (likely cold start), retrying with longer wait...');
                         powershellTimeoutRetried = true;
                         // 不消耗重试次数，给 PowerShell 预热时间后重试
                         i--;
-                        await new Promise(r => setTimeout(r, 1000)); // 等待 1 秒让 PowerShell 预热
+                        await new Promise(r => setTimeout(r, 2000)); // 等待 2 秒让 PowerShell 预热
                         continue;
                     }
                 }
@@ -224,25 +268,46 @@ export class ProcessHunter {
     private async runDiagnostics(): Promise<void> {
         logger.warn('⚠️ All scan attempts failed, running diagnostics...');
         logger.info(`Target process name: ${this.targetProcess}`);
+        logger.info(`Platform: ${process.platform}, Arch: ${process.arch}`);
+        
+        // Windows 特定诊断
+        if (process.platform === 'win32') {
+            logger.info('📋 Windows Troubleshooting Tips:');
+            logger.info('  1. Ensure Antigravity/Windsurf is running');
+            logger.info('  2. Check if language_server_windows_x64.exe is in Task Manager');
+            logger.info('  3. Try restarting Antigravity/VS Code');
+            logger.info('  4. If PowerShell errors occur, try: Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned');
+            logger.info('  5. If WMI errors occur, try: net start winmgmt (run as admin)');
+        }
         
         try {
             const diagCmd = this.strategy.getDiagnosticCommand();
             logger.debug(`Diagnostic command: ${diagCmd}`);
             
-            const { stdout, stderr } = await execAsync(diagCmd, { timeout: 5000 });
+            const { stdout, stderr } = await execAsync(diagCmd, { timeout: 10000 });
             
-            if (stdout.trim()) {
-                logger.info(`📋 Related processes found:\n${stdout}`);
+            if (stdout && stdout.trim()) {
+                logger.info(`📋 Related processes found:\n${stdout.substring(0, 2000)}`);
             } else {
                 logger.warn('❌ No related processes found (language_server/antigravity)');
+                logger.info('💡 This usually means Antigravity is not running or the process name has changed.');
             }
             
-            if (stderr) {
-                logger.warn(`Diagnostic stderr: ${stderr}`);
+            if (stderr && stderr.trim()) {
+                logger.warn(`Diagnostic stderr: ${stderr.substring(0, 500)}`);
             }
         } catch (e) {
             const error = e instanceof Error ? e : new Error(String(e));
             logger.error(`Diagnostic command failed: ${error.message}`);
+            
+            // 为用户提供进一步的诊断建议
+            if (process.platform === 'win32') {
+                logger.info('💡 Try running this command manually in PowerShell to debug:');
+                logger.info('   Get-Process | Where-Object { $_.ProcessName -match "language|antigravity" }');
+            } else {
+                logger.info('💡 Try running this command manually in Terminal to debug:');
+                logger.info('   ps aux | grep -E "language|antigravity"');
+            }
         }
     }
 
@@ -252,8 +317,8 @@ export class ProcessHunter {
     private async identifyPorts(pid: number): Promise<number[]> {
         try {
             // 确保端口检测命令可用（Unix 平台）
-            if ('ensurePortCommandAvailable' in this.strategy) {
-                await (this.strategy as any).ensurePortCommandAvailable();
+            if (this.strategy instanceof UnixStrategy) {
+                await this.strategy.ensurePortCommandAvailable();
             }
             
             const cmd = this.strategy.getPortListCommand(pid);

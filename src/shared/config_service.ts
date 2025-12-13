@@ -107,10 +107,10 @@ class ConfigService {
     async togglePinnedModel(modelId: string): Promise<string[]> {
         logger.info(`Toggling pin state for model: ${modelId}`);
         const config = this.getConfig();
-        let pinnedModels = [...config.pinnedModels];
+        const pinnedModels = [...config.pinnedModels];
 
         const existingIndex = pinnedModels.findIndex(
-            p => p.toLowerCase() === modelId.toLowerCase()
+            p => p.toLowerCase() === modelId.toLowerCase(),
         );
 
         if (existingIndex > -1) {
@@ -195,7 +195,7 @@ class ConfigService {
     async togglePinnedGroup(groupId: string): Promise<string[]> {
         logger.info(`Toggling pin state for group: ${groupId}`);
         const config = this.getConfig();
-        let pinnedGroups = [...config.pinnedGroups];
+        const pinnedGroups = [...config.pinnedGroups];
 
         const existingIndex = pinnedGroups.indexOf(groupId);
 

@@ -210,7 +210,7 @@ function setupMessageHandling(): void {
                 }
                 break;
 
-            case 'resetOrder':
+            case 'resetOrder': {
                 const currentConfig = configService.getConfig();
                 if (currentConfig.groupingEnabled) {
                     logger.info('User reset group order to default');
@@ -221,6 +221,7 @@ function setupMessageHandling(): void {
                 }
                 reactor.reprocess();
                 break;
+            }
 
             case 'refresh':
                 logger.info('User triggered manual refresh');
@@ -253,12 +254,12 @@ function setupMessageHandling(): void {
                 reactor.reprocess();
                 break;
 
-            case 'toggleGrouping':
+            case 'toggleGrouping': {
                 logger.info('User toggled grouping display');
                 const enabled = await configService.toggleGroupingEnabled();
                 // 用户期望：切换到分组模式时，状态栏默认也显示分组
                 if (enabled) {
-                    let config = configService.getConfig();
+                    const config = configService.getConfig();
                     if (!config.groupingShowInStatusBar) {
                         await configService.updateConfig('groupingShowInStatusBar', true);
                     }
@@ -276,6 +277,7 @@ function setupMessageHandling(): void {
                 // 使用缓存数据重新渲染
                 reactor.reprocess();
                 break;
+            }
 
             case 'renameGroup':
                 if (message.modelIds && message.groupName) {
@@ -325,7 +327,7 @@ function setupMessageHandling(): void {
                 }
                 break;
 
-            case 'autoGroup':
+            case 'autoGroup': {
                 logger.info('User triggered auto-grouping');
                 // 获取最新的快照数据
                 const latestSnapshot = reactor.getLatestSnapshot();
@@ -344,6 +346,7 @@ function setupMessageHandling(): void {
                     logger.warn('No snapshot data available for auto-grouping');
                 }
                 break;
+            }
 
             case 'updateThresholds':
                 // 处理从 Dashboard 设置模态框发来的阈值更新
@@ -362,7 +365,7 @@ function setupMessageHandling(): void {
                         await configService.updateConfig('criticalThreshold', criticalVal);
                         logger.info(`Thresholds updated: warning=${warningVal}%, critical=${criticalVal}%`);
                         vscode.window.showInformationMessage(
-                            t('threshold.updated', { value: `Warning: ${warningVal}%, Critical: ${criticalVal}` })
+                            t('threshold.updated', { value: `Warning: ${warningVal}%, Critical: ${criticalVal}` }),
                         );
                         // 清除通知记录，让新阈值生效
                         notifiedModels.clear();
@@ -470,7 +473,7 @@ function updateStatusBar(snapshot: QuotaSnapshot, config: CockpitConfig): void {
     if (config.groupingEnabled && config.groupingShowInStatusBar && snapshot.groups && snapshot.groups.length > 0) {
         // 获取置顶的分组
         const monitoredGroups = snapshot.groups.filter(g =>
-            config.pinnedGroups.includes(g.groupId)
+            config.pinnedGroups.includes(g.groupId),
         );
 
         if (monitoredGroups.length > 0) {
@@ -480,10 +483,10 @@ function updateStatusBar(snapshot: QuotaSnapshot, config: CockpitConfig): void {
                     const idxA = config.groupOrder.indexOf(a.groupId);
                     const idxB = config.groupOrder.indexOf(b.groupId);
                     // 如果都在排序列表中，按列表顺序
-                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1 && idxB !== -1) {return idxA - idxB;}
                     // 如果一个在列表一个不在，在列表的优先
-                    if (idxA !== -1) return -1;
-                    if (idxB !== -1) return 1;
+                    if (idxA !== -1) {return -1;}
+                    if (idxB !== -1) {return 1;}
                     // 都不在，保持原序
                     return 0;
                 });
@@ -532,9 +535,9 @@ function updateStatusBar(snapshot: QuotaSnapshot, config: CockpitConfig): void {
                 monitoredModels.sort((a, b) => {
                     const idxA = config.modelOrder.indexOf(a.modelId);
                     const idxB = config.modelOrder.indexOf(b.modelId);
-                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-                    if (idxA !== -1) return -1;
-                    if (idxB !== -1) return 1;
+                    if (idxA !== -1 && idxB !== -1) {return idxA - idxB;}
+                    if (idxA !== -1) {return -1;}
+                    if (idxB !== -1) {return 1;}
                     return 0;
                 });
             }
@@ -595,7 +598,7 @@ function generateQuotaTooltip(snapshot: QuotaSnapshot, config: CockpitConfig): v
     md.appendMarkdown(`**🚀 ${t('dashboard.title')}${planInfo}**\n\n`);
 
     // 排序逻辑与仪表盘保持一致
-    let sortedModels = [...snapshot.models];
+    const sortedModels = [...snapshot.models];
     if (config.modelOrder && config.modelOrder.length > 0) {
         // 有自定义顺序时，按用户拖拽设置的顺序排序
         const orderMap = new Map<string, number>();
@@ -643,20 +646,22 @@ function generateCompactProgressBar(percentage: number): string {
 
 /**
  * 获取模型短名称
+ * @deprecated 保留以备将来使用
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getShortModelName(label: string): string {
     // 移除常见前缀，保留核心名称
     if (label.includes('Claude')) {
-        if (label.includes('Opus')) return 'Claude Opus';
-        if (label.includes('Sonnet')) return 'Claude Sonnet';
-        if (label.includes('Thinking')) return 'Claude Think';
+        if (label.includes('Opus')) {return 'Claude Opus';}
+        if (label.includes('Sonnet')) {return 'Claude Sonnet';}
+        if (label.includes('Thinking')) {return 'Claude Think';}
         return 'Claude';
     }
     if (label.includes('Gemini')) {
-        if (label.includes('Flash')) return 'Gemini Flash';
-        if (label.includes('Pro') && label.includes('High')) return 'Gemini Pro(H)';
-        if (label.includes('Pro') && label.includes('Low')) return 'Gemini Pro(L)';
-        if (label.includes('Pro')) return 'Gemini Pro';
+        if (label.includes('Flash')) {return 'Gemini Flash';}
+        if (label.includes('Pro') && label.includes('High')) {return 'Gemini Pro(H)';}
+        if (label.includes('Pro') && label.includes('Low')) {return 'Gemini Pro(L)';}
+        if (label.includes('Pro')) {return 'Gemini Pro';}
         return 'Gemini';
     }
     if (label.includes('GPT')) {
@@ -673,8 +678,8 @@ function getStatusIcon(percentage: number, config?: CockpitConfig): string {
     const warningThreshold = config?.warningThreshold ?? QUOTA_THRESHOLDS.WARNING_DEFAULT;
     const criticalThreshold = config?.criticalThreshold ?? QUOTA_THRESHOLDS.CRITICAL_DEFAULT;
     
-    if (percentage <= criticalThreshold) return '🔴';  // 危险
-    if (percentage <= warningThreshold) return '🟡';    // 警告
+    if (percentage <= criticalThreshold) {return '🔴';}  // 危险
+    if (percentage <= warningThreshold) {return '🟡';}    // 警告
     return '🟢'; // 健康
 }
 

@@ -60,10 +60,10 @@ export class WindowsStrategy implements PlatformStrategy {
     getProcessByKeywordCommand(): string {
         if (this.usePowershell) {
             // 查找所有 CommandLine 包含 csrf_token 的进程
-            return `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'csrf_token' } | Select-Object ProcessId,Name,CommandLine | ConvertTo-Json"`;
+            return 'powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match \'csrf_token\' } | Select-Object ProcessId,Name,CommandLine | ConvertTo-Json"';
         }
         // WMIC 不支持按 CommandLine 筛选，返回所有进程
-        return `wmic process get ProcessId,Name,CommandLine /format:list`;
+        return 'wmic process get ProcessId,Name,CommandLine /format:list';
     }
 
     parseProcessInfo(stdout: string): ProcessInfo[] {
@@ -91,7 +91,7 @@ export class WindowsStrategy implements PlatformStrategy {
                     }
 
                     const pid = item.ProcessId;
-                    if (!pid) continue;
+                    if (!pid) {continue;}
 
                     const portMatch = commandLine.match(/--extension_server_port[=\s]+(\d+)/);
                     const tokenMatch = commandLine.match(/--csrf_token[=\s]+([a-f0-9-]+)/i);
@@ -204,9 +204,9 @@ export class WindowsStrategy implements PlatformStrategy {
     getDiagnosticCommand(): string {
         // 列出所有包含 'language' 或 'antigravity' 的进程
         if (this.usePowershell) {
-            return `powershell -NoProfile -Command "Get-Process | Where-Object { $_.ProcessName -match 'language|antigravity' } | Select-Object Id,ProcessName,Path | Format-Table -AutoSize"`;
+            return 'powershell -NoProfile -Command "Get-Process | Where-Object { $_.ProcessName -match \'language|antigravity\' } | Select-Object Id,ProcessName,Path | Format-Table -AutoSize"';
         }
-        return `wmic process where "name like '%language%' or name like '%antigravity%'" get ProcessId,Name,CommandLine /format:list`;
+        return 'wmic process where "name like \'%language%\' or name like \'%antigravity%\'" get ProcessId,Name,CommandLine /format:list';
     }
 }
 
@@ -236,8 +236,9 @@ export class UnixStrategy implements PlatformStrategy {
         }
         this.portCommandChecked = true;
 
-        const { exec } = require('child_process');
-        const { promisify } = require('util');
+        // 使用动态导入避免顶层依赖
+        const { exec } = await import('child_process');
+        const { promisify } = await import('util');
         const execAsync = promisify(exec);
 
         const commands = ['lsof', 'ss', 'netstat'] as const;
@@ -324,8 +325,8 @@ export class UnixStrategy implements PlatformStrategy {
         // Unix 平台排序策略：当前进程的子进程 > 其他进程
         // 为了提高成功率，我们将子进程排在第一位，但返回所有候选进程
         return candidates.sort((a, b) => {
-            if (a.ppid === currentPid) return -1;
-            if (b.ppid === currentPid) return 1;
+            if (a.ppid === currentPid) {return -1;}
+            if (b.ppid === currentPid) {return 1;}
             return 0;
         });
     }
@@ -429,7 +430,7 @@ export class UnixStrategy implements PlatformStrategy {
 
     getDiagnosticCommand(): string {
         // 列出所有包含 'language' 或 'antigravity' 的进程
-        return `ps aux | grep -E 'language|antigravity' | grep -v grep`;
+        return 'ps aux | grep -E \'language|antigravity\' | grep -v grep';
     }
 }
 

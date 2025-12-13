@@ -16,7 +16,7 @@ import {
 import { logger } from '../shared/log_service';
 import { configService } from '../shared/config_service';
 import { t } from '../shared/i18n';
-import { TIMING, API_ENDPOINTS, QUOTA_THRESHOLDS } from '../shared/constants';
+import { TIMING, API_ENDPOINTS } from '../shared/constants';
 
 /**
  * 反应堆核心类
@@ -89,7 +89,7 @@ export class ReactorCore {
                 res.on('end', () => {
                     logger.info(`Signal Received (${res.statusCode}):`, {
                         statusCode: res.statusCode,
-                        bodyLength: body.length
+                        bodyLength: body.length,
                     });
                     // logger.debug('Signal Body:', body); // 取消注释以查看完整响应
 
