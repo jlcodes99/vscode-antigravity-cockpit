@@ -22,23 +22,26 @@ export class WindowsStrategy implements PlatformStrategy {
 
     /**
      * 判断命令行是否属于 Antigravity 进程
+     * 精准匹配：必须包含 --app_data_dir antigravity 参数
      */
     private isAntigravityProcess(commandLine: string): boolean {
         const lowerCmd = commandLine.toLowerCase();
-        // 必须包含 csrf_token（这是 Antigravity 进程最独特的标识）
+        
+        // 必须包含 csrf_token（基本标识）
         if (!commandLine.includes('csrf_token')) {
             return false;
         }
+        
+        // 精准特征：--app_data_dir antigravity
         if (/--app_data_dir\s+antigravity\b/i.test(commandLine)) {
             return true;
         }
+        
+        // 路径特征：包含 \antigravity\ 或 /antigravity/
         if (lowerCmd.includes('\\antigravity\\') || lowerCmd.includes('/antigravity/')) {
             return true;
         }
-        // 有 csrf_token 且包含 extension_server_port 也算
-        if (commandLine.includes('extension_server_port')) {
-            return true;
-        }
+        
         return false;
     }
 
