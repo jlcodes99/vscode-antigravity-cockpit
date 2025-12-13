@@ -357,7 +357,7 @@ export interface PlatformStrategy {
     /** 获取进程列表命令 */
     getProcessListCommand(processName: string): string;
     /** 解析进程信息 */
-    parseProcessInfo(stdout: string): ProcessInfo | null;
+    parseProcessInfo(stdout: string): ProcessInfo[];
     /** 获取端口列表命令 */
     getPortListCommand(pid: number): string;
     /** 解析监听端口 */

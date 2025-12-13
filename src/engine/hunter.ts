@@ -92,11 +92,20 @@ export class ProcessHunter {
                     logger.warn(`StdErr: ${stderr}`);
                 }
 
-                const info = this.strategy.parseProcessInfo(stdout);
+                const candidates = this.strategy.parseProcessInfo(stdout);
 
-                if (info) {
-                    logger.info(`✅ Found Process: PID=${info.pid}, ExtPort=${info.extensionPort}`);
-                    return await this.verifyAndConnect(info);
+                if (candidates && candidates.length > 0) {
+                    logger.info(`Found ${candidates.length} candidate process(es)`);
+                    
+                    // 遍历所有候选进程尝试连接
+                    for (const info of candidates) {
+                        logger.info(`🔍 Checking Process: PID=${info.pid}, ExtPort=${info.extensionPort}`);
+                        const result = await this.verifyAndConnect(info);
+                        if (result) {
+                            return result;
+                        }
+                    }
+                    logger.warn('❌ All candidates failed verification in this attempt');
                 }
             } catch (e) {
                 const error = e instanceof Error ? e : new Error(String(e));
@@ -165,11 +174,18 @@ export class ProcessHunter {
                 logger.warn(`StdErr: ${stderr}`);
             }
 
-            const info = this.strategy.parseProcessInfo(stdout);
+            const candidates = this.strategy.parseProcessInfo(stdout);
 
-            if (info) {
-                logger.info(`✅ Found Process by keyword: PID=${info.pid}`);
-                return await this.verifyAndConnect(info);
+            if (candidates && candidates.length > 0) {
+                logger.info(`Found ${candidates.length} keyword candidate(s)`);
+                
+                for (const info of candidates) {
+                    logger.info(`🔍 Checking Keyword Candidate: PID=${info.pid}`);
+                    const result = await this.verifyAndConnect(info);
+                    if (result) {
+                        return result;
+                    }
+                }
             }
         } catch (e) {
             const error = e instanceof Error ? e : new Error(String(e));
