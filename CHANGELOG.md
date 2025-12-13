@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.18] - 2025-12-13
+
+### Added
+- 创建独立的 CHANGELOG.md 文件，记录所有历史版本更新
+
+### Changed
+- README 中的 Changelog 章节改为引用独立文件
+- 移除冗余的 `activationEvents` 配置（VS Code 自动生成）
+
+---
+
 ## [1.4.17] - 2025-12-13
 
 ### Added
