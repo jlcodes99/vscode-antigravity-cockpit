@@ -3,7 +3,7 @@
   "displayName": "Antigravity Cockpit",
   "icon": "assets/icon.png",
   "description": "A premium, dashboard-style quota monitor for Antigravity AI.",
-  "version": "1.4.18",
+  "version": "1.4.19",
   "publisher": "jlcodes",
   "engines": {
     "vscode": "^1.90.0"
@@ -112,7 +112,12 @@
         "agCockpit.logLevel": {
           "type": "string",
           "default": "info",
-          "enum": ["debug", "info", "warn", "error"],
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
           "enumDescriptions": [
             "Show all logs including debug information",
             "Show info, warnings and errors",
@@ -129,7 +134,11 @@
         "agCockpit.statusBarFormat": {
           "type": "string",
           "default": "standard",
-          "enum": ["compact", "standard", "detailed"],
+          "enum": [
+            "compact",
+            "standard",
+            "detailed"
+          ],
           "enumDescriptions": [
             "Show percentage only (e.g. '95%')",
             "Show model name and percentage (e.g. 'Gemini: 95%')",
@@ -213,7 +222,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./ && npm run copy-webview",
-    "copy-webview": "mkdir -p out/view/webview && cp src/view/webview/*.css src/view/webview/*.js out/view/webview/ 2>/dev/null || true",
+    "copy-webview": "shx mkdir -p out/view/webview && shx cp src/view/webview/*.css src/view/webview/*.js out/view/webview/",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src --ext ts",
     "lint:fix": "eslint src --ext ts --fix",
@@ -221,11 +230,12 @@
     "pretest": "npm run compile"
   },
   "devDependencies": {
-    "@types/vscode": "^1.90.0",
     "@types/node": "^20.0.0",
+    "@types/vscode": "^1.90.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^8.57.0",
+    "shx": "^0.4.0",
     "typescript": "^5.3.0"
   }
 }
