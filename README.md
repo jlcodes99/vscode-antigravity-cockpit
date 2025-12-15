@@ -2,7 +2,9 @@
 
 > A futuristic dashboard for monitoring Google Antigravity AI quotas in VS Code.
 
-[![Version](https://img.shields.io/visual-studio-marketplace/v/jlcodes.antigravity-cockpit)](https://marketplace.visualstudio.com/items?itemName=jlcodes.antigravity-cockpit)
+[English] · [Chinese](README.zh-CN.md)
+
+[![Version](https://img.shields.io/open-vsx/v/jlcodes/antigravity-cockpit)](https://open-vsx.org/extension/jlcodes/antigravity-cockpit)
 [![GitHub stars](https://img.shields.io/github/stars/jlcodes99/vscode-antigravity-cockpit?style=flat&color=gold)](https://github.com/jlcodes99/vscode-antigravity-cockpit)
 [![GitHub issues](https://img.shields.io/github/issues/jlcodes99/vscode-antigravity-cockpit)](https://github.com/jlcodes99/vscode-antigravity-cockpit/issues)
 [![License](https://img.shields.io/github/license/jlcodes99/vscode-antigravity-cockpit)](https://github.com/jlcodes99/vscode-antigravity-cockpit)
@@ -36,7 +38,7 @@ Know *exactly* when to get back to work. Displays both a countdown (e.g., `4h 40
 - Notifications can be disabled in settings if you prefer a quiet experience.
 
 ### 🌐 Multi-language Support
-- Supports **English** and **Chinese (简体中文)**.
+- Supports **English** and **Chinese**.
 - Automatically detects your VS Code language setting.
 
 
@@ -94,21 +96,21 @@ We believe in **Interactivity over Configuration**. All major preferences (Sorti
 
 ## 📦 Installation
 
-### Method 1: From VS Code Marketplace (推荐)
+### Method 1: From Open VSX Registry (Recommended)
 
-1. Open VS Code
+1. Open your editor (VSCodium / Code - OSS, etc.)
 2. Press `Cmd+Shift+X` (macOS) / `Ctrl+Shift+X` (Windows/Linux) to open Extensions
-3. Search for `Antigravity Cockpit`
+3. Search for `Antigravity Cockpit` or `antigravity-cockpit`
 4. Click **Install**
 
-### Method 2: From VSIX File (命令行安装)
+### Method 2: From VSIX File (CLI)
 
 ```bash
 # Download or build the .vsix file first, then:
-code --install-extension antigravity-cockpit-1.2.11.vsix
+code --install-extension antigravity-cockpit-x.y.z.vsix
 ```
 
-### Method 3: From VSIX File (拖拽安装)
+### Method 3: From VSIX File (Drag & Drop)
 
 1. Download or build the `.vsix` file
 2. Open VS Code
@@ -161,7 +163,7 @@ npm run package
 
 **Option A: Command Line**
 ```bash
-code --install-extension antigravity-cockpit-1.2.11.vsix
+code --install-extension antigravity-cockpit-x.y.z.vsix
 ```
 
 **Option B: Drag & Drop**
@@ -231,7 +233,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📝 Changelog
 
-For a complete list of changes and version history, see [CHANGELOG.md](CHANGELOG.md).
+For a complete list of changes and version history, see:
+- English: [CHANGELOG.md](CHANGELOG.md)
+- Chinese: [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)
 
 ---
 
@@ -243,9 +247,7 @@ If you find **Antigravity Cockpit** useful, consider giving it a star on GitHub!
 
 - ⭐ **[Star on GitHub](https://github.com/jlcodes99/vscode-antigravity-cockpit)** - Show your support!
 - 💬 **[Report Issues / Feedback](https://github.com/jlcodes99/vscode-antigravity-cockpit/issues)** - Help us improve!
-- 📖 **[Rate on Marketplace](https://marketplace.visualstudio.com/items?itemName=jlcodes.antigravity-cockpit&ssr=false#review-details)** - Leave a review!
-
-> 如果觉得这个插件好用，给个 ⭐ Star 支持一下吧！您的支持是我持续更新的动力 💪
+- 📖 **[Open on Open VSX](https://open-vsx.org/extension/jlcodes/antigravity-cockpit)** - View details / leave feedback!
 
 ---
 
