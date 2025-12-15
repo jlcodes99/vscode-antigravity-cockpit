@@ -135,11 +135,52 @@ export class ReactorCore {
         this.currentInterval = interval;
         logger.info(`Reactor Pulse: ${interval}ms`);
 
-        this.syncTelemetry();
+        // 启动时使用带重试的初始化同步，失败会自动重试
+        this.initWithRetry();
 
+        // 定时同步（失败不重试，等下一个周期自然重试）
         this.pulseTimer = setInterval(() => {
             this.syncTelemetry();
         }, interval);
+    }
+
+    /**
+     * 带重试的初始化同步
+     * 仅在启动时调用，失败会自动重试，用户无感
+     * @param maxRetries 最大重试次数
+     * @param currentRetry 当前重试次数
+     */
+    private async initWithRetry(
+        maxRetries: number = 3,
+        currentRetry: number = 0,
+    ): Promise<void> {
+        try {
+            await this.syncTelemetryCore();
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            
+            if (currentRetry < maxRetries) {
+                // 还有重试机会，使用指数退避
+                const delay = 2000 * (currentRetry + 1);  // 2s, 4s, 6s
+                logger.warn(`Init sync failed, retry ${currentRetry + 1}/${maxRetries} in ${delay}ms: ${err.message}`);
+                
+                await this.delay(delay);
+                return this.initWithRetry(maxRetries, currentRetry + 1);
+            }
+            
+            // 超过最大重试次数，触发错误回调
+            logger.error(`Init sync failed after ${maxRetries} retries: ${err.message}`);
+            if (this.errorHandler) {
+                this.errorHandler(err);
+            }
+        }
+    }
+
+    /**
+     * 延迟指定毫秒数
+     */
+    private delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 
     /**
@@ -153,46 +194,53 @@ export class ReactorCore {
     }
 
     /**
-     * 同步遥测数据
+     * 同步遥测数据（用于定时器调用，自带错误处理）
      */
     async syncTelemetry(): Promise<void> {
         try {
-            const raw = await this.transmit<ServerUserStatusResponse>(
-                API_ENDPOINTS.GET_USER_STATUS,
-                {
-                    metadata: {
-                        ideName: 'antigravity',
-                        extensionName: 'antigravity',
-                        locale: 'en',
-                    },
-                },
-            );
-
-            this.lastRawResponse = raw; // 缓存原始响应
-            const telemetry = this.decodeSignal(raw);
-            this.lastSnapshot = telemetry; // Cache the latest snapshot
-
-            // 打印关键配额信息
-            const maxLabelLen = Math.max(...telemetry.models.map(m => m.label.length));
-            const quotaSummary = telemetry.models.map(m => {
-                const pct = m.remainingPercentage !== undefined ? m.remainingPercentage.toFixed(2) + '%' : 'N/A';
-                return `    ${m.label.padEnd(maxLabelLen)} : ${pct}`;
-            }).join('\n');
-            
-            logger.info(`Quota Update:\n${quotaSummary}`);
-
-            // 检查并发送配额通知
-            this.checkAndNotify(telemetry);
-
-            if (this.updateHandler) {
-                this.updateHandler(telemetry);
-            }
+            await this.syncTelemetryCore();
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
             logger.error(`Telemetry Sync Failed: ${err.message}`);
             if (this.errorHandler) {
                 this.errorHandler(err);
             }
+        }
+    }
+
+    /**
+     * 同步遥测数据核心逻辑（可抛出异常，用于重试机制）
+     */
+    private async syncTelemetryCore(): Promise<void> {
+        const raw = await this.transmit<ServerUserStatusResponse>(
+            API_ENDPOINTS.GET_USER_STATUS,
+            {
+                metadata: {
+                    ideName: 'antigravity',
+                    extensionName: 'antigravity',
+                    locale: 'en',
+                },
+            },
+        );
+
+        this.lastRawResponse = raw; // 缓存原始响应
+        const telemetry = this.decodeSignal(raw);
+        this.lastSnapshot = telemetry; // Cache the latest snapshot
+
+        // 打印关键配额信息
+        const maxLabelLen = Math.max(...telemetry.models.map(m => m.label.length));
+        const quotaSummary = telemetry.models.map(m => {
+            const pct = m.remainingPercentage !== undefined ? m.remainingPercentage.toFixed(2) + '%' : 'N/A';
+            return `    ${m.label.padEnd(maxLabelLen)} : ${pct}`;
+        }).join('\n');
+        
+        logger.info(`Quota Update:\n${quotaSummary}`);
+
+        // 检查并发送配额通知
+        this.checkAndNotify(telemetry);
+
+        if (this.updateHandler) {
+            this.updateHandler(telemetry);
         }
     }
 
@@ -271,6 +319,13 @@ export class ReactorCore {
      * 解码服务端响应
      */
     private decodeSignal(data: ServerUserStatusResponse): QuotaSnapshot {
+        // 验证响应数据结构
+        if (!data || !data.userStatus) {
+            throw new Error(t('error.invalidResponse', { 
+                details: data ? JSON.stringify(data).substring(0, 100) : 'empty response' 
+            }));
+        }
+        
         const status = data.userStatus;
         const plan = status.planStatus?.planInfo;
         const credits = status.planStatus?.availablePromptCredits;

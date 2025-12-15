@@ -143,6 +143,8 @@ const translations: Record<SupportedLocale, TranslationMap> = {
         'offline.justNow': 'just now',
         'offline.minutesAgo': '{count}m ago',
         'offline.hoursAgo': '{count}h ago',
+        // Error messages
+        'error.invalidResponse': 'Invalid server response: {details}',
     },
     'zh-cn': {
         // 状态栏
@@ -272,6 +274,8 @@ const translations: Record<SupportedLocale, TranslationMap> = {
         'offline.justNow': '刚刚',
         'offline.minutesAgo': '{count}分钟前',
         'offline.hoursAgo': '{count}小时前',
+        // Error messages
+        'error.invalidResponse': '服务器响应无效: {details}',
     },
 };
 

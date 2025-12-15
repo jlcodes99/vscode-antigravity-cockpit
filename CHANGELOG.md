@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.20] - 2025-12-15
+
+### Fixed
+- 修复启动时服务未就绪（500 错误）导致的 `Cannot read properties of undefined` 崩溃问题
+- 添加服务器响应验证，提供更清晰的错误信息
+
+### Added
+- 启动时自动重试机制：首次同步失败会自动重试最多 3 次
+
+---
+
 ## [1.4.19] - 2025-12-13
 
 ### Security
