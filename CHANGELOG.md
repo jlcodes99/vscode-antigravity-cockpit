@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.5.1] - 2025-12-16
+
+### Added
+- **Reset Name Button**: Add "Reset" button in rename modal to quickly restore original name
+
+### Fixed
+- **Status Bar Sync**: Custom model names now correctly display in the status bar (non-grouping mode)
+
+### Improved
+- **Theme Compatibility**: Use VS Code theme variables for colors (tooltip, semantic colors, badges)
+
+---
+
 ## [1.5.0] - 2025-12-16
 
 ### Added

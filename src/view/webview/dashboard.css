@@ -4,18 +4,25 @@
  */
 
 :root {
-    /* 暗色主题默认值 */
+    /* 主题适配变量 - 优先使用 VS Code 主题，提供暗色默认值 */
     --bg-color: var(--vscode-editor-background, #0d1117);
     --card-bg: var(--vscode-sideBar-background, #161b22);
     --text-primary: var(--vscode-editor-foreground, #e6edf3);
     --text-secondary: var(--vscode-descriptionForeground, #8b949e);
     --accent: var(--vscode-button-background, #2f81f7);
     --accent-hover: var(--vscode-button-hoverBackground, #1f6feb);
-    --success: #238636;
-    --warning: #d29922;
-    --danger: #da3633;
     --border-color: var(--vscode-widget-border, #30363d);
     --font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif);
+    
+    /* 语义色 - 使用 VS Code 主题适配 */
+    --success: var(--vscode-testing-iconPassed, #238636);
+    --warning: var(--vscode-editorWarning-foreground, #d29922);
+    --danger: var(--vscode-editorError-foreground, #da3633);
+    
+    /* Tooltip 专用 */
+    --tooltip-bg: var(--vscode-editorWidget-background, #1e1e1e);
+    --tooltip-fg: var(--vscode-editorWidget-foreground, #cccccc);
+    --tooltip-border: var(--vscode-editorWidget-border, #454545);
 }
 
 * {
@@ -101,7 +108,7 @@ body {
 /* ============ 离线状态卡片 ============ */
 
 .offline-card {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: var(--card-bg);
     border: 1px solid var(--danger);
     border-radius: 16px;
     padding: 40px;
@@ -446,15 +453,15 @@ input:checked + .slider:before {
     left: 50%;
     transform: translateX(-50%);
     margin-top: 6px;
-    background: #1e1e1e;
-    color: #ffffff;
+    background: var(--tooltip-bg);
+    color: var(--tooltip-fg);
     padding: 6px 12px;
     border-radius: 4px;
     font-size: 12px;
     white-space: nowrap;
     z-index: 1000;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
-    border: 1px solid #444;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--tooltip-border);
 }
 
 /* ============ 动画 ============ */
@@ -525,8 +532,8 @@ input:checked + .slider:before {
 }
 
 .tier-badge {
-    background: linear-gradient(135deg, var(--accent) 0%, #a435f0 100%);
-    color: white;
+    background: var(--accent);
+    color: var(--vscode-button-foreground, white);
     padding: 2px 8px;
     border-radius: 12px;
     font-size: 11px;
@@ -575,7 +582,7 @@ input:checked + .slider:before {
 
 .tag.success {
     background-color: rgba(35, 134, 54, 0.2);
-    color: #4cca6d;
+    color: var(--success);
     border: 1px solid rgba(35, 134, 54, 0.4);
 }
 
@@ -1096,6 +1103,28 @@ input:checked + .slider:before {
     transform: translateY(-1px);
 }
 
+.modal-footer .btn-secondary {
+    padding: 10px 24px;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.modal-footer .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--text-secondary);
+    color: var(--text-primary);
+}
+
+.modal-footer-space-between {
+    justify-content: space-between;
+}
+
 /* Range Hint */
 .range-hint {
     color: var(--text-secondary);
@@ -1166,14 +1195,14 @@ input:checked + .slider:before {
 }
 
 .footer-link.star-link {
-    background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-    color: #1a1a2e;
+    background: var(--warning);
+    color: var(--bg-color);
     border: none;
 }
 
 .footer-link.star-link:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(251, 191, 36, 0.4);
+    box-shadow: 0 4px 12px rgba(210, 153, 34, 0.4);
 }
 
 .footer-link.feedback-link {

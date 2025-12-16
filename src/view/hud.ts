@@ -376,18 +376,19 @@ export class CockpitHUD {
     <div id="rename-modal" class="modal hidden">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>✏️ ${i18n.getLocale() === 'zh-cn' ? '重命名分组' : 'Rename Group'}</h3>
+                <h3>✏️ ${i18n.getLocale() === 'zh-cn' ? '重命名' : 'Rename'}</h3>
                 <button id="close-rename-btn" class="close-btn">×</button>
             </div>
             <div class="modal-body">
                 <div class="setting-item">
                     <label for="rename-input">${i18n.getLocale() === 'zh-cn' ? '新名称' : 'New Name'}</label>
                     <div class="setting-input-group">
-                        <input type="text" id="rename-input" placeholder="${i18n.getLocale() === 'zh-cn' ? '输入分组名称...' : 'Enter group name...'}" maxlength="30">
+                        <input type="text" id="rename-input" placeholder="${i18n.getLocale() === 'zh-cn' ? '输入名称...' : 'Enter name...'}" maxlength="30">
                     </div>
                 </div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer modal-footer-space-between">
+                <button id="reset-name-btn" class="btn-secondary">${i18n.getLocale() === 'zh-cn' ? '重置' : 'Reset'}</button>
                 <button id="save-rename-btn" class="btn-primary">${i18n.getLocale() === 'zh-cn' ? '确定' : 'OK'}</button>
             </div>
         </div>

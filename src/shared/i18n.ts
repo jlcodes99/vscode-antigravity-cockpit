@@ -122,6 +122,7 @@ const translations: Record<SupportedLocale, TranslationMap> = {
         'model.renamePrompt': 'Enter new name for this model:',
         'model.renamed': 'Model renamed to {name}',
         'model.nameEmpty': 'Name cannot be empty',
+        'model.reset': 'Reset',
         // Status Bar Format
         'statusBarFormat.title': 'Status Bar Style',
         'statusBarFormat.icon': 'Icon Only',
@@ -284,6 +285,7 @@ const translations: Record<SupportedLocale, TranslationMap> = {
         'model.renamePrompt': '请输入新的模型名称:',
         'model.renamed': '模型已重命名为 {name}',
         'model.nameEmpty': '名称不能为空',
+        'model.reset': '重置',
         // Status Bar Format
         'statusBarFormat.title': '状态栏样式',
         'statusBarFormat.icon': '仅图标',

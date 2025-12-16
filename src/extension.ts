@@ -624,7 +624,9 @@ function updateStatusBar(snapshot: QuotaSnapshot, config: CockpitConfig): void {
             // 显示置顶模型
             monitoredModels.forEach(m => {
                 const pct = m.remainingPercentage ?? 0;
-                const text = formatStatusBarText(m.label, pct, config.statusBarFormat, config);
+                // 使用自定义名称（如果存在）
+                const displayName = config.modelCustomNames?.[m.modelId] || m.label;
+                const text = formatStatusBarText(displayName, pct, config.statusBarFormat, config);
                 if (text) {statusTextParts.push(text);}
                 if (pct < minPercentage) {
                     minPercentage = pct;
@@ -644,7 +646,9 @@ function updateStatusBar(snapshot: QuotaSnapshot, config: CockpitConfig): void {
             });
 
             if (lowestModel) {
-                const text = formatStatusBarText(lowestModel.label, lowestPct, config.statusBarFormat, config);
+                // 使用自定义名称（如果存在）
+                const displayName = config.modelCustomNames?.[lowestModel.modelId] || lowestModel.label;
+                const text = formatStatusBarText(displayName, lowestPct, config.statusBarFormat, config);
                 if (text) {
                     statusTextParts.push(text);
                 } else {

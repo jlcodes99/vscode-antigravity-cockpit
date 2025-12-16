@@ -29,6 +29,7 @@
     let renameModelIds = [];  // 当前分组包含的模型 ID
     let renameModelId = null; // 当前正在重命名的模型 ID（非分组模式）
     let isRenamingModel = false; // 标记是否正在重命名模型（而非分组）
+    let renameOriginalName = ''; // 原始名称（用于重置）
 
     // 刷新冷却时间（秒），默认 120 秒
     let refreshCooldown = 120;
@@ -111,6 +112,12 @@
                     saveRename();
                 }
             });
+        }
+        
+        // 重置名称按钮
+        const resetNameBtn = document.getElementById('reset-name-btn');
+        if (resetNameBtn) {
+            resetNameBtn.addEventListener('click', resetName);
         }
 
         // 事件委托：处理置顶开关
@@ -256,12 +263,13 @@
      * @param {string} modelId 模型 ID
      * @param {string} currentName 当前名称
      */
-    function openModelRenameModal(modelId, currentName) {
+    function openModelRenameModal(modelId, currentName, originalName) {
         if (renameModal) {
             isRenamingModel = true; // 模型重命名模式
             renameModelId = modelId;
             renameGroupId = null;
             renameModelIds = [];
+            renameOriginalName = originalName || currentName || ''; // 保存原始名称
             
             const renameInput = document.getElementById('rename-input');
             if (renameInput) {
@@ -281,6 +289,7 @@
             renameModelIds = [];
             renameModelId = null;
             isRenamingModel = false;
+            renameOriginalName = '';
         }
     }
     
@@ -315,6 +324,20 @@
         }
         
         closeRenameModal();
+    }
+    /**
+     * 重置名称为默认值（填入输入框，不直接提交）
+     */
+    function resetName() {
+        const renameInput = document.getElementById('rename-input');
+        if (!renameInput) return;
+        
+        if (isRenamingModel && renameModelId && renameOriginalName) {
+            // 模型重置模式：将原始名称填入输入框
+            renameInput.value = renameOriginalName;
+            renameInput.focus();
+        }
+        // 分组重置暂不支持
     }
     
     function handleToggleProfile() {
@@ -947,7 +970,7 @@
         if (renameBtn) {
             renameBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                openModelRenameModal(model.modelId, displayName);
+                openModelRenameModal(model.modelId, displayName, originalLabel);
             });
         }
         
