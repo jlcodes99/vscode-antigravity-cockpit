@@ -692,6 +692,9 @@
         const bar = document.createElement('div');
         bar.className = 'auto-group-toolbar';
         bar.innerHTML = `
+            <span class="grouping-hint">
+                ${i18n['grouping.description'] || '此模式将共享配额的模型聚合展示，支持重命名、排序并同步至状态栏。您可以点击右侧“自动分组”智能归类，或点击上方「配额分组」切换回全部模型视图。'}
+            </span>
             <button id="auto-group-btn" class="auto-group-link" title="${i18n['grouping.autoGroupHint'] || 'Recalculate groups based on current quota'}">
                 <span class="icon">🔄</span>
                 ${i18n['grouping.autoGroup'] || 'Auto Group'}

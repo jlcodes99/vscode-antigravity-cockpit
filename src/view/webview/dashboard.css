@@ -886,17 +886,32 @@ input:checked + .slider:before {
 .auto-group-toolbar {
     width: 100%;
     display: flex;
-    justify-content: flex-end;
-    margin-bottom: 12px;
-    grid-column: 1 / -1;  /* 横跨整个网格 */
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    background: rgba(47, 129, 247, 0.05);
+    border: 1px solid rgba(47, 129, 247, 0.1);
+    border-radius: 8px;
+    grid-column: 1 / -1;
+}
+
+.grouping-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+    flex: 1;
+    margin-right: 20px;
+    display: flex;
+    align-items: center; /* 确保文字块内部也垂直居中 */
 }
 
 .auto-group-link {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
-    background: transparent;
+    padding: 6px 14px;
+    background: var(--card-bg);
     color: var(--accent);
     border: 1px solid var(--accent);
     border-radius: 6px;
@@ -904,12 +919,14 @@ input:checked + .slider:before {
     font-size: 12px;
     font-weight: 500;
     transition: all 0.2s ease;
-    opacity: 0.8;
+    white-space: nowrap; /* 防止按钮换行 */
+    height: 32px; /* 固定高度确保对齐 */
 }
 
 .auto-group-link:hover {
-    opacity: 1;
-    background: rgba(47, 129, 247, 0.1);
+    background: var(--accent);
+    color: white; /* 悬停变为实心 */
+    box-shadow: 0 4px 12px rgba(47, 129, 247, 0.3);
     transform: translateY(-1px);
 }
 

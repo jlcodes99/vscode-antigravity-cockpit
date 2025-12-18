@@ -8,6 +8,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.5.14] - 2025-12-18
+
+### Improved
+- **Grouping Mode Guidance**: Added explanatory text to the top of the grouping mode view to guide users on auto-grouping and mode switching.
+
 ## [1.5.13] - 2025-12-18
 
 ### Added
