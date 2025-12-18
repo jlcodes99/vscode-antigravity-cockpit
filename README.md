@@ -2,7 +2,7 @@
 
 > A futuristic dashboard for monitoring Google Antigravity AI quotas in VS Code.
 
-[English] · [Chinese](README.zh-CN.md)
+[English] · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md)
 
 [![Version](https://img.shields.io/open-vsx/v/jlcodes/antigravity-cockpit)](https://open-vsx.org/extension/jlcodes/antigravity-cockpit)
 [![GitHub stars](https://img.shields.io/github/stars/jlcodes99/vscode-antigravity-cockpit?style=flat&color=gold)](https://github.com/jlcodes99/vscode-antigravity-cockpit)
@@ -38,7 +38,7 @@ Know *exactly* when to get back to work. Displays both a countdown (e.g., `4h 40
 - Notifications can be disabled in settings if you prefer a quiet experience.
 
 ### 🌐 Multi-language Support
-- Supports **English** and **Chinese**.
+- Supports **English**, **Simplified Chinese**, and **Traditional Chinese (Taiwan)**.
 - Automatically detects your VS Code language setting.
 
 
