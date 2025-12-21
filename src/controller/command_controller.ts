@@ -37,12 +37,7 @@ export class CommandController {
                         );
                         if (selection === t('webview.switchToQuickPick')) {
                             await configService.updateConfig('displayMode', DISPLAY_MODE.QUICKPICK);
-                            // 同时关闭分组模式，因为 QuickPick 不支持分组
-                            if (config.groupingEnabled) {
-                                await configService.updateConfig('groupingEnabled', false);
-                            }
                             vscode.window.showInformationMessage(t('webview.switchedToQuickPick'));
-                            // 刷新状态栏以反映分组模式关闭
                             this.reactor.reprocess();
                             this.quickPickView.show();
                         }

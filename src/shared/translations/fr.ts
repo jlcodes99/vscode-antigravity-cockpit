@@ -164,13 +164,18 @@ export const fr = {
     'error.invalidResponse': 'Réponse serveur invalide: {details}',
 
     // Mode QuickPick
-    'quickpick.placeholder': 'Cliquez sur un modèle pour basculer l\'épinglage dans la barre d\'état',
+    'quickpick.placeholder': 'Clic sur modèle pour épingler | Haut-droit: Actualiser, Groupe, Logs, Paramètres, Webview',
+    'quickpick.placeholderGrouped': 'Clic sur groupe pour épingler | Haut-droit: Actualiser, Groupe, Logs, Paramètres, Webview, Auto-groupe',
     'quickpick.quotaSection': 'Quotas des Modèles',
     'quickpick.actionsSection': 'Actions',
     'quickpick.noData': 'Aucune donnée de quota',
     'quickpick.openSettings': 'Ouvrir les Paramètres',
+    'quickpick.openLogs': 'Voir les Journaux',
+    'quickpick.refreshCooldown': 'Veuillez attendre {seconds}s avant d\'actualiser',
     'quickpick.switchToWebview': 'Passer en Mode Webview',
     'quickpick.switchedToWebview': 'Passé en mode Webview.',
+    'quickpick.back': 'Retour',
+    'quickpick.selectAction': 'Sélectionner une action',
 
     // Fallback Webview
     'webview.failedPrompt': 'Échec du chargement de Webview. Passer en mode compatibilité QuickPick?',

@@ -276,11 +276,9 @@ export class MessageController {
                         if (message.displayMode === 'quickpick') {
                             // 1. 关闭 Webview
                             this.hud.dispose();
-                            // 2. 自动关闭分组模式 (QuickPick 不支持分组)
-                            await configService.updateConfig('groupingEnabled', false);
-                            // 3. 刷新状态栏
+                            // 2. 刷新状态栏
                             this.reactor.reprocess();
-                            // 4. 立即弹出 QuickPick (通过命令)
+                            // 3. 立即弹出 QuickPick (通过命令)
                             vscode.commands.executeCommand('agCockpit.open');
                         } else {
                             this.reactor.reprocess();

@@ -164,13 +164,18 @@ export const pl = {
     'error.invalidResponse': 'Nieprawidłowa odpowiedź serwera: {details}',
 
     // Tryb QuickPick
-    'quickpick.placeholder': 'Kliknij model, aby przełączyć przypinanie do paska stanu',
+    'quickpick.placeholder': 'Kliknij model aby przypiąć | Prawy górny: Odśwież, Grupa, Logi, Ustawienia, Webview',
+    'quickpick.placeholderGrouped': 'Kliknij grupę aby przypiąć | Prawy górny: Odśwież, Grupa, Logi, Ustawienia, Webview, Autogr.',
     'quickpick.quotaSection': 'Limity Modeli',
     'quickpick.actionsSection': 'Akcje',
     'quickpick.noData': 'Brak danych limitu',
     'quickpick.openSettings': 'Otwórz Ustawienia',
+    'quickpick.openLogs': 'Zobacz Logi',
+    'quickpick.refreshCooldown': 'Poczekaj {seconds}s przed odświeżeniem',
     'quickpick.switchToWebview': 'Przełącz na Tryb Webview',
     'quickpick.switchedToWebview': 'Przełączono na tryb Webview.',
+    'quickpick.back': 'Wstecz',
+    'quickpick.selectAction': 'Wybierz akcję',
 
     // Fallback Webview
     'webview.failedPrompt': 'Nie udało się załadować Webview. Przełączyć na tryb kompatybilności QuickPick?',

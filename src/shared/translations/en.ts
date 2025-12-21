@@ -98,8 +98,8 @@ export const en = {
 
     // Grouping
     'grouping.title': 'Quota Groups',
-    'grouping.enable': 'Enable Grouping',
-    'grouping.disable': 'Disable Grouping',
+    'grouping.enable': 'Enable Quota Groups',
+    'grouping.disable': 'Disable Quota Groups',
     'grouping.rename': 'Rename Group',
     'grouping.renamePrompt': 'Enter new name for this group:',
     'grouping.nameLabel': 'Group Name',
@@ -168,13 +168,18 @@ export const en = {
     'error.invalidResponse': 'Invalid server response: {details}',
 
     // QuickPick mode
-    'quickpick.placeholder': 'Click a model to toggle status bar pinning',
+    'quickpick.placeholder': 'Click model to pin | Top-right: Refresh, Group, Logs, Settings, Webview',
+    'quickpick.placeholderGrouped': 'Click group to pin | Top-right: Refresh, Group, Logs, Settings, Webview, Auto-group',
     'quickpick.quotaSection': 'Model Quotas',
     'quickpick.actionsSection': 'Actions',
     'quickpick.noData': 'No quota data',
     'quickpick.openSettings': 'Open Settings',
+    'quickpick.openLogs': 'View Logs',
+    'quickpick.refreshCooldown': 'Please wait {seconds}s before refreshing',
     'quickpick.switchToWebview': 'Switch to Webview Mode',
     'quickpick.switchedToWebview': 'Switched to Webview mode.',
+    'quickpick.back': 'Back',
+    'quickpick.selectAction': 'Select an action',
 
     // Webview fallback
     'webview.failedPrompt': 'Failed to load Webview. Switch to QuickPick compatibility mode?',

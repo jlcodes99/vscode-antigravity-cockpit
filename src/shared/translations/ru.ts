@@ -164,13 +164,18 @@ export const ru = {
     'error.invalidResponse': 'Неверный ответ сервера: {details}',
 
     // Режим QuickPick
-    'quickpick.placeholder': 'Нажмите на модель, чтобы переключить закрепление в строке состояния',
+    'quickpick.placeholder': 'Кликните модель для закрепления | Справа: Обновить, Группа, Логи, Настройки, Webview',
+    'quickpick.placeholderGrouped': 'Кликните группу для закрепления | Справа: Обновить, Группа, Логи, Настройки, Webview, Автогруппа',
     'quickpick.quotaSection': 'Квоты моделей',
     'quickpick.actionsSection': 'Действия',
     'quickpick.noData': 'Нет данных о квоте',
     'quickpick.openSettings': 'Открыть настройки',
+    'quickpick.openLogs': 'Просмотр логов',
+    'quickpick.refreshCooldown': 'Подождите {seconds}с перед обновлением',
     'quickpick.switchToWebview': 'Переключиться на режим Webview',
     'quickpick.switchedToWebview': 'Переключено на режим Webview.',
+    'quickpick.back': 'Назад',
+    'quickpick.selectAction': 'Выберите действие',
 
     // Fallback Webview
     'webview.failedPrompt': 'Не удалось загрузить Webview. Переключиться на режим совместимости QuickPick?',

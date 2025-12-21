@@ -164,13 +164,18 @@ export const es = {
     'error.invalidResponse': 'Respuesta del servidor inválida: {details}',
 
     // Modo QuickPick
-    'quickpick.placeholder': 'Haga clic en un modelo para alternar la fijación en la barra de estado',
+    'quickpick.placeholder': 'Clic en modelo para fijar | Arriba-derecha: Actualizar, Grupo, Logs, Config, Webview',
+    'quickpick.placeholderGrouped': 'Clic en grupo para fijar | Arriba-derecha: Actualizar, Grupo, Logs, Config, Webview, Auto-grupo',
     'quickpick.quotaSection': 'Cuotas de Modelos',
     'quickpick.actionsSection': 'Acciones',
     'quickpick.noData': 'Sin datos de cuota',
     'quickpick.openSettings': 'Abrir Configuración',
+    'quickpick.openLogs': 'Ver Registros',
+    'quickpick.refreshCooldown': 'Espere {seconds}s antes de actualizar',
     'quickpick.switchToWebview': 'Cambiar a Modo Webview',
     'quickpick.switchedToWebview': 'Cambiado a modo Webview.',
+    'quickpick.back': 'Atrás',
+    'quickpick.selectAction': 'Seleccionar acción',
 
     // Fallback de Webview
     'webview.failedPrompt': 'Error al cargar Webview. ¿Cambiar al modo de compatibilidad QuickPick?',

@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.5.20] - 2025-12-21
+
+### Added
+- **QuickPick Mode**: Full grouping mode support - now mirrors Webview's grouping functionality
+- **QuickPick Mode**: Title bar action buttons (Refresh, Toggle Grouping, Logs, Settings, Webview)
+- **QuickPick Mode**: Auto-group button in title bar (only visible in grouping mode)
+- **QuickPick Mode**: Rename and reset buttons for each model/group item
+- **QuickPick Mode**: Refresh cooldown mechanism to prevent rapid consecutive refreshes
+
+### Improved
+- **QuickPick Mode**: Actions moved from list items to title bar buttons for cleaner UI
+- **QuickPick Mode**: Progress bar and reset time moved to detail line for better alignment
+- **Translations**: Added QuickPick-specific translations for all 13 supported languages
+
+---
+
 ## [1.5.19] - 2025-12-21
 
 ### Improved

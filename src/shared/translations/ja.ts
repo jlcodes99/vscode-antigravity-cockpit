@@ -164,13 +164,18 @@ export const ja = {
     'error.invalidResponse': 'サーバー応答が無効です: {details}',
 
     // QuickPickモード
-    'quickpick.placeholder': 'モデルをクリックしてステータスバーの固定を切り替え',
+    'quickpick.placeholder': 'モデルをクリックして固定 | 右上: 更新、グループ、ログ、設定、Webview',
+    'quickpick.placeholderGrouped': 'グループをクリックして固定 | 右上: 更新、グループ、ログ、設定、Webview、自動グループ',
     'quickpick.quotaSection': 'モデルクォータ',
     'quickpick.actionsSection': 'アクション',
     'quickpick.noData': 'クォータデータなし',
     'quickpick.openSettings': '設定を開く',
+    'quickpick.openLogs': 'ログを表示',
+    'quickpick.refreshCooldown': '{seconds}秒後に更新してください',
     'quickpick.switchToWebview': 'Webviewモードに切り替え',
     'quickpick.switchedToWebview': 'Webviewモードに切り替えました。',
+    'quickpick.back': '戻る',
+    'quickpick.selectAction': 'アクションを選択',
 
     // Webviewフォールバック
     'webview.failedPrompt': 'Webviewの読み込みに失敗しました。QuickPick互換モードに切り替えますか？',

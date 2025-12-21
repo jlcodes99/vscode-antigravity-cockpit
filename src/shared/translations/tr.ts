@@ -164,13 +164,18 @@ export const tr = {
     'error.invalidResponse': 'Geçersiz sunucu yanıtı: {details}',
 
     // QuickPick Modu
-    'quickpick.placeholder': 'Durum çubuğu sabitlemesini değiştirmek için bir modele tıklayın',
+    'quickpick.placeholder': 'Model tıkla sabitlemek için | Sağ üst: Yenile, Grup, Günlükler, Ayarlar, Webview',
+    'quickpick.placeholderGrouped': 'Grup tıkla sabitlemek için | Sağ üst: Yenile, Grup, Günlükler, Ayarlar, Webview, Oto-grup',
     'quickpick.quotaSection': 'Model Kotaları',
     'quickpick.actionsSection': 'Eylemler',
     'quickpick.noData': 'Kota verisi yok',
     'quickpick.openSettings': 'Ayarları Aç',
+    'quickpick.openLogs': 'Günlükleri Görüntüle',
+    'quickpick.refreshCooldown': 'Yenilemeden önce {seconds}s bekleyin',
     'quickpick.switchToWebview': 'Webview Moduna Geç',
     'quickpick.switchedToWebview': 'Webview moduna geçildi.',
+    'quickpick.back': 'Geri',
+    'quickpick.selectAction': 'Eylem seç',
 
     // Webview Fallback
     'webview.failedPrompt': 'Webview yüklenemedi. QuickPick uyumluluk moduna geçilsin mi?',

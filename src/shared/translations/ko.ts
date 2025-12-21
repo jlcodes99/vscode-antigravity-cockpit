@@ -164,13 +164,18 @@ export const ko = {
     'error.invalidResponse': '잘못된 서버 응답: {details}',
 
     // QuickPick 모드
-    'quickpick.placeholder': '모델을 클릭하여 상태 표시줄 고정 전환',
+    'quickpick.placeholder': '모델 클릭하여 고정 | 오른쪽 상단: 새로고침, 그룹, 로그, 설정, Webview',
+    'quickpick.placeholderGrouped': '그룹 클릭하여 고정 | 오른쪽 상단: 새로고침, 그룹, 로그, 설정, Webview, 자동그룹',
     'quickpick.quotaSection': '모델 할당량',
     'quickpick.actionsSection': '작업',
     'quickpick.noData': '할당량 데이터 없음',
     'quickpick.openSettings': '설정 열기',
+    'quickpick.openLogs': '로그 보기',
+    'quickpick.refreshCooldown': '{seconds}초 후에 새로고침하세요',
     'quickpick.switchToWebview': 'Webview 모드로 전환',
     'quickpick.switchedToWebview': 'Webview 모드로 전환됨.',
+    'quickpick.back': '뒤로',
+    'quickpick.selectAction': '작업 선택',
 
     // Webview 폴백
     'webview.failedPrompt': 'Webview 로드 실패. QuickPick 호환 모드로 전환하시겠습니까?',

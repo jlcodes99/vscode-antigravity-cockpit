@@ -164,13 +164,18 @@ export const ptBR = {
     'error.invalidResponse': 'Resposta do servidor inválida: {details}',
 
     // Modo QuickPick
-    'quickpick.placeholder': 'Clique em um modelo para alternar a fixação na barra de status',
+    'quickpick.placeholder': 'Clique no modelo para fixar | Superior direito: Atualizar, Grupo, Logs, Config, Webview',
+    'quickpick.placeholderGrouped': 'Clique no grupo para fixar | Superior direito: Atualizar, Grupo, Logs, Config, Webview, Auto-grupo',
     'quickpick.quotaSection': 'Cotas de Modelos',
     'quickpick.actionsSection': 'Ações',
     'quickpick.noData': 'Sem dados de cota',
     'quickpick.openSettings': 'Abrir Configurações',
+    'quickpick.openLogs': 'Ver Logs',
+    'quickpick.refreshCooldown': 'Aguarde {seconds}s antes de atualizar',
     'quickpick.switchToWebview': 'Mudar para Modo Webview',
     'quickpick.switchedToWebview': 'Mudado para modo Webview.',
+    'quickpick.back': 'Voltar',
+    'quickpick.selectAction': 'Selecionar ação',
 
     // Fallback do Webview
     'webview.failedPrompt': 'Falha ao carregar Webview. Mudar para modo de compatibilidade QuickPick?',

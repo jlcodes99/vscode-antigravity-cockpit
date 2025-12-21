@@ -164,13 +164,18 @@ export const zhTW = {
     'error.invalidResponse': '伺服器回應無效: {details}',
 
     // QuickPick 模式
-    'quickpick.placeholder': '點擊模型可切換狀態列固定',
+    'quickpick.placeholder': '點擊模型固定狀態列 | 右上角操作：重新整理、分組、日誌、設定、切換 Webview',
+    'quickpick.placeholderGrouped': '點擊分組固定狀態列 | 右上角操作：重新整理、分組、日誌、設定、Webview、自動分組',
     'quickpick.quotaSection': '模型配額',
     'quickpick.actionsSection': '操作',
     'quickpick.noData': '暫無配額資料',
     'quickpick.openSettings': '開啟設定',
+    'quickpick.openLogs': '查看日誌',
+    'quickpick.refreshCooldown': '請等待 {seconds} 秒後再重新整理',
     'quickpick.switchToWebview': '切換到 Webview 模式',
     'quickpick.switchedToWebview': '已切換到 Webview 模式。',
+    'quickpick.back': '返回',
+    'quickpick.selectAction': '選擇操作',
 
     // Webview 回退
     'webview.failedPrompt': 'Webview 載入失敗，是否切換到 QuickPick 相容模式？',

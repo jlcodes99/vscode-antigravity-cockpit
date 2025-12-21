@@ -164,13 +164,18 @@ export const de = {
     'error.invalidResponse': 'Ungültige Serverantwort: {details}',
 
     // QuickPick-Modus
-    'quickpick.placeholder': 'Auf Modell klicken um Statusleisten-Anheftung umzuschalten',
+    'quickpick.placeholder': 'Modell klicken zum Anheften | Rechts oben: Aktualisieren, Gruppe, Logs, Einstellungen, Webview',
+    'quickpick.placeholderGrouped': 'Gruppe klicken zum Anheften | Rechts oben: Aktualisieren, Gruppe, Logs, Einstellungen, Webview, Auto-Gruppe',
     'quickpick.quotaSection': 'Modellkontingente',
     'quickpick.actionsSection': 'Aktionen',
     'quickpick.noData': 'Keine Kontingentdaten',
     'quickpick.openSettings': 'Einstellungen öffnen',
+    'quickpick.openLogs': 'Logs anzeigen',
+    'quickpick.refreshCooldown': 'Bitte {seconds}s warten vor Aktualisierung',
     'quickpick.switchToWebview': 'Zu Webview-Modus wechseln',
     'quickpick.switchedToWebview': 'Zu Webview-Modus gewechselt.',
+    'quickpick.back': 'Zurück',
+    'quickpick.selectAction': 'Aktion auswählen',
 
     // Webview-Fallback
     'webview.failedPrompt': 'Webview konnte nicht geladen werden. Zu QuickPick-Kompatibilitätsmodus wechseln?',

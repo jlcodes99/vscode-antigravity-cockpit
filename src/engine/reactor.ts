@@ -564,11 +564,20 @@ export class ReactorCore {
     }
 
     /**
-     * 格式化日期为 ISO 格式
+     * 格式化日期（自动国际化）
      */
     private formatIso(d: Date): string {
-        const pad = (n: number) => n.toString().padStart(2, '0');
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        const dateStr = d.toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        });
+        const timeStr = d.toLocaleTimeString(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+        });
+        return `${dateStr} ${timeStr}`;
     }
 
     /**

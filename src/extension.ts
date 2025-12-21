@@ -93,14 +93,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 async function handleConfigChange(config: CockpitConfig): Promise<void> {
     logger.debug('Configuration changed', config);
 
-    // 如果切换到 QuickPick 模式，自动关闭分组模式（QuickPick 不支持分组）
-    if (config.displayMode === DISPLAY_MODE.QUICKPICK && config.groupingEnabled) {
-        logger.info('Switching to QuickPick mode, disabling grouping');
-        await configService.updateConfig('groupingEnabled', false);
-        // 不需要继续处理，因为 updateConfig 会触发新的 configChange 事件
-        return;
-    }
-
     // 仅当刷新间隔变化时重启 Reactor
     const newInterval = configService.getRefreshIntervalMs();
 

@@ -98,8 +98,8 @@ export const zhCN = {
 
     // Grouping
     'grouping.title': '配额分组',
-    'grouping.enable': '开启分组',
-    'grouping.disable': '关闭分组',
+    'grouping.enable': '打开配额分组',
+    'grouping.disable': '关闭配额分组',
     'grouping.rename': '重命名分组',
     'grouping.renamePrompt': '请输入新的分组名称:',
     'grouping.nameLabel': '分组名称',
@@ -168,13 +168,18 @@ export const zhCN = {
     'error.invalidResponse': '服务器响应无效: {details}',
 
     // QuickPick mode
-    'quickpick.placeholder': '点击模型可切换状态栏固定',
+    'quickpick.placeholder': '点击模型固定状态栏 | 右上角操作：刷新、分组、日志、设置、切换 Webview',
+    'quickpick.placeholderGrouped': '点击分组固定状态栏 | 右上角操作：刷新、分组、日志、设置、Webview、自动分组',
     'quickpick.quotaSection': '模型配额',
     'quickpick.actionsSection': '操作',
     'quickpick.noData': '暂无配额数据',
     'quickpick.openSettings': '打开设置',
+    'quickpick.openLogs': '查看日志',
+    'quickpick.refreshCooldown': '请等待 {seconds} 秒后再刷新',
     'quickpick.switchToWebview': '切换到 Webview 模式',
     'quickpick.switchedToWebview': '已切换到 Webview 模式。',
+    'quickpick.back': '返回',
+    'quickpick.selectAction': '选择操作',
 
     // Webview fallback
     'webview.failedPrompt': 'Webview 加载失败，是否切换到 QuickPick 兼容模式？',

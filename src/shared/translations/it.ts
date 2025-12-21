@@ -164,13 +164,18 @@ export const it = {
     'error.invalidResponse': 'Risposta server non valida: {details}',
 
     // Modalità QuickPick
-    'quickpick.placeholder': 'Clicca su un modello per attivare/disattivare il fissaggio nella barra di stato',
+    'quickpick.placeholder': 'Clicca modello per fissare | In alto a destra: Aggiorna, Gruppo, Log, Impostazioni, Webview',
+    'quickpick.placeholderGrouped': 'Clicca gruppo per fissare | In alto a destra: Aggiorna, Gruppo, Log, Impostazioni, Webview, Auto-gruppo',
     'quickpick.quotaSection': 'Quote Modelli',
     'quickpick.actionsSection': 'Azioni',
     'quickpick.noData': 'Nessun dato quota',
     'quickpick.openSettings': 'Apri Impostazioni',
+    'quickpick.openLogs': 'Visualizza Log',
+    'quickpick.refreshCooldown': 'Attendi {seconds}s prima di aggiornare',
     'quickpick.switchToWebview': 'Passa a Modalità Webview',
     'quickpick.switchedToWebview': 'Passato a modalità Webview.',
+    'quickpick.back': 'Indietro',
+    'quickpick.selectAction': 'Seleziona azione',
 
     // Fallback Webview
     'webview.failedPrompt': 'Caricamento Webview fallito. Passare alla modalità compatibilità QuickPick?',

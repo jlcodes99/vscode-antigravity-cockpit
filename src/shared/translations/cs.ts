@@ -164,13 +164,18 @@ export const cs = {
     'error.invalidResponse': 'Neplatná odpověď serveru: {details}',
 
     // Režim QuickPick
-    'quickpick.placeholder': 'Klikněte na model pro přepnutí připnutí ke stavovému řádku',
+    'quickpick.placeholder': 'Klikněte na model pro připnutí | Vpravo nahoře: Obnovit, Skupina, Logy, Nastavení, Webview',
+    'quickpick.placeholderGrouped': 'Klikněte na skupinu pro připnutí | Vpravo nahoře: Obnovit, Skupina, Logy, Nastavení, Webview, Auto-sk.',
     'quickpick.quotaSection': 'Kvóty Modelů',
     'quickpick.actionsSection': 'Akce',
     'quickpick.noData': 'Žádná data kvóty',
     'quickpick.openSettings': 'Otevřít Nastavení',
+    'quickpick.openLogs': 'Zobrazit Logy',
+    'quickpick.refreshCooldown': 'Počkejte {seconds}s před obnovením',
     'quickpick.switchToWebview': 'Přepnout na Režim Webview',
     'quickpick.switchedToWebview': 'Přepnuto na režim Webview.',
+    'quickpick.back': 'Zpět',
+    'quickpick.selectAction': 'Vyberte akci',
 
     // Fallback Webview
     'webview.failedPrompt': 'Nepodařilo se načíst Webview. Přepnout na režim kompatibility QuickPick?',
