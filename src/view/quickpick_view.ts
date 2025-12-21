@@ -81,9 +81,43 @@ export class QuickPickView {
 
             // 处理模型置顶切换
             if (currentActiveItem.modelId) {
-                await configService.togglePinnedModel(currentActiveItem.modelId);
-                // 刷新菜单
-                pick.items = this.buildMenuItems();
+                const targetModelId = currentActiveItem.modelId;
+                
+                // 先切换置顶状态
+                await configService.togglePinnedModel(targetModelId);
+                
+                // 获取更新后的置顶状态
+                const config = configService.getConfig();
+                const isPinnedNow = config.pinnedModels.some(
+                    p => p.toLowerCase() === targetModelId.toLowerCase(),
+                );
+                
+                // 局部刷新：只更新被点击项的 label（切换图标）
+                const currentItems = [...pick.items] as QuotaQuickPickItem[];
+                const targetIndex = currentItems.findIndex(
+                    item => item.modelId === targetModelId,
+                );
+                
+                if (targetIndex >= 0) {
+                    const oldItem = currentItems[targetIndex];
+                    const newPinIcon = isPinnedNow ? '$(pinned)' : '$(circle-outline)';
+                    // 替换 label 中的图标（第一个图标是 pin 状态）
+                    const newLabel = oldItem.label.replace(
+                        /^\$\((pinned|circle-outline)\)/,
+                        newPinIcon,
+                    );
+                    
+                    // 创建更新后的项
+                    const updatedItem: QuotaQuickPickItem = {
+                        ...oldItem,
+                        label: newLabel,
+                    };
+                    currentItems[targetIndex] = updatedItem;
+                    
+                    // 更新列表并保持选中位置
+                    pick.items = currentItems;
+                    pick.activeItems = [updatedItem];
+                }
             }
         });
 
@@ -157,20 +191,11 @@ export class QuickPickView {
                     p => p.toLowerCase() === model.modelId.toLowerCase(),
                 );
 
-                // 状态图标
-                const statusIcon = model.isExhausted 
-                    ? '$(error)' 
-                    : pct < config.criticalThreshold 
-                        ? '$(error)' 
-                        : pct < config.warningThreshold 
-                            ? '$(warning)' 
-                            : '$(check)';
-
                 // 置顶标识
                 const pinIcon = isPinned ? '$(pinned)' : '$(circle-outline)';
 
                 items.push({
-                    label: `${pinIcon} ${statusIcon} ${model.label}`,
+                    label: `${pinIcon} ${model.label}`,
                     description: `${bar} ${pct.toFixed(1)}%`,
                     detail: `    ${t('dashboard.resetIn')}: ${model.timeUntilResetFormatted}`,
                     modelId: model.modelId,

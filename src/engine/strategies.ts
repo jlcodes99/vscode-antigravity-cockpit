@@ -340,20 +340,20 @@ export class UnixStrategy implements PlatformStrategy {
 
         // macOS: 优先使用 lsof
         if (this.platform === 'darwin') {
-            return `lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | grep -E "^\\S+\\s+${pid}\\s"`;
+            return `lsof -nP -a -iTCP -sTCP:LISTEN -p ${pid} 2>/dev/null | grep -E "^\\S+\\s+${pid}\\s"`;
         }
 
         // Linux: 根据检测到的可用命令选择
         switch (this.availablePortCommand) {
             case 'lsof':
-                return `lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | grep -E "^\\S+\\s+${pid}\\s"`;
+                return `lsof -nP -a -iTCP -sTCP:LISTEN -p ${pid} 2>/dev/null | grep -E "^\\S+\\s+${pid}\\s"`;
             case 'ss':
                 return `ss -tlnp 2>/dev/null | grep "pid=${pid},"`;
             case 'netstat':
                 return `netstat -tulpn 2>/dev/null | grep ${pid}`;
             default:
                 // 回退：尝试多个命令
-                return `ss -tlnp 2>/dev/null | grep "pid=${pid}," || lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | grep -E "^\\S+\\s+${pid}\\s" || netstat -tulpn 2>/dev/null | grep ${pid}`;
+                return `ss -tlnp 2>/dev/null | grep "pid=${pid}," || lsof -nP -a -iTCP -sTCP:LISTEN -p ${pid} 2>/dev/null | grep -E "^\\S+\\s+${pid}\\s" || netstat -tulpn 2>/dev/null | grep ${pid}`;
         }
     }
 

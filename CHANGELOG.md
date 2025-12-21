@@ -8,6 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.5.19] - 2025-12-21
+
+### Improved
+- **QuickPick Mode**: Partial refresh when toggling pin status - only update the clicked item instead of rebuilding the entire list
+- **QuickPick Mode**: Removed redundant status icons (check/warning/error), keeping only the pin icon for cleaner UI
+
+---
+
 ## [1.5.18] - 2025-12-19
 
 ### Improved
