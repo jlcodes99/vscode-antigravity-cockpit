@@ -1,253 +1,211 @@
-# Antigravity Cockpit 🚀
+# Antigravity Cockpit
 
-> A futuristic dashboard for monitoring Google Antigravity AI quotas in VS Code.
-
-[English] · [Chinese](README.zh-CN.md)
+English · [简体中文](README.zh-CN.md)
 
 [![Version](https://img.shields.io/open-vsx/v/jlcodes/antigravity-cockpit)](https://open-vsx.org/extension/jlcodes/antigravity-cockpit)
 [![GitHub stars](https://img.shields.io/github/stars/jlcodes99/vscode-antigravity-cockpit?style=flat&color=gold)](https://github.com/jlcodes99/vscode-antigravity-cockpit)
 [![GitHub issues](https://img.shields.io/github/issues/jlcodes99/vscode-antigravity-cockpit)](https://github.com/jlcodes99/vscode-antigravity-cockpit/issues)
 [![License](https://img.shields.io/github/license/jlcodes99/vscode-antigravity-cockpit)](https://github.com/jlcodes99/vscode-antigravity-cockpit)
 
-**Antigravity Cockpit** transforms your coding experience with a premium, Cyberpunk-styled HUD for monitoring AI model quotas. Say goodbye to guessing when your models limits reset.
+VS Code extension for monitoring Google Antigravity AI model quotas.
 
-![Antigravity Cockpit Dashboard](assets/dashboard_preview.png)
+**Features**: Webview Dashboard · QuickPick Mode · Quota Grouping · Auto-Grouping · Rename · Card/List View · Drag-and-Drop Sorting · Status Bar Monitor · Threshold Notifications · Privacy Mode
 
----
+**Languages**: Follows VS Code language setting, supports 14 languages
 
-## ✨ Features
-
-### 🚀 Immersive Dashboard
-A beautiful, dark-mode Webview visualization of all your AI models (**Gemini 3 Pro (High)**, **Claude Sonnet 4.5**, **GPT-OSS 120B (Medium)**, etc.) with real-time health gauges.
-
-### ⏱️ Precision Timing
-Know *exactly* when to get back to work. Displays both a countdown (e.g., `4h 40m`) and the absolute reset timestamp (e.g., `15:16:25`).
-
-### 👆 Interactive Control
-- **Drag & Drop**: Arrange models exactly how you want them. Your layout is saved automatically.
-- **Pin to Bar**: Toggle which models appear in your VS Code status bar directly from the card.
-- **One-Click Refresh**: Need data now? Hit the refresh button (120s cooldown).
-
-### 📊 Smart Status Bar
-- Shows pinned models side-by-side (e.g., `🚀 Gemini 3 Pro (High): 100% | Claude Sonnet 4.5: 86%`).
-- If nothing is pinned, intelligently monitors the **lowest quota** model to keep you safe.
-- Customizable display formats: compact, standard, or detailed.
-
-### 🔔 Smart Notifications
-- Get notified when a model's quota is **exhausted** or running **low** (< 30%).
-- Notifications can be disabled in settings if you prefer a quiet experience.
-
-### 🌐 Multi-language Support
-- Supports **English** and **Chinese**.
-- Automatically detects your VS Code language setting.
-
-
-### 💎 Stable & Fast
-- **Instant Rehydration**: Dashboard state is cached, so it loads instantly even after being backgrounded.
-- **Zero-Config**: Auto-detects local Antigravity processes without manual setup.
-- **VS Code Theme Integration**: Automatically adapts to your light or dark theme.
+🇺🇸 English · 🇨🇳 简体中文 · 🇹🇼 繁體中文 · 🇯🇵 日本語 · 🇩🇪 Deutsch · 🇪🇸 Español · 🇫🇷 Français · 🇮🇹 Italiano · 🇰🇷 한국어 · 🇧🇷 Português · 🇷🇺 Русский · 🇹🇷 Türkçe · 🇵🇱 Polski · 🇨🇿 Čeština
 
 ---
 
-## 🕹️ Usage
+## Features
 
-1. **Open**: 
-   - Click the **$(rocket) Cockpit** item in your status bar
+### Display Modes
 
-2. **Customize**:
-   - **Pin**: Flip the switch on a model card to see it in the status bar.
-   - **Order**: Drag cards to reorder (look for the ⋮⋮ handle).
-   - **Credits**: Toggle "Show Prompt Credits" at the top right if you use them.
+Two display modes available, configurable via `agCockpit.displayMode`:
 
-3. **Troubleshoot**:
-   - If the dashboard shows "Systems Offline", click **Retry Connection**.
-   - Use the **Open Logs** button to view detailed debug information.
+#### Webview Dashboard
+
+![Dashboard Overview](assets/dashboard_card_grouped.png)
+
+- **Card View / List View**: Two layouts, switchable in settings panel
+- **Grouping Mode**: Aggregates models by quota pool
+- **Non-Grouping Mode**: Shows individual model quotas
+- **Drag-and-Drop Sorting**: Reorder cards by dragging
+- **Auto-Grouping**: Automatically categorizes models by quota pool
+
+![List View](assets/dashboard_list_view.png)
+
+#### QuickPick Mode
+
+![QuickPick Mode](assets/quickpick_mode.png)
+
+Uses VS Code native QuickPick API, suitable for:
+- Environments where Webview cannot load
+- Users who prefer keyboard navigation
+- Quick quota checks
+
+Features:
+- Supports grouping / non-grouping mode
+- Title bar buttons: Refresh, Toggle Grouping, Logs, Settings, Switch to Webview
+- Pin models to status bar
+- Rename models and groups
 
 ---
 
-## ⚙️ Configuration
+### Status Bar
 
-We believe in **Interactivity over Configuration**. All major preferences (Sorting, Pinning, Visibility) are managed directly via the UI.
+Displays quota status of monitored models. 6 formats available:
 
-### Available Settings
+| Format | Example |
+|--------|---------|
+| Icon only | `🚀` |
+| Dot only | `🟢` / `🟡` / `🔴` |
+| Percent only | `95%` |
+| Dot + Percent | `🟢 95%` |
+| Name + Percent | `Sonnet: 95%` |
+| Full display | `🟢 Sonnet: 95%` |
+
+- **Multi-Model Pinning**: Monitor multiple models simultaneously
+- **Auto-Monitor**: Shows the model with lowest remaining quota when no model is pinned
+
+---
+
+### Quota Display
+
+Each model / group shows:
+- **Remaining quota percentage**
+- **Countdown**: e.g., `4h 40m`
+- **Reset time**: e.g., `15:16`
+- **Progress bar**: Visual representation of remaining quota
+
+---
+
+### Model Capabilities Tooltip
+
+![Model Capabilities Tooltip](assets/model_capabilities_tooltip.png)
+
+Hover over model name to view:
+- Supported input types (text, image, video, etc.)
+- Context window size
+- Other capability tags
+
+---
+
+### Grouping Feature
+
+- **Group by Quota Pool**: Models sharing quota pools are grouped automatically or manually
+- **Custom Group Names**: Click edit icon to rename
+- **Group Sorting**: Drag to reorder groups
+- **Group Pinning**: Pin groups to status bar
+
+---
+
+### Settings Panel
+
+![Settings Modal](assets/settings_modal.png)
+
+Open via gear icon in dashboard header. Configure:
+- Status bar display format
+- Warning threshold (yellow)
+- Critical threshold (red)
+- View mode (card / list)
+- Notification toggle
+
+---
+
+### Profile Panel
+
+Displays:
+- Subscription tier
+- User ID
+- Collapsible, sensitive data can be masked
+
+---
+
+### Notifications
+
+Sends notifications when model quota falls below warning threshold or is exhausted. Can be disabled in settings.
+
+---
+
+## Usage
+
+1. **Open**:
+   - Click status bar icon
+   - Or `Ctrl/Cmd+Shift+Q`
+   - Or run `Antigravity Cockpit: Open Dashboard` from command palette
+
+2. **Refresh**: Click refresh button or `Ctrl/Cmd+Shift+R` (when dashboard is active)
+
+3. **Troubleshooting**:
+   - Click **Retry Connection** when showing "Systems Offline"
+   - Click **Open Logs** to view debug logs
+
+---
+
+## Configuration
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `agCockpit.refreshInterval` | `120` | Polling frequency in seconds (10-3600) |
-| `agCockpit.showPromptCredits` | `false` | Show prompt credits in dashboard |
-| `agCockpit.pinnedModels` | `[]` | Models to show in status bar |
-| `agCockpit.logLevel` | `info` | Log verbosity: debug, info, warn, error |
-| `agCockpit.notificationEnabled` | `true` | Show quota notifications |
-| `agCockpit.statusBarFormat` | `standard` | Display format: compact, standard, detailed |
-
-### Example `settings.json`:
-
-```json
-{
-  "agCockpit.refreshInterval": 120,
-  "agCockpit.showPromptCredits": true,
-  "agCockpit.pinnedModels": ["Gemini 3 Pro (High)", "Claude Sonnet 4.5"],
-  "agCockpit.statusBarFormat": "detailed",
-  "agCockpit.logLevel": "debug"
-}
-```
+| `agCockpit.displayMode` | `webview` | Display mode: `webview` / `quickpick` |
+| `agCockpit.viewMode` | `card` | View mode: `card` / `list` |
+| `agCockpit.refreshInterval` | `120` | Refresh interval (seconds, 10-3600) |
+| `agCockpit.statusBarFormat` | `standard` | Status bar format |
+| `agCockpit.groupingEnabled` | `true` | Enable grouping mode |
+| `agCockpit.warningThreshold` | `30` | Warning threshold (%) |
+| `agCockpit.criticalThreshold` | `10` | Critical threshold (%) |
+| `agCockpit.notificationEnabled` | `true` | Enable notifications |
+| `agCockpit.pinnedModels` | `[]` | Models pinned to status bar |
+| `agCockpit.pinnedGroups` | `[]` | Groups pinned to status bar |
 
 ---
 
-## 📦 Installation
+## Installation
 
-### Method 1: From Open VSX Registry (Recommended)
+### Open VSX Marketplace
+1. `Cmd/Ctrl+Shift+X` to open Extensions panel
+2. Search `Antigravity Cockpit`
+3. Click Install
 
-1. Open your editor (VSCodium / Code - OSS, etc.)
-2. Press `Cmd+Shift+X` (macOS) / `Ctrl+Shift+X` (Windows/Linux) to open Extensions
-3. Search for `Antigravity Cockpit` or `antigravity-cockpit`
-4. Click **Install**
-
-### Method 2: From VSIX File (CLI)
-
+### VSIX File
 ```bash
-# Download or build the .vsix file first, then:
 code --install-extension antigravity-cockpit-x.y.z.vsix
 ```
 
-### Method 3: From VSIX File (Drag & Drop)
-
-1. Download or build the `.vsix` file
-2. Open VS Code
-3. Open Extensions panel (`Cmd+Shift+X` / `Ctrl+Shift+X`)
-4. Drag the `.vsix` file into the Extensions panel
-5. Or click `...` menu → **Install from VSIX...** → Select the file
-
-### Method 4: Install from Source
-
-See [Building from Source](#-building-from-source) below.
-
 ---
 
-## 🔧 Building from Source
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) v18 or higher
-- [npm](https://www.npmjs.com/) v9 or higher
-- [VS Code](https://code.visualstudio.com/) v1.90 or higher
-
-### Step 1: Clone & Install
+## Build from Source
 
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/jlcodes99/vscode-antigravity-cockpit.git
 cd vscode-antigravity-cockpit
 
 # Install dependencies
 npm install
-```
 
-### Step 2: Compile
-
-```bash
-# Compile TypeScript to JavaScript
+# Compile
 npm run compile
-```
 
-### Step 3: Package (Optional)
-
-```bash
-# Create .vsix package file
+# Package
 npm run package
-
-# This will generate: antigravity-cockpit-x.x.x.vsix
 ```
 
-### Step 4: Install
-
-**Option A: Command Line**
-```bash
-code --install-extension antigravity-cockpit-x.y.z.vsix
-```
-
-**Option B: Drag & Drop**
-1. Open VS Code Extensions panel
-2. Drag the `.vsix` file into it
-
-**Option C: VS Code Menu**
-1. Open Extensions panel
-2. Click `...` menu at top-right
-3. Select **Install from VSIX...**
-4. Choose the `.vsix` file
-
-### Step 5: Debug Mode (Development)
-
-1. Open the project in VS Code
-2. Press `F5` to launch Extension Development Host
-3. A new VS Code window will open with the extension loaded
-
-### Available Scripts
-
-| Script | Description |
-|--------|-------------|
-| `npm run compile` | Compile TypeScript + copy webview assets |
-| `npm run watch` | Watch mode compilation |
-| `npm run lint` | Run ESLint |
-| `npm run lint:fix` | Fix ESLint issues |
-| `npm run package` | Create .vsix package |
+Requirements: Node.js v18+, npm v9+
 
 ---
 
-## 📁 Project Structure
+## Changelog
 
-```
-src/
-├── extension.ts              # Extension entry point
-├── engine/
-│   ├── hunter.ts             # Process detection
-│   ├── reactor.ts            # API communication
-│   └── strategies.ts         # Platform-specific strategies
-├── shared/
-│   ├── config_service.ts     # Configuration management
-│   ├── constants.ts          # Constants and magic values
-│   ├── i18n.ts               # Internationalization
-│   ├── log_service.ts        # Logging service
-│   └── types.ts              # TypeScript type definitions
-└── view/
-    ├── hud.ts                # Webview panel management
-    └── webview/
-        ├── dashboard.css     # Dashboard styles
-        └── dashboard.js      # Dashboard logic
-```
+- [CHANGELOG.md](CHANGELOG.md) (English)
+- [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md) (Chinese)
 
 ---
 
-## 🤝 Contributing
+## Support
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-### Development Guidelines
-
-- Follow the ESLint configuration (`.eslintrc.json`)
-- Use TypeScript with strict mode
-- Add JSDoc comments to public APIs
-- Test on Windows, macOS, and Linux if possible
-
----
-
-## 📝 Changelog
-
-For a complete list of changes and version history, see:
-- English: [CHANGELOG.md](CHANGELOG.md)
-- Chinese: [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)
-
----
-
-## ⭐ Support This Project
-
-If you find **Antigravity Cockpit** useful, consider giving it a star on GitHub! Your support helps keep this project alive and motivates further development.
-
-[![GitHub stars](https://img.shields.io/github/stars/jlcodes99/vscode-antigravity-cockpit?style=social)](https://github.com/jlcodes99/vscode-antigravity-cockpit)
-
-- ⭐ **[Star on GitHub](https://github.com/jlcodes99/vscode-antigravity-cockpit)** - Show your support!
-- 💬 **[Report Issues / Feedback](https://github.com/jlcodes99/vscode-antigravity-cockpit/issues)** - Help us improve!
-- 📖 **[Open on Open VSX](https://open-vsx.org/extension/jlcodes/antigravity-cockpit)** - View details / leave feedback!
+- ⭐ [GitHub Star](https://github.com/jlcodes99/vscode-antigravity-cockpit)
+- 💬 [Report Issues](https://github.com/jlcodes99/vscode-antigravity-cockpit/issues)
 
 ---
 
