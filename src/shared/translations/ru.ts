@@ -31,7 +31,7 @@ export const ru = {
     'dashboard.active': 'Здоров',
     'dashboard.warning': 'Предупреждение',
     'dashboard.danger': 'Опасность',
-    'dashboard.online': 'Восстановлено',
+    'dashboard.online': 'Скоро восстановится',
     'dashboard.dragHint': 'Перетащите для сортировки',
     'dashboard.pinHint': 'Закрепить в строке состояния',
     'dashboard.resetOrder': 'Сбросить порядок',

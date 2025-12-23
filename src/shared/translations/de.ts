@@ -31,7 +31,7 @@ export const de = {
     'dashboard.active': 'Gesund',
     'dashboard.warning': 'Warnung',
     'dashboard.danger': 'Gefahr',
-    'dashboard.online': 'Wiederhergestellt',
+    'dashboard.online': 'Bald wiederhergestellt',
     'dashboard.dragHint': 'Ziehen zum Neuordnen',
     'dashboard.pinHint': 'An Statusleiste anheften',
     'dashboard.resetOrder': 'Reihenfolge zurücksetzen',

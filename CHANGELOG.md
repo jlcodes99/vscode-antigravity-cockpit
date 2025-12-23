@@ -8,6 +8,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.5.32] - 2025-12-23
+
+### Fixed
+- **Translation Key**: Fixed incorrect translation key `status.error` → `statusBar.error` in status bar controller.
+- **Data Masking Persistence**: "Hide Data" state in Plan Details now persists across Dashboard reopens and restarts.
+- **Variable Declaration Order**: Moved `isProfileHidden` and `isDataMasked` declarations to top of dashboard.js for better code organization.
+
+### Improved
+- **UX**: Changed reset countdown text from "Restored" to "Restoring Soon" for more accurate representation (quota restore has latency).
+- **i18n**: Updated `dashboard.online` translations in all 14 languages.
+
 ## [1.5.31] - 2025-12-23
 
 ### Fixed

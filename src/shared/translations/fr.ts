@@ -31,7 +31,7 @@ export const fr = {
     'dashboard.active': 'Sain',
     'dashboard.warning': 'Avertissement',
     'dashboard.danger': 'Danger',
-    'dashboard.online': 'Restauré',
+    'dashboard.online': 'Bientôt restauré',
     'dashboard.dragHint': 'Glisser pour réorganiser',
     'dashboard.pinHint': 'Épingler à la barre d\'état',
     'dashboard.resetOrder': 'Réinitialiser l\'ordre',

@@ -31,7 +31,7 @@ export const zhTW = {
     'dashboard.active': '健康',
     'dashboard.warning': '警告',
     'dashboard.danger': '危險',
-    'dashboard.online': '已恢復',
+    'dashboard.online': '即將恢復',
     'dashboard.dragHint': '拖曳排序',
     'dashboard.pinHint': '固定到狀態列',
     'dashboard.resetOrder': '重置排序',

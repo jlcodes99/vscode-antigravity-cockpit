@@ -31,7 +31,7 @@ export const ko = {
     'dashboard.active': '정상',
     'dashboard.warning': '경고',
     'dashboard.danger': '위험',
-    'dashboard.online': '복구됨',
+    'dashboard.online': '곧 복구됨',
     'dashboard.dragHint': '드래그하여 재정렬',
     'dashboard.pinHint': '상태 표시줄에 고정',
     'dashboard.resetOrder': '순서 초기화',

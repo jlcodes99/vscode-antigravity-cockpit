@@ -34,7 +34,7 @@ export const en = {
     'dashboard.active': 'Healthy',
     'dashboard.warning': 'Warning',
     'dashboard.danger': 'Danger',
-    'dashboard.online': 'Restored',
+    'dashboard.online': 'Restoring Soon',
     'dashboard.dragHint': 'Drag to reorder',
     'dashboard.pinHint': 'Pin to Status Bar',
     'dashboard.resetOrder': 'Reset Order',

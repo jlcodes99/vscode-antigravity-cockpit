@@ -107,6 +107,7 @@ export class CockpitHUD {
                 profileHidden: config.profileHidden,
                 viewMode: config.viewMode,
                 displayMode: config.displayMode,
+                dataMasked: config.dataMasked,
             });
         }
     }

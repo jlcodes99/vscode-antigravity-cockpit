@@ -31,7 +31,7 @@ export const ptBR = {
     'dashboard.active': 'Saudável',
     'dashboard.warning': 'Aviso',
     'dashboard.danger': 'Perigo',
-    'dashboard.online': 'Restaurado',
+    'dashboard.online': 'Em breve restaurado',
     'dashboard.dragHint': 'Arraste para reordenar',
     'dashboard.pinHint': 'Fixar na barra de status',
     'dashboard.resetOrder': 'Redefinir ordem',

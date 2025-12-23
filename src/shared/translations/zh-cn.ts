@@ -34,7 +34,7 @@ export const zhCN = {
     'dashboard.active': '健康',
     'dashboard.warning': '警告',
     'dashboard.danger': '危险',
-    'dashboard.online': '已恢复',
+    'dashboard.online': '即将恢复',
     'dashboard.dragHint': '拖拽排序',
     'dashboard.pinHint': '固定到状态栏',
     'dashboard.resetOrder': '重置排序',

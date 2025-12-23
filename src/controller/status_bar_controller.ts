@@ -178,7 +178,7 @@ export class StatusBarController {
     }
 
     public setError(message: string): void {
-        this.statusBarItem.text = `$(error) ${t('status.error')}`;
+        this.statusBarItem.text = `$(error) ${t('statusBar.error')}`;
         this.statusBarItem.tooltip = message;
         this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
     }

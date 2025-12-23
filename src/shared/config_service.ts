@@ -47,6 +47,8 @@ export interface CockpitConfig {
     profileHidden: boolean;
     /** 视图模式 (card | list) */
     viewMode: string;
+    /** 是否遮罩敏感数据 */
+    dataMasked: boolean;
 }
 
 /** 配置服务类 */
@@ -90,6 +92,7 @@ class ConfigService {
             displayMode: config.get<string>(CONFIG_KEYS.DISPLAY_MODE, DISPLAY_MODE.WEBVIEW),
             profileHidden: config.get<boolean>(CONFIG_KEYS.PROFILE_HIDDEN, false),
             viewMode: config.get<string>(CONFIG_KEYS.VIEW_MODE, 'card'),
+            dataMasked: config.get<boolean>(CONFIG_KEYS.DATA_MASKED, false),
         };
     }
 

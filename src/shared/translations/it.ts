@@ -31,7 +31,7 @@ export const it = {
     'dashboard.active': 'Sano',
     'dashboard.warning': 'Avviso',
     'dashboard.danger': 'Pericolo',
-    'dashboard.online': 'Ripristinato',
+    'dashboard.online': 'Presto ripristinato',
     'dashboard.dragHint': 'Trascina per riordinare',
     'dashboard.pinHint': 'Fissa alla barra di stato',
     'dashboard.resetOrder': 'Reimposta ordine',

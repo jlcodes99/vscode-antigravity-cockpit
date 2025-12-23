@@ -285,6 +285,15 @@ export class MessageController {
                         }
                     }
                     break;
+
+                case 'updateDataMasked':
+                    // 更新数据遮罩状态
+                    if (message.dataMasked !== undefined) {
+                        logger.info(`User changed data masking to: ${message.dataMasked}`);
+                        await configService.updateConfig('dataMasked', message.dataMasked);
+                        this.reactor.reprocess();
+                    }
+                    break;
             }
         });
     }

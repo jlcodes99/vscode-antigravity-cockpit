@@ -31,7 +31,7 @@ export const cs = {
     'dashboard.active': 'Zdravý',
     'dashboard.warning': 'Varování',
     'dashboard.danger': 'Nebezpečí',
-    'dashboard.online': 'Obnoveno',
+    'dashboard.online': 'Brzy obnoveno',
     'dashboard.dragHint': 'Přetáhněte pro změnu pořadí',
     'dashboard.pinHint': 'Připnout na stavový řádek',
     'dashboard.resetOrder': 'Resetovat pořadí',

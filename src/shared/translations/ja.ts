@@ -31,7 +31,7 @@ export const ja = {
     'dashboard.active': '正常',
     'dashboard.warning': '警告',
     'dashboard.danger': '危険',
-    'dashboard.online': '復旧',
+    'dashboard.online': 'まもなく復旧',
     'dashboard.dragHint': 'ドラッグで並び替え',
     'dashboard.pinHint': 'ステータスバーに固定',
     'dashboard.resetOrder': '順序をリセット',

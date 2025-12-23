@@ -31,7 +31,7 @@ export const pl = {
     'dashboard.active': 'Zdrowy',
     'dashboard.warning': 'Ostrzeżenie',
     'dashboard.danger': 'Niebezpieczeństwo',
-    'dashboard.online': 'Przywrócone',
+    'dashboard.online': 'Wkrótce przywrócone',
     'dashboard.dragHint': 'Przeciągnij, aby zmienić kolejność',
     'dashboard.pinHint': 'Przypnij do paska stanu',
     'dashboard.resetOrder': 'Resetuj kolejność',

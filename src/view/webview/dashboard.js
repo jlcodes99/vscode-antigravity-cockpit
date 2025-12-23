@@ -32,6 +32,8 @@
     let isRenamingModel = false; // 标记是否正在重命名模型（而非分组）
     let currentViewMode = 'card';
     let renameOriginalName = ''; // 原始名称（用于重置）
+    let isProfileHidden = false;  // 控制整个计划详情卡片的显示/隐藏
+    let isDataMasked = false;     // 控制数据是否显示为 ***
 
     // 刷新冷却时间（秒），默认 120 秒
     let refreshCooldown = 120;
@@ -49,11 +51,7 @@
             }
         }
         
-        // isProfileHidden and currentViewMode are now loaded from config in handleMessage
-        // Only restore data masking from webview state
-        if (state.isDataMasked !== undefined) {
-            isDataMasked = state.isDataMasked;
-        }
+        // isProfileHidden, currentViewMode, and isDataMasked are now loaded from config in handleMessage
 
         // 绑定事件
         refreshBtn.addEventListener('click', handleRefresh);
@@ -483,6 +481,10 @@
                 }
                 if (message.config.viewMode) {
                     currentViewMode = message.config.viewMode;
+                }
+                // 从配置读取 dataMasked 状态（持久化存储）
+                if (message.config.dataMasked !== undefined) {
+                    isDataMasked = message.config.dataMasked;
                 }
             }
             
@@ -1113,8 +1115,6 @@
 
     // State for profile toggle
     let isProfileExpanded = false;
-    let isProfileHidden = false;  // 控制整个计划详情卡片的显示/隐藏
-    let isDataMasked = false;     // 控制数据是否显示为 ***
 
     function renderUserProfile(userInfo) {
         // 如果用户选择隐藏计划详情，直接返回不渲染
@@ -1218,10 +1218,8 @@
         if (maskBtn) {
             maskBtn.addEventListener('click', () => {
                 isDataMasked = !isDataMasked;
-                // 保存状态
-                const state = vscode.getState() || {};
-                vscode.setState({ ...state, isDataMasked });
-                vscode.postMessage({ command: 'rerender' });
+                // 发送消息到扩展，持久化存储到配置
+                vscode.postMessage({ command: 'updateDataMasked', dataMasked: isDataMasked });
             });
         }
     }

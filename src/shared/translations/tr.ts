@@ -31,7 +31,7 @@ export const tr = {
     'dashboard.active': 'Sağlıklı',
     'dashboard.warning': 'Uyarı',
     'dashboard.danger': 'Tehlike',
-    'dashboard.online': 'Geri Yüklendi',
+    'dashboard.online': 'Yakında geri yüklenecek',
     'dashboard.dragHint': 'Yeniden sıralamak için sürükleyin',
     'dashboard.pinHint': 'Durum çubuğuna sabitle',
     'dashboard.resetOrder': 'Sırayı Sıfırla',

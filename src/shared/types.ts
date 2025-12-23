@@ -300,7 +300,8 @@ export type WebviewMessageType =
     | 'updateStatusBarFormat'
     | 'toggleProfile'
     | 'updateViewMode'
-    | 'updateDisplayMode';
+    | 'updateDisplayMode'
+    | 'updateDataMasked';
 
 /** Webview 消息 */
 export interface WebviewMessage {
@@ -327,6 +328,8 @@ export interface WebviewMessage {
     viewMode?: string;
     /** 显示模式 (updateDisplayMode) */
     displayMode?: 'webview' | 'quickpick';
+    /** 数据遮罩状态 (updateDataMasked) */
+    dataMasked?: boolean;
 }
 
 /** Dashboard 配置 */
@@ -367,6 +370,8 @@ export interface DashboardConfig {
     viewMode?: string;
     /** 显示模式 (webview | quickpick) */
     displayMode?: string;
+    /** 是否遮罩敏感数据 */
+    dataMasked?: boolean;
 }
 
 /** 状态栏更新数据 */
