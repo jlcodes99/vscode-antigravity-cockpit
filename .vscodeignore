@@ -19,6 +19,7 @@ out/**/*.d.ts
 tsconfig.json
 package-lock.json
 jest.config.js
+.env.local
 
 # Exclude specific assets (KEEP icon.png)
 assets/*
@@ -34,3 +35,6 @@ Thumbs.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Exclude node_modules (dependencies are bundled by esbuild)
+node_modules/**

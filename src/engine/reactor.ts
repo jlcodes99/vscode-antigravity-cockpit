@@ -16,6 +16,7 @@ import { logger } from '../shared/log_service';
 import { configService } from '../shared/config_service';
 import { t } from '../shared/i18n';
 import { TIMING, API_ENDPOINTS } from '../shared/constants';
+import { captureError } from '../shared/error_reporter';
 
 /**
  * 反应堆核心类
@@ -209,6 +210,7 @@ export class ReactorCore {
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
             logger.error(`Telemetry Sync Failed: ${err.message}`);
+            captureError(err, { phase: 'telemetrySync' });
             if (this.errorHandler) {
                 this.errorHandler(err);
             }

@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.5.37]
+
+### Added
+- **Error Reporting**: Lightweight anonymous error reporting to help improve the extension
+  - Automatically captures and reports errors for faster bug fixes
+  - Respects VS Code's global telemetry settings
+  - Can be disabled via `agCockpit.telemetryEnabled` setting
+  - Collects: error stack trace, OS type & version, VS Code version, extension version
+
 ## [1.5.36]
 
 ### Improved

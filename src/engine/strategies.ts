@@ -63,11 +63,11 @@ export class WindowsStrategy implements PlatformStrategy {
             let cleanStdout = stdout;
 
             if (jsonStart >= 0 || jsonObjectStart >= 0) {
-                 // 找到最早的 JSON 开始符号
-                 const start = (jsonStart >= 0 && jsonObjectStart >= 0) 
+                // 找到最早的 JSON 开始符号
+                const start = (jsonStart >= 0 && jsonObjectStart >= 0) 
                     ? Math.min(jsonStart, jsonObjectStart) 
                     : Math.max(jsonStart, jsonObjectStart);
-                 cleanStdout = stdout.substring(start);
+                cleanStdout = stdout.substring(start);
             }
 
             let data = JSON.parse(cleanStdout.trim());
@@ -84,26 +84,26 @@ export class WindowsStrategy implements PlatformStrategy {
             const candidates: ProcessInfo[] = [];
 
             for (const item of data) {
-                 const commandLine = item.CommandLine || '';
-                 if (!commandLine || !this.isAntigravityProcess(commandLine)) {
-                     continue;
-                 }
+                const commandLine = item.CommandLine || '';
+                if (!commandLine || !this.isAntigravityProcess(commandLine)) {
+                    continue;
+                }
 
-                 const pid = item.ProcessId;
-                 if (!pid) { continue; }
+                const pid = item.ProcessId;
+                if (!pid) { continue; }
 
-                 const portMatch = commandLine.match(/--extension_server_port[=\s]+(\d+)/);
-                 const tokenMatch = commandLine.match(/--csrf_token[=\s]+([a-f0-9-]+)/i);
+                const portMatch = commandLine.match(/--extension_server_port[=\s]+(\d+)/);
+                const tokenMatch = commandLine.match(/--csrf_token[=\s]+([a-f0-9-]+)/i);
 
-                 if (!tokenMatch?.[1]) {
-                     logger.warn(`[WindowsStrategy] Cannot extract CSRF Token from PID ${pid}`);
-                     continue;
-                 }
+                if (!tokenMatch?.[1]) {
+                    logger.warn(`[WindowsStrategy] Cannot extract CSRF Token from PID ${pid}`);
+                    continue;
+                }
 
-                 const extensionPort = portMatch?.[1] ? parseInt(portMatch[1], 10) : 0;
-                 const csrfToken = tokenMatch[1];
+                const extensionPort = portMatch?.[1] ? parseInt(portMatch[1], 10) : 0;
+                const csrfToken = tokenMatch[1];
 
-                 candidates.push({ pid, extensionPort, csrfToken });
+                candidates.push({ pid, extensionPort, csrfToken });
             }
 
             logger.info(`[WindowsStrategy] Found ${totalCount} language_server processes, ${candidates.length} belong to Antigravity`);

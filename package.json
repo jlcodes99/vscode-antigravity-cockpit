@@ -3,7 +3,7 @@
   "displayName": "Antigravity Cockpit",
   "icon": "assets/icon.png",
   "description": "A premium, dashboard-style quota monitor for Antigravity AI.",
-  "version": "1.5.36",
+  "version": "1.5.37",
   "publisher": "jlcodes",
   "engines": {
     "vscode": "^1.90.0"
@@ -242,6 +242,12 @@
           "type": "boolean",
           "default": false,
           "description": "Mask sensitive data (email, etc.) in the Plan Details panel."
+        },
+        "agCockpit.telemetryEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable anonymous error reporting to help improve the extension. No personal data is collected.",
+          "tags": ["telemetry", "usesOnlineServices"]
         }
       }
     },
