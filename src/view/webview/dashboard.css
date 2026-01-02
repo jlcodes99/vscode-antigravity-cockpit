@@ -2187,4 +2187,52 @@ input:checked + .slider:before {
     font-weight: 500;
 }
 
+/* Notification Modal Header */
+.notification-header {
+    display: flex;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.announcement-header-title {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+}
+
+.announcement-header-title h3 {
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.icon-btn {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 4px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.icon-btn:hover {
+    color: var(--text-primary);
+    background-color: var(--hover-bg);
+}
+
+.back-btn {
+    font-weight: bold;
+    margin-right: 4px;
+}
+
 

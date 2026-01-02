@@ -752,9 +752,13 @@ export class CockpitHUD {
     <!-- Announcement Popup Modal -->
     <div id="announcement-popup-modal" class="modal hidden">
         <div class="modal-content modal-content-medium announcement-popup-content">
-            <div class="modal-header">
-                <span id="announcement-popup-type" class="announcement-type-badge"></span>
-                <h3 id="announcement-popup-title"></h3>
+            <div class="modal-header notification-header">
+                <button id="announcement-popup-back" class="icon-btn back-btn hidden">←</button>
+                <div class="announcement-header-title">
+                    <span id="announcement-popup-type" class="announcement-type-badge"></span>
+                    <h3 id="announcement-popup-title"></h3>
+                </div>
+                <button id="announcement-popup-close" class="close-btn">×</button>
             </div>
             <div class="modal-body announcement-popup-body">
                 <div id="announcement-popup-content" class="announcement-content"></div>

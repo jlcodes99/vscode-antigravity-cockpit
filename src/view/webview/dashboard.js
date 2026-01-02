@@ -2262,7 +2262,20 @@
                 const id = item.dataset.id;
                 const ann = announcements.find(a => a.id === id);
                 if (ann) {
-                    showAnnouncementPopup(ann);
+                    // 若未读，点击即标记已读
+                    if (announcementState.unreadIds.includes(id)) {
+                        vscode.postMessage({
+                            command: 'announcement.markAsRead',
+                            id: id
+                        });
+                        // 乐观更新本地状态
+                        announcementState.unreadIds = announcementState.unreadIds.filter(uid => uid !== id);
+                        updateAnnouncementBadge();
+                        item.classList.remove('unread');
+                        const dot = item.querySelector('.announcement-unread-dot');
+                        if (dot) dot.remove();
+                    }
+                    showAnnouncementPopup(ann, true);
                     closeAnnouncementList();
                 }
             });
@@ -2283,7 +2296,7 @@
         return (i18n['announcement.timeAgo.daysAgo'] || '{count}d ago').replace('{count}', diffDays);
     }
 
-    function showAnnouncementPopup(ann) {
+    function showAnnouncementPopup(ann, fromList = false) {
         currentPopupAnnouncement = ann;
         
         const typeLabels = {
@@ -2298,6 +2311,10 @@
         const popupContent = document.getElementById('announcement-popup-content');
         const popupAction = document.getElementById('announcement-popup-action');
         const popupGotIt = document.getElementById('announcement-popup-got-it');
+        
+        // Header buttons
+        const backBtn = document.getElementById('announcement-popup-back');
+        const closeBtn = document.getElementById('announcement-popup-close');
 
         if (popupType) {
             popupType.textContent = typeLabels[ann.type] || typeLabels.info;
@@ -2318,16 +2335,41 @@
             if (popupGotIt) popupGotIt.classList.remove('hidden');
         }
 
+        // 处理返回/关闭按钮显示
+        if (fromList) {
+            if (backBtn) {
+                backBtn.classList.remove('hidden');
+                backBtn.onclick = () => {
+                    closeAnnouncementPopup(true); // 跳过动画
+                    openAnnouncementList(); // 返回列表
+                };
+            }
+            // 从列表进入时，关闭也跳过动画
+            if (closeBtn) {
+                closeBtn.onclick = () => {
+                    closeAnnouncementPopup(true);
+                };
+            }
+        } else {
+            if (backBtn) backBtn.classList.add('hidden');
+            // 自动弹窗时，关闭使用动画
+            if (closeBtn) {
+                closeBtn.onclick = () => {
+                    closeAnnouncementPopup();
+                };
+            }
+        }
+
         const modal = document.getElementById('announcement-popup-modal');
         if (modal) modal.classList.remove('hidden');
     }
 
-    function closeAnnouncementPopup() {
+    function closeAnnouncementPopup(skipAnimation = false) {
         const modal = document.getElementById('announcement-popup-modal');
         const modalContent = modal?.querySelector('.announcement-popup-content');
         const bellBtn = document.getElementById('announcement-btn');
         
-        if (modal && modalContent && bellBtn) {
+        if (modal && modalContent && bellBtn && !skipAnimation) {
             // 获取铃铛按钮的位置
             const bellRect = bellBtn.getBoundingClientRect();
             const contentRect = modalContent.getBoundingClientRect();
