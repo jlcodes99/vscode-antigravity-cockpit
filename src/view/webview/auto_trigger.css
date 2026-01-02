@@ -297,6 +297,23 @@
     gap: 6px;
 }
 
+.at-custom-time-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.at-custom-time-label {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+}
+
+.at-input-time-compact {
+    min-width: 110px;
+}
+
 .at-chip {
     padding: 6px 12px;
     background: var(--vscode-input-background);

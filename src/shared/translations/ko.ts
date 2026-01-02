@@ -250,6 +250,8 @@ export const ko = {
     'autoTrigger.weekly': '매주',
     'autoTrigger.interval': '간격',
     'autoTrigger.selectTime': '시간 선택 (다중 선택 가능)',
+    'autoTrigger.customTime': '사용자 지정 시간',
+    'autoTrigger.addTime': '추가',
     'autoTrigger.selectDay': '요일 선택',
     'autoTrigger.workdays': '평일',
     'autoTrigger.weekend': '주말',

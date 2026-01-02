@@ -250,6 +250,8 @@ export const it = {
     'autoTrigger.weekly': 'Settimanale',
     'autoTrigger.interval': 'Intervallo',
     'autoTrigger.selectTime': 'Scegli ora (più di una possibile)',
+    'autoTrigger.customTime': 'Ora personalizzata',
+    'autoTrigger.addTime': 'Aggiungi',
     'autoTrigger.selectDay': 'Scegli giorni',
     'autoTrigger.workdays': 'Giorni feriali',
     'autoTrigger.weekend': 'Fine settimana',

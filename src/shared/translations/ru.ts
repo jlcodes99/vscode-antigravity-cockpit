@@ -250,6 +250,8 @@ export const ru = {
     'autoTrigger.weekly': 'Еженедельно',
     'autoTrigger.interval': 'Интервал',
     'autoTrigger.selectTime': 'Выберите время (можно несколько)',
+    'autoTrigger.customTime': 'Пользовательское время',
+    'autoTrigger.addTime': 'Добавить',
     'autoTrigger.selectDay': 'Выберите дни',
     'autoTrigger.workdays': 'Будни',
     'autoTrigger.weekend': 'Выходные',

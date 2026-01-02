@@ -252,6 +252,8 @@ export const zhCN = {
     'autoTrigger.weekly': '每周',
     'autoTrigger.interval': '间隔',
     'autoTrigger.selectTime': '触发时间（可多选）',
+    'autoTrigger.customTime': '自定义时间',
+    'autoTrigger.addTime': '添加',
     'autoTrigger.selectDay': '选择星期',
     'autoTrigger.workdays': '工作日',
     'autoTrigger.weekend': '周末',

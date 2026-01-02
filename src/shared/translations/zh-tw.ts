@@ -251,6 +251,8 @@ export const zhTW = {
     'autoTrigger.weekly': '每周',
     'autoTrigger.interval': '間隔',
     'autoTrigger.selectTime': '觸發時間（可多選）',
+    'autoTrigger.customTime': '自訂時間',
+    'autoTrigger.addTime': '新增',
     'autoTrigger.selectDay': '選擇星期',
     'autoTrigger.workdays': '工作日',
     'autoTrigger.weekend': '周末',

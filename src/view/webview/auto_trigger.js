@@ -13,6 +13,8 @@
     const i18n = window.__autoTriggerI18n || {};
     const t = (key) => i18n[key] || key;
 
+    const baseTimeOptions = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'];
+
     // 状态
     let currentState = null;
     let availableModels = [];
@@ -28,6 +30,8 @@
     let configIntervalHours = 4;
     let configIntervalStart = '07:00';
     let configIntervalEnd = '22:00';
+    const baseDailyTimes = [...baseTimeOptions];
+    const baseWeeklyTimes = [...baseTimeOptions];
 
     // ============ 初始化 ============
 
@@ -73,6 +77,7 @@
         document.getElementById('at-mode-select')?.addEventListener('change', (e) => {
             configMode = e.target.value;
             updateModeConfigVisibility();
+            updateTimeChips();
             updatePreview();
         });
 
@@ -91,6 +96,8 @@
             }
         });
 
+        bindCustomTimeInput('at-daily-custom-time', 'at-daily-add-time', 'daily');
+
         // 时间选择 - Weekly
         document.getElementById('at-weekly-times')?.addEventListener('click', (e) => {
             if (e.target.classList.contains('at-chip')) {
@@ -99,6 +106,8 @@
                 updatePreview();
             }
         });
+
+        bindCustomTimeInput('at-weekly-custom-time', 'at-weekly-add-time', 'weekly');
 
         // 星期选择
         document.getElementById('at-weekly-days')?.addEventListener('click', (e) => {
@@ -394,8 +403,28 @@
     function updateTimeChips() {
         const times = configMode === 'daily' ? configDailyTimes : configWeeklyTimes;
         const containerId = configMode === 'daily' ? 'at-daily-times' : 'at-weekly-times';
-        
-        document.querySelectorAll(`#${containerId} .at-chip`).forEach(chip => {
+        const baseTimes = configMode === 'daily' ? baseDailyTimes : baseWeeklyTimes;
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        container.querySelectorAll('.at-chip[data-custom="true"]').forEach(chip => {
+            if (!times.includes(chip.dataset.time)) {
+                chip.remove();
+            }
+        });
+
+        times.forEach(time => {
+            if (!baseTimes.includes(time) && !container.querySelector(`.at-chip[data-time="${time}"]`)) {
+                const chip = document.createElement('div');
+                chip.className = 'at-chip at-chip-custom';
+                chip.dataset.time = time;
+                chip.dataset.custom = 'true';
+                chip.textContent = time;
+                container.appendChild(chip);
+            }
+        });
+
+        container.querySelectorAll('.at-chip').forEach(chip => {
             chip.classList.toggle('selected', times.includes(chip.dataset.time));
         });
     }
@@ -414,6 +443,53 @@
             if (arr.length > 1) arr.splice(idx, 1);
         } else {
             arr.push(time);
+        }
+        arr.sort();
+        updateTimeChips();
+    }
+
+    function bindCustomTimeInput(inputId, buttonId, mode) {
+        const input = document.getElementById(inputId);
+        const button = document.getElementById(buttonId);
+        if (!input || !button) return;
+
+        const addTime = () => {
+            const normalized = normalizeTimeInput(input.value);
+            if (!normalized) return;
+            addCustomTime(normalized, mode);
+            input.value = '';
+            updatePreview();
+        };
+
+        button.addEventListener('click', addTime);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addTime();
+            }
+        });
+    }
+
+    function normalizeTimeInput(value) {
+        const trimmed = String(value || '').trim();
+        if (!trimmed) return null;
+
+        const match = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return null;
+
+        const hour = parseInt(match[1], 10);
+        const minute = parseInt(match[2], 10);
+        if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+        if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+
+        return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    }
+
+    function addCustomTime(time, mode) {
+        const arr = mode === 'daily' ? configDailyTimes : configWeeklyTimes;
+        if (!arr.includes(time)) {
+            arr.push(time);
+            arr.sort();
         }
         updateTimeChips();
     }

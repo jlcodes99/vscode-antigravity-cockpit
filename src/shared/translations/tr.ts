@@ -250,6 +250,8 @@ export const tr = {
     'autoTrigger.weekly': 'Haftalık',
     'autoTrigger.interval': 'Aralık',
     'autoTrigger.selectTime': 'Zaman Seç (birden fazla olabilir)',
+    'autoTrigger.customTime': 'Özel saat',
+    'autoTrigger.addTime': 'Ekle',
     'autoTrigger.selectDay': 'Günleri Seç',
     'autoTrigger.workdays': 'Hafta İçi',
     'autoTrigger.weekend': 'Hafta Sonu',

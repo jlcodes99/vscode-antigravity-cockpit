@@ -251,6 +251,8 @@ export const ja = {
     'autoTrigger.weekly': '毎週',
     'autoTrigger.interval': '間隔',
     'autoTrigger.selectTime': '時間を選択（複数可）',
+    'autoTrigger.customTime': 'カスタム時間',
+    'autoTrigger.addTime': '追加',
     'autoTrigger.selectDay': '曜日を選択',
     'autoTrigger.workdays': '平日',
     'autoTrigger.weekend': '週末',

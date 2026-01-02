@@ -250,6 +250,8 @@ export const ptBR = {
     'autoTrigger.weekly': 'Semanal',
     'autoTrigger.interval': 'Intervalo',
     'autoTrigger.selectTime': 'Escolher hora (várias possíveis)',
+    'autoTrigger.customTime': 'Hora personalizada',
+    'autoTrigger.addTime': 'Adicionar',
     'autoTrigger.selectDay': 'Escolher dias',
     'autoTrigger.workdays': 'Dias úteis',
     'autoTrigger.weekend': 'Fim de semana',

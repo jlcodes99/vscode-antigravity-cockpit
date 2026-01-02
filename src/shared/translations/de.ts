@@ -250,6 +250,8 @@ export const de = {
     'autoTrigger.weekly': 'Wöchentlich',
     'autoTrigger.interval': 'Intervall',
     'autoTrigger.selectTime': 'Zeit wählen (mehrere möglich)',
+    'autoTrigger.customTime': 'Benutzerdefinierte Zeit',
+    'autoTrigger.addTime': 'Hinzufügen',
     'autoTrigger.selectDay': 'Tage wählen',
     'autoTrigger.workdays': 'Wochentage',
     'autoTrigger.weekend': 'Wochenende',

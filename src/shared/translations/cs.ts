@@ -250,6 +250,8 @@ export const cs = {
     'autoTrigger.weekly': 'Týdně',
     'autoTrigger.interval': 'Interval',
     'autoTrigger.selectTime': 'Vyberte čas (možno více)',
+    'autoTrigger.customTime': 'Vlastní čas',
+    'autoTrigger.addTime': 'Přidat',
     'autoTrigger.selectDay': 'Vyberte dny',
     'autoTrigger.workdays': 'Pracovní dny',
     'autoTrigger.weekend': 'Víkend',

@@ -298,6 +298,27 @@ export class CockpitHUD {
         const translations = i18n.getAllTranslations();
         const translationsJson = JSON.stringify(translations);
 
+        const timeOptions = [
+            '06:00',
+            '07:00',
+            '08:00',
+            '09:00',
+            '10:00',
+            '11:00',
+            '12:00',
+            '14:00',
+            '16:00',
+            '18:00',
+            '20:00',
+            '22:00',
+        ];
+        const renderTimeChips = (options: string[], selected: string): string => {
+            return options.map(time => {
+                const selectedClass = time === selected ? ' selected' : '';
+                return `<div class="at-chip${selectedClass}" data-time="${time}">${time}</div>`;
+            }).join('');
+        };
+
         // CSP nonce
         const nonce = this.generateNonce();
 
@@ -449,18 +470,12 @@ export class CockpitHUD {
                 <div id="at-config-daily" class="at-mode-config">
                     <label>${t('autoTrigger.selectTime')}</label>
                     <div class="at-time-grid" id="at-daily-times">
-                        <div class="at-chip" data-time="06:00">06:00</div>
-                        <div class="at-chip" data-time="07:00">07:00</div>
-                        <div class="at-chip selected" data-time="08:00">08:00</div>
-                        <div class="at-chip" data-time="09:00">09:00</div>
-                        <div class="at-chip" data-time="10:00">10:00</div>
-                        <div class="at-chip" data-time="11:00">11:00</div>
-                        <div class="at-chip" data-time="12:00">12:00</div>
-                        <div class="at-chip" data-time="14:00">14:00</div>
-                        <div class="at-chip" data-time="16:00">16:00</div>
-                        <div class="at-chip" data-time="18:00">18:00</div>
-                        <div class="at-chip" data-time="20:00">20:00</div>
-                        <div class="at-chip" data-time="22:00">22:00</div>
+                        ${renderTimeChips(timeOptions, '08:00')}
+                    </div>
+                    <div class="at-custom-time-row">
+                        <span class="at-custom-time-label">${t('autoTrigger.customTime')}</span>
+                        <input type="time" id="at-daily-custom-time" class="at-input-time at-input-time-compact">
+                        <button id="at-daily-add-time" class="at-btn at-btn-secondary at-btn-small">${t('autoTrigger.addTime')}</button>
                     </div>
                 </div>
 
@@ -483,10 +498,12 @@ export class CockpitHUD {
                     </div>
                     <label>${t('autoTrigger.selectTime')}</label>
                     <div class="at-time-grid" id="at-weekly-times">
-                        <div class="at-chip" data-time="07:00">07:00</div>
-                        <div class="at-chip selected" data-time="08:00">08:00</div>
-                        <div class="at-chip" data-time="12:00">12:00</div>
-                        <div class="at-chip" data-time="18:00">18:00</div>
+                        ${renderTimeChips(timeOptions, '08:00')}
+                    </div>
+                    <div class="at-custom-time-row">
+                        <span class="at-custom-time-label">${t('autoTrigger.customTime')}</span>
+                        <input type="time" id="at-weekly-custom-time" class="at-input-time at-input-time-compact">
+                        <button id="at-weekly-add-time" class="at-btn at-btn-secondary at-btn-small">${t('autoTrigger.addTime')}</button>
                     </div>
                 </div>
 

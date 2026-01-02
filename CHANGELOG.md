@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.6.13]
+
+### Improved
+- **Auto Wake-up**: Custom time input plus unified daily/weekly preset times
+- **Auto Wake-up**: More accurate cron parsing and safer long-delay scheduling
+
 ## [1.6.12]
 
 ### Improved

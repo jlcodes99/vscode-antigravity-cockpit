@@ -4,7 +4,11 @@
  */
 
 import { ScheduleConfig, ScheduleRepeatMode, DayOfWeek, CrontabParseResult } from './types';
+import { CronExpressionParser } from 'cron-parser';
 import { logger } from '../shared/log_service';
+
+const MAX_TIMER_DELAY_MS = 2_147_483_647; // setTimeout 最大延迟约 24.8 天
+const LOCAL_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 /**
  * Cron 表达式解析器
@@ -136,23 +140,17 @@ class CronParser {
 
             const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
 
-            // 验证每个字段
-            if (!this.isValidField(minute, 0, 59) ||
-                !this.isValidField(hour, 0, 23) ||
-                !this.isValidField(dayOfMonth, 1, 31) ||
-                !this.isValidField(month, 1, 12) ||
-                !this.isValidField(dayOfWeek, 0, 6)) {
-                return {
-                    valid: false,
-                    error: '字段值超出有效范围',
-                };
-            }
-
             // 生成人类可读描述
             const description = this.generateDescription(minute, hour, dayOfMonth, month, dayOfWeek);
 
-            // 计算接下来的运行时间
-            const nextRuns = this.getNextRuns(crontab, 5);
+            const interval = CronExpressionParser.parse(crontab, {
+                currentDate: new Date(),
+                tz: LOCAL_TIMEZONE,
+            });
+            const nextRuns: Date[] = [];
+            for (let i = 0; i < 5; i++) {
+                nextRuns.push(interval.next().toDate());
+            }
 
             return {
                 valid: true,
@@ -169,37 +167,6 @@ class CronParser {
     }
 
     /**
-     * 验证 cron 字段
-     */
-    private static isValidField(field: string, min: number, max: number): boolean {
-        if (field === '*') return true;
-
-        // 处理步进值 */n
-        if (field.startsWith('*/')) {
-            const step = parseInt(field.slice(2), 10);
-            return !isNaN(step) && step >= 1 && step <= max;
-        }
-
-        // 处理范围 a-b
-        if (field.includes('-')) {
-            const [start, end] = field.split('-').map(Number);
-            return !isNaN(start) && !isNaN(end) && start >= min && end <= max && start <= end;
-        }
-
-        // 处理列表 a,b,c
-        if (field.includes(',')) {
-            return field.split(',').every(v => {
-                const num = parseInt(v, 10);
-                return !isNaN(num) && num >= min && num <= max;
-            });
-        }
-
-        // 单个数字
-        const num = parseInt(field, 10);
-        return !isNaN(num) && num >= min && num <= max;
-    }
-
-    /**
      * 生成人类可读描述
      */
     private static generateDescription(
@@ -209,6 +176,14 @@ class CronParser {
         month: string,
         dayOfWeek: string
     ): string {
+        if (dayOfMonth !== '*' || month !== '*') {
+            return '自定义调度';
+        }
+
+        if (minute.includes('/') || hour.includes('/') || dayOfWeek.includes('/')) {
+            return '自定义调度';
+        }
+
         const parts: string[] = [];
 
         // 时间描述
@@ -271,46 +246,21 @@ class CronParser {
      * 计算接下来 n 次运行时间
      */
     static getNextRuns(crontab: string, count: number): Date[] {
-        const parts = crontab.trim().split(/\s+/);
-        if (parts.length !== 5) return [];
+        try {
+            const results: Date[] = [];
+            const interval = CronExpressionParser.parse(crontab, {
+                currentDate: new Date(),
+                tz: LOCAL_TIMEZONE,
+            });
 
-        const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
-        const minutes = this.expandField(minute, 0, 59);
-        const hours = this.expandField(hour, 0, 23);
-        const daysOfWeek = dayOfWeek === '*' ? null : this.expandField(dayOfWeek, 0, 6);
-
-        const results: Date[] = [];
-        const now = new Date();
-        const maxIterations = 366 * 24; // 最多检查一年
-
-        let current = new Date(now);
-        current.setSeconds(0);
-        current.setMilliseconds(0);
-
-        let iterations = 0;
-        while (results.length < count && iterations < maxIterations) {
-            iterations++;
-            current = new Date(current.getTime() + 60000); // 加一分钟
-
-            // 检查星期
-            if (daysOfWeek && !daysOfWeek.includes(current.getDay())) {
-                continue;
+            for (let i = 0; i < count; i++) {
+                results.push(interval.next().toDate());
             }
 
-            // 检查小时
-            if (!hours.includes(current.getHours())) {
-                continue;
-            }
-
-            // 检查分钟
-            if (!minutes.includes(current.getMinutes())) {
-                continue;
-            }
-
-            results.push(new Date(current));
+            return results;
+        } catch {
+            return [];
         }
-
-        return results;
     }
 }
 
@@ -417,6 +367,12 @@ class SchedulerService {
         if (delay < 0) {
             // 如果已经过了，下一分钟重新计算
             this.timer = setTimeout(() => this.scheduleNextRun(), 60000);
+            return;
+        }
+
+        if (delay > MAX_TIMER_DELAY_MS) {
+            logger.info('[SchedulerService] Next run is far in the future; scheduling a checkpoint.');
+            this.timer = setTimeout(() => this.scheduleNextRun(), MAX_TIMER_DELAY_MS);
             return;
         }
 

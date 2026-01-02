@@ -252,6 +252,8 @@ export const en = {
     'autoTrigger.weekly': 'Weekly',
     'autoTrigger.interval': 'Interval',
     'autoTrigger.selectTime': 'Select Time (multiple allowed)',
+    'autoTrigger.customTime': 'Custom time',
+    'autoTrigger.addTime': 'Add',
     'autoTrigger.selectDay': 'Select Days',
     'autoTrigger.workdays': 'Weekdays',
     'autoTrigger.weekend': 'Weekend',
