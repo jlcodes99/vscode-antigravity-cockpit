@@ -125,69 +125,43 @@ class OAuthService {
      * @returns 新的 access_token，失败返回 null
      */
     async refreshAccessToken(): Promise<string | null> {
-        const credential = await credentialStorage.getCredential();
-        if (!credential || !credential.refreshToken) {
-            logger.warn('[OAuthService] No refresh token available');
-            return null;
+        const result = await this.refreshAccessTokenDetailed();
+        if (result.state === 'ok') {
+            return result.token ?? null;
         }
-
-        try {
-            const response = await fetch(TOKEN_URL, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: new URLSearchParams({
-                    client_id: ANTIGRAVITY_CLIENT_ID,
-                    client_secret: ANTIGRAVITY_CLIENT_SECRET,
-                    refresh_token: credential.refreshToken,
-                    grant_type: 'refresh_token',
-                }).toString(),
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Token refresh failed: ${response.status} - ${errorText}`);
-            }
-
-            const data = await response.json() as {
-                access_token: string;
-                expires_in: number;
-            };
-
-            const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
-            await credentialStorage.updateAccessToken(data.access_token, expiresAt);
-
-            logger.info('[OAuthService] Access token refreshed');
-            return data.access_token;
-
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            logger.error(`[OAuthService] Token refresh failed: ${err.message}`);
-            return null;
-        }
+        return null;
     }
 
     /**
      * 获取有效的 access_token（必要时自动刷新）
      */
     async getValidAccessToken(): Promise<string | null> {
+        const result = await this.getAccessTokenStatus();
+        return result.state === 'ok' ? result.token ?? null : null;
+    }
+
+    async getAccessTokenStatus(): Promise<AccessTokenResult> {
         const credential = await credentialStorage.getCredential();
         if (!credential) {
-            return null;
+            return { state: 'missing' };
         }
 
         // 检查是否过期（提前 5 分钟刷新）
         const expiresAt = new Date(credential.expiresAt);
         const now = new Date();
         const bufferTime = 5 * 60 * 1000; // 5 分钟
+        const isExpired = expiresAt.getTime() <= now.getTime();
 
         if (expiresAt.getTime() - now.getTime() < bufferTime) {
             logger.info('[OAuthService] Token expiring soon, refreshing...');
-            return await this.refreshAccessToken();
+            const refreshed = await this.refreshAccessTokenDetailed();
+            if (refreshed.state === 'missing' && isExpired) {
+                return { state: 'expired', error: 'Access token expired' };
+            }
+            return refreshed;
         }
 
-        return credential.accessToken;
+        return { state: 'ok', token: credential.accessToken };
     }
 
     /**
@@ -416,7 +390,71 @@ class OAuthService {
         const data = await response.json() as { email: string };
         return data.email;
     }
+
+    private async refreshAccessTokenDetailed(): Promise<AccessTokenResult> {
+        const credential = await credentialStorage.getCredential();
+        if (!credential || !credential.refreshToken) {
+            logger.warn('[OAuthService] No refresh token available');
+            return { state: 'missing' };
+        }
+
+        try {
+            const response = await fetch(TOKEN_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    client_id: ANTIGRAVITY_CLIENT_ID,
+                    client_secret: ANTIGRAVITY_CLIENT_SECRET,
+                    refresh_token: credential.refreshToken,
+                    grant_type: 'refresh_token',
+                }).toString(),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                const lowered = errorText.toLowerCase();
+                if (lowered.includes('invalid_grant')) {
+                    logger.warn('[OAuthService] Refresh token invalid (invalid_grant)');
+                    return { state: 'invalid_grant', error: errorText };
+                }
+                const message = `Token refresh failed: ${response.status} - ${errorText}`;
+                logger.error(`[OAuthService] ${message}`);
+                return { state: 'refresh_failed', error: message };
+            }
+
+            const data = await response.json() as {
+                access_token: string;
+                expires_in: number;
+            };
+
+            const expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+            await credentialStorage.updateAccessToken(data.access_token, expiresAt);
+
+            logger.info('[OAuthService] Access token refreshed');
+            return { state: 'ok', token: data.access_token };
+
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.error(`[OAuthService] Token refresh failed: ${err.message}`);
+            return { state: 'refresh_failed', error: err.message };
+        }
+    }
 }
 
 // 导出单例
 export const oauthService = new OAuthService();
+
+export type AccessTokenState =
+    | 'ok'
+    | 'missing'
+    | 'expired'
+    | 'invalid_grant'
+    | 'refresh_failed';
+
+export interface AccessTokenResult {
+    state: AccessTokenState;
+    token?: string;
+    error?: string;
+}

@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.1]
+
+### Changed
+- **Authorized Quota**: Prefer Cloud Code production endpoint with sandbox fallback, and resolve project ID via loadCodeAssist with onboardUser fallback.
+- **Auto Wake-up**: Use the same primary Cloud Code endpoint with fallback.
+- **Logging**: Cloud Code request logs now include the full request URL for easier troubleshooting.
+- **Reliability**: Authorized quota requests use retry/backoff and reuse cached data on transient failures.
+- **Authorization**: Detect invalid refresh tokens explicitly and log clearer token states.
+- **Cloud Code Client**: Unified request logic across authorized quota and auto wake-up with shared retry rules.
+- **Error Handling**: Treat 403 as non-retryable to avoid noisy loops.
+
+### Fixed
+- **Loading State**: Fixed an issue where the loading screen would get stuck indefinitely during initial installation or when switching quota sources.
+
+### Refactor
+- **Configuration Persistence**: Migrated `quotaSource` setting to global state to resolve VS Code setting synchronization conflicts and write failures. Old configuration is automatically migrated and cleaned up.
+
 ## [1.7.0]
 
 ### Added

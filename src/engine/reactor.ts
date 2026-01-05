@@ -20,6 +20,7 @@ import { t } from '../shared/i18n';
 import { TIMING, API_ENDPOINTS } from '../shared/constants';
 import { captureError } from '../shared/error_reporter';
 import { AntigravityError, isServerError } from '../shared/errors';
+import { cloudCodeClient, CloudCodeAuthError, CloudCodeRequestError } from '../shared/cloudcode_client';
 import { autoTriggerController } from '../auto_trigger/controller';
 import { oauthService, credentialStorage } from '../auto_trigger';
 
@@ -408,6 +409,40 @@ export class ReactorCore {
                 this.publishTelemetry(telemetry, 'authorized');
                 return;
             } catch (error) {
+                if (error instanceof CloudCodeAuthError) {
+                    logger.warn(`[AuthorizedQuota] Authorization invalid: ${error.message}`);
+                    try {
+                        await credentialStorage.deleteCredential();
+                    } catch (deleteError) {
+                        const err = deleteError instanceof Error ? deleteError : new Error(String(deleteError));
+                        logger.warn(`[AuthorizedQuota] Failed to clear credential: ${err.message}`);
+                    }
+                    const telemetry = ReactorCore.createOfflineSnapshot();
+                    this.publishTelemetry(telemetry, 'authorized');
+                    return;
+                }
+
+                if (error instanceof CloudCodeRequestError && error.status === 403) {
+                    logger.warn('[AuthorizedQuota] Access forbidden (403), stopping authorized sync');
+                    const telemetry = ReactorCore.createOfflineSnapshot();
+                    this.publishTelemetry(telemetry, 'authorized');
+                    return;
+                }
+
+                if (error instanceof CloudCodeRequestError && error.retryable) {
+                    if (this.lastAuthorizedModels) {
+                        const cacheAge = this.getCacheAgeMs('authorized');
+                        const ageNote = cacheAge !== undefined ? ` (age=${Math.round(cacheAge / 1000)}s)` : '';
+                        logger.warn(`[AuthorizedQuota] Request failed, using cached models${ageNote}`);
+                        const telemetry = this.buildSnapshot(this.lastAuthorizedModels);
+                        this.publishTelemetry(telemetry, 'authorized');
+                        return;
+                    }
+                    const telemetry = ReactorCore.createOfflineSnapshot();
+                    this.publishTelemetry(telemetry, 'authorized');
+                    return;
+                }
+
                 throw this.wrapSyncError(error, 'authorized');
             }
         }
@@ -481,43 +516,54 @@ export class ReactorCore {
      * 获取授权配额并构建快照
      */
     private async fetchAuthorizedTelemetry(): Promise<QuotaSnapshot> {
-        const accessToken = await oauthService.getValidAccessToken();
-        if (!accessToken) {
+        const tokenResult = await oauthService.getAccessTokenStatus();
+        if (tokenResult.state === 'invalid_grant') {
+            throw new CloudCodeAuthError('Authorization expired');
+        }
+        if (tokenResult.state === 'refresh_failed') {
+            throw new CloudCodeRequestError('Token refresh failed', undefined, true);
+        }
+        if (tokenResult.state !== 'ok' || !tokenResult.token) {
             throw new Error(t('quotaSource.authorizedMissing') || 'Authorize auto wake-up first');
         }
+        const accessToken = tokenResult.token;
 
-        const models = await this.fetchAuthorizedQuotaModels(accessToken);
+        let projectId: string | undefined;
+        const credential = await credentialStorage.getCredential();
+        if (credential?.projectId) {
+            projectId = credential.projectId;
+        } else {
+            try {
+                const info = await cloudCodeClient.resolveProjectId(accessToken, { logLabel: 'AuthorizedQuota' });
+                if (info.projectId) {
+                    projectId = info.projectId;
+                    if (credential) {
+                        credential.projectId = projectId;
+                        await credentialStorage.saveCredential(credential);
+                    }
+                }
+            } catch (error) {
+                if (error instanceof CloudCodeAuthError) {
+                    throw error;
+                }
+                const err = error instanceof Error ? error : new Error(String(error));
+                logger.warn(`[AuthorizedQuota] loadCodeAssist failed, continuing without project: ${err.message}`);
+            }
+        }
+
+        const models = await this.fetchAuthorizedQuotaModels(accessToken, projectId);
         this.lastAuthorizedModels = models;
         await this.ensureAuthorizedVisibleModels(models);
         return this.buildSnapshot(models);
     }
 
-    private async fetchAuthorizedQuotaModels(accessToken: string): Promise<ModelQuotaInfo[]> {
-        const url = 'https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:fetchAvailableModels';
-        logger.info(`[AuthorizedQuota] Fetching available models (url=${url})`);
-        let response: Response;
-        try {
-            response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'User-Agent': 'antigravity',
-                    'Content-Type': 'application/json',
-                    'Accept-Encoding': 'gzip',
-                },
-                body: JSON.stringify({}),
-            });
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            logger.error(`[AuthorizedQuota] Request failed (url=${url}): ${err.message}`);
-            throw err;
-        }
-
-        if (!response.ok) {
-            throw new Error(`Authorized quota request failed (${response.status})`);
-        }
-
-        const data = await response.json() as AuthorizedQuotaResponse;
+    private async fetchAuthorizedQuotaModels(accessToken: string, projectId?: string): Promise<ModelQuotaInfo[]> {
+        logger.info('[AuthorizedQuota] Fetching available models');
+        const data = await cloudCodeClient.fetchAvailableModels(
+            accessToken,
+            projectId,
+            { logLabel: 'AuthorizedQuota' },
+        ) as AuthorizedQuotaResponse;
         const models: ModelQuotaInfo[] = [];
         const now = Date.now();
 

@@ -3,19 +3,12 @@
  * 触发服务：执行自动对话触发
  */
 
-import { oauthService } from './oauth_service';
+import { oauthService, AccessTokenResult } from './oauth_service';
 import { credentialStorage } from './credential_storage';
 import { TriggerRecord, ModelInfo } from './types';
 import { logger } from '../shared/log_service';
+import { cloudCodeClient } from '../shared/cloudcode_client';
 
-// Antigravity API 配置
-const ANTIGRAVITY_API_URL = 'https://daily-cloudcode-pa.sandbox.googleapis.com';
-const ANTIGRAVITY_USER_AGENT = 'antigravity/1.11.3 windows/amd64';
-const ANTIGRAVITY_METADATA = {
-    ideType: 'ANTIGRAVITY',
-    platform: 'PLATFORM_UNSPECIFIED',
-    pluginType: 'GEMINI',
-};
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const RESET_TRIGGER_COOLDOWN_MS = 10 * 60 * 1000;
 const MAX_TRIGGER_CONCURRENCY = 4;
@@ -210,10 +203,11 @@ class TriggerService {
         try {
             // 1. 获取有效的 access_token
             stage = 'get_access_token';
-            const accessToken = await oauthService.getValidAccessToken();
-            if (!accessToken) {
-                throw new Error('No valid access token. Please authorize first.');
+            const tokenResult = await this.getAccessTokenResult();
+            if (tokenResult.state !== 'ok' || !tokenResult.token) {
+                throw new Error(`No valid access token (${tokenResult.state}). Please authorize first.`);
             }
+            const accessToken = tokenResult.token;
 
             // 2. 获取 project_id
             stage = 'get_project_id';
@@ -353,8 +347,17 @@ class TriggerService {
      * 获取 project_id
      */
     private async fetchProjectId(accessToken: string): Promise<string> {
-        const projectId = await this.tryLoadCodeAssist(accessToken)
-            || await this.tryOnboardUser(accessToken);
+        let projectId: string | undefined;
+        try {
+            const info = await cloudCodeClient.resolveProjectId(accessToken, {
+                logLabel: 'TriggerService',
+                timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS,
+            });
+            projectId = info.projectId;
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.warn(`[TriggerService] Failed to resolve project_id: ${err.message}`);
+        }
 
         if (projectId) {
             const credential = await credentialStorage.getCredential();
@@ -375,22 +378,29 @@ class TriggerService {
      * @param filterByConstants 可选，配额中显示的模型常量列表，用于过滤
      */
     async fetchAvailableModels(filterByConstants?: string[]): Promise<ModelInfo[]> {
-        const accessToken = await oauthService.getValidAccessToken();
-        if (!accessToken) {
-            logger.debug('[TriggerService] fetchAvailableModels: No access token, skipping');
+        const tokenResult = await this.getAccessTokenResult();
+        if (tokenResult.state !== 'ok' || !tokenResult.token) {
+            logger.debug(`[TriggerService] fetchAvailableModels: No access token (${tokenResult.state}), skipping`);
+            return [];
+        }
+        const accessToken = tokenResult.token;
+
+        let data: { models?: Record<string, { displayName?: string; model?: string }> } | undefined;
+        try {
+            data = await cloudCodeClient.fetchAvailableModels(
+                accessToken,
+                undefined,
+                { logLabel: 'TriggerService', timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS },
+            );
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.warn(`[TriggerService] fetchAvailableModels failed, returning empty: ${err.message}`);
             return [];
         }
 
-        const url = `${ANTIGRAVITY_API_URL}/v1internal:fetchAvailableModels`;
-        const result = await this.requestJson(url, {}, accessToken);
-
-        if (!result.ok || !result.data) {
-            logger.warn('[TriggerService] fetchAvailableModels failed, returning empty');
-            // 返回空数组，让前端从配额数据中获取模型列表
+        if (!data) {
             return [];
         }
-
-        const data = result.data as { models?: Record<string, { displayName?: string; model?: string }> };
         if (!data.models) {
             return [];
         }
@@ -456,36 +466,25 @@ class TriggerService {
             },
         };
 
-        const url = `${ANTIGRAVITY_API_URL}/v1internal:generateContent`;
-        let response: Response;
+        let result: { data: any; text: string; status: number };
         try {
-            response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'User-Agent': ANTIGRAVITY_USER_AGENT,
-                    'Content-Type': 'application/json',
-                    'Accept-Encoding': 'gzip',
-                },
-                body: JSON.stringify(requestBody),
-            });
+            result = await cloudCodeClient.requestJson(
+                '/v1internal:generateContent',
+                requestBody,
+                accessToken,
+                { logLabel: 'TriggerService', timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS },
+            );
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            logger.error(`[TriggerService] sendTriggerRequest failed (url=${url}, model=${model}, requestId=${requestId}): ${err.message}`);
-            throw err;
+            throw new Error(`API request failed (generateContent): ${err.message}`);
         }
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API request failed (${url}): ${response.status} - ${errorText.substring(0, 100)}`);
-        }
-
-        const text = await response.text();
+        const text = result.text || JSON.stringify(result.data);
         // 输出完整响应，便于调试
         logger.info(`[TriggerService] generateContent response: ${text.substring(0, 2000)}`);
         
         try {
-            const data = JSON.parse(text);
+            const data = result.data;
             // Antigravity API 响应结构：data.response.candidates[0].content.parts[0].text
             // 或者直接：data.candidates[0].content.parts[0].text
             const candidates = data?.response?.candidates || data?.candidates;
@@ -496,177 +495,16 @@ class TriggerService {
         }
     }
 
-    private async tryLoadCodeAssist(accessToken: string): Promise<string | null> {
-        const url = `${ANTIGRAVITY_API_URL}/v1internal:loadCodeAssist`;
-        const body = { metadata: ANTIGRAVITY_METADATA };
-        const result = await this.requestJson(url, body, accessToken);
-
-        if (!result.ok) {
-            logger.warn(`[TriggerService] loadCodeAssist failed: ${result.status}`);
-            return null;
+    private async getAccessTokenResult(): Promise<AccessTokenResult> {
+        const result = await oauthService.getAccessTokenStatus();
+        if (result.state === 'invalid_grant') {
+            logger.warn('[TriggerService] Refresh token invalid (invalid_grant)');
+        } else if (result.state === 'expired') {
+            logger.warn('[TriggerService] Access token expired');
+        } else if (result.state === 'refresh_failed') {
+            logger.warn(`[TriggerService] Token refresh failed: ${result.error || 'unknown'}`);
         }
-
-        const data = result.data as {
-            currentTier?: unknown;
-            cloudaicompanionProject?: unknown;
-        } | undefined;
-
-        if (!data?.currentTier) {
-            logger.info('[TriggerService] loadCodeAssist: user not activated');
-            return null;
-        }
-
-        const project = data.cloudaicompanionProject;
-        if (typeof project === 'string' && project) {
-            return project;
-        }
-        if (project && typeof project === 'object' && 'id' in project) {
-            const id = (project as { id?: string }).id;
-            if (id) {
-                return id;
-            }
-        }
-
-        logger.warn('[TriggerService] loadCodeAssist returned no project_id');
-        return null;
-    }
-
-    private async tryOnboardUser(accessToken: string): Promise<string | null> {
-        const tierId = await this.getOnboardTier(accessToken);
-        if (!tierId) {
-            return null;
-        }
-
-        const url = `${ANTIGRAVITY_API_URL}/v1internal:onboardUser`;
-        const body = {
-            tierId,
-            metadata: ANTIGRAVITY_METADATA,
-        };
-
-        const maxAttempts = 5;
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-            const result = await this.requestJson(url, body, accessToken);
-            if (!result.ok) {
-                logger.warn(`[TriggerService] onboardUser failed: ${result.status}`);
-                return null;
-            }
-
-            const data = result.data as {
-                done?: boolean;
-                response?: { cloudaicompanionProject?: unknown };
-            } | undefined;
-
-            if (data?.done) {
-                const project = data.response?.cloudaicompanionProject;
-                if (typeof project === 'string' && project) {
-                    return project;
-                }
-                if (project && typeof project === 'object' && 'id' in project) {
-                    const id = (project as { id?: string }).id;
-                    if (id) {
-                        return id;
-                    }
-                }
-                logger.warn('[TriggerService] onboardUser done but no project_id');
-                return null;
-            }
-
-            await this.sleep(2000);
-        }
-
-        logger.warn('[TriggerService] onboardUser timed out');
-        return null;
-    }
-
-    private async getOnboardTier(accessToken: string): Promise<string | null> {
-        const url = `${ANTIGRAVITY_API_URL}/v1internal:loadCodeAssist`;
-        const body = { metadata: ANTIGRAVITY_METADATA };
-        const result = await this.requestJson(url, body, accessToken);
-
-        if (!result.ok) {
-            logger.warn(`[TriggerService] loadCodeAssist (tier) failed: ${result.status}`);
-            return null;
-        }
-
-        const data = result.data as { allowedTiers?: Array<{ id?: string; isDefault?: boolean }> } | undefined;
-        const allowedTiers = data?.allowedTiers || [];
-        const defaultTier = allowedTiers.find(tier => tier?.isDefault);
-        if (defaultTier?.id) {
-            return defaultTier.id;
-        }
-
-        logger.warn('[TriggerService] No default tier found, using LEGACY');
-        return 'LEGACY';
-    }
-
-    private async requestJson(
-        url: string,
-        body: object,
-        accessToken: string,
-        timeoutMs: number = DEFAULT_REQUEST_TIMEOUT_MS,
-        retries: number = 2,
-    ): Promise<{ ok: boolean; status: number; data?: unknown; text?: string }> {
-        let lastError: Error | undefined;
-
-        for (let attempt = 0; attempt <= retries; attempt++) {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-            try {
-                // 如果是重试，等待一小会儿 (指数退避)
-                if (attempt > 0) {
-                    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-                    logger.info(`[TriggerService] Retrying request (${attempt}/${retries}) in ${delay}ms...`);
-                    await this.sleep(delay);
-                }
-
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'User-Agent': ANTIGRAVITY_USER_AGENT,
-                        'Content-Type': 'application/json',
-                        'Accept-Encoding': 'gzip',
-                    },
-                    body: JSON.stringify(body),
-                    signal: controller.signal,
-                });
-
-                const text = await response.text();
-                let data: unknown;
-                if (text) {
-                    try {
-                        data = JSON.parse(text);
-                    } catch {
-                        data = undefined;
-                    }
-                }
-
-                return {
-                    ok: response.ok,
-                    status: response.status,
-                    data,
-                    text,
-                };
-            } catch (error) {
-                lastError = error instanceof Error ? error : new Error(String(error));
-                // 只对 fetch 错误（网络错误）进行重试，不包括超时
-                if (lastError.name === 'AbortError') {
-                    // 超时通常不再重试，除非你想，这里假设超时不重试以快速失败
-                    // 但如果是 fetch failed，通常是网络问题
-                }
-                logger.warn(`[TriggerService] Request attempt ${attempt + 1} failed: ${lastError.message}`);
-                
-                // 如果是最后一次尝试，或者错误不是网络连接错误（简单起见，所有 fetch 异常都重试），退出循环
-                if (attempt === retries) {
-                    break;
-                }
-            } finally {
-                clearTimeout(timeout);
-            }
-        }
-        
-        return { ok: false, status: 0 };
+        return result;
     }
 
     private async sleep(ms: number): Promise<void> {

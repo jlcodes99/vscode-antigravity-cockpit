@@ -137,7 +137,7 @@ VS Code 扩展，用于监控 Google Antigravity AI 模型配额。
 
 3. **故障排查**：
    - "Systems Offline" 时点击 **Retry Connection**
-   - 点击 **Open Logs** 查看调试日志
+   - 点击 **Open Logs** 查看调试日志（授权请求会显示完整 URL 以便区分域名）
 
 ---
 

@@ -137,7 +137,7 @@ Sends notifications when model quota falls below warning threshold or is exhaust
 
 3. **Troubleshooting**:
    - Click **Retry Connection** when showing "Systems Offline"
-   - Click **Open Logs** to view debug logs
+   - Click **Open Logs** to view debug logs (authorized requests show full URLs to identify domains)
 
 ---
 
