@@ -3,6 +3,7 @@
 English · [简体中文](README.md)
 
 [![Version](https://img.shields.io/open-vsx/v/jlcodes/antigravity-cockpit)](https://open-vsx.org/extension/jlcodes/antigravity-cockpit)
+[![Downloads](https://img.shields.io/open-vsx/dt/jlcodes/antigravity-cockpit?color=success)](https://open-vsx.org/extension/jlcodes/antigravity-cockpit)
 [![GitHub stars](https://img.shields.io/github/stars/jlcodes99/vscode-antigravity-cockpit?style=flat&color=gold)](https://github.com/jlcodes99/vscode-antigravity-cockpit)
 [![GitHub issues](https://img.shields.io/github/issues/jlcodes99/vscode-antigravity-cockpit)](https://github.com/jlcodes99/vscode-antigravity-cockpit/issues)
 [![License](https://img.shields.io/github/license/jlcodes99/vscode-antigravity-cockpit)](https://github.com/jlcodes99/vscode-antigravity-cockpit)
@@ -225,6 +226,12 @@ Requirements: Node.js v18+, npm v9+
 If you find this extension helpful, consider buying me a coffee! Your support keeps me motivated to continue improving ❤️
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-Support-orange?style=for-the-badge&logo=buy-me-a-coffee)](docs/DONATE.md)
+
+---
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=jlcodes99/vscode-antigravity-cockpit&type=Date)](https://star-history.com/#jlcodes99/vscode-antigravity-cockpit&Date)
 
 ---
 
