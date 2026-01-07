@@ -481,6 +481,8 @@ export interface DashboardConfig {
     url?: string;
     /** 分组映射 (modelId -> groupId) */
     groupMappings?: Record<string, string>;
+    /** 语言设置（'auto' 跟随 VS Code，或具体语言代码） */
+    language?: string;
 }
 
 /** 状态栏更新数据 */

@@ -123,7 +123,8 @@ class I18nService {
      * 应用语言设置
      * @param languageSetting 语言设置值，'auto' 跟随 VS Code，其他为具体语言代码
      */
-    applyLanguageSetting(languageSetting: string): void {
+    applyLanguageSetting(languageSetting: string): boolean {
+        const previousLocale = this.currentLocale;
         this.manualLocale = languageSetting;
         
         if (languageSetting === 'auto') {
@@ -139,6 +140,8 @@ class I18nService {
                 this.detectLocale();
             }
         }
+
+        return this.currentLocale !== previousLocale;
     }
 
     /**

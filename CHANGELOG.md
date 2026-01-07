@@ -8,6 +8,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.7.24]
+
+### Fixed
+- **Language**: Auto-follow VS Code language now updates the dashboard/quickpick after language switches.
+- **Language**: Settings panel now reflects the saved language selection instead of always showing "Auto".
+
 ## [1.7.23]
 
 ### Added

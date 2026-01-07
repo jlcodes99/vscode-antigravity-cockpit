@@ -47,13 +47,15 @@ export class CockpitHUD {
                 
                 // 恢复引用
                 this.panel = webviewPanel;
-                
+
                 // 重新设置 webview 内容和事件监听
                 webviewPanel.webview.options = {
                     enableScripts: true,
                     localResourceRoots: [this.extensionUri],
                 };
-                
+
+                // 重新同步语言（确保跟随 VS Code 语言时生效）
+                i18n.applyLanguageSetting(configService.getConfig().language);
                 webviewPanel.webview.html = this.generateHtml(webviewPanel.webview);
                 
                 webviewPanel.onDidDispose(() => {
@@ -80,10 +82,14 @@ export class CockpitHUD {
      * @returns 是否成功打开
      */
     public async revealHud(initialTab?: string): Promise<boolean> {
+        const localeChanged = i18n.applyLanguageSetting(configService.getConfig().language);
         const column = vscode.window.activeTextEditor?.viewColumn;
 
         // 如果已经有 panel，直接显示
         if (this.panel) {
+            if (localeChanged) {
+                this.panel.webview.html = this.generateHtml(this.panel.webview);
+            }
             this.panel.reveal(column);
             await this.refreshWithCachedData();
             // 如果指定了初始标签页，发送消息切换
@@ -210,6 +216,7 @@ export class CockpitHUD {
             displayMode: config.displayMode,
             dataMasked: config.dataMasked,
             groupMappings: config.groupMappings,
+            language: config.language,
         });
     }
 
@@ -243,6 +250,11 @@ export class CockpitHUD {
         this.cachedTelemetry = snapshot;
         
         if (this.panel) {
+            const localeChanged = i18n.applyLanguageSetting(configService.getConfig().language);
+            if (localeChanged) {
+                this.panel.webview.html = this.generateHtml(this.panel.webview);
+            }
+
             // 转换数据为 Webview 兼容格式
             const webviewData = this.convertToWebviewFormat(snapshot);
 

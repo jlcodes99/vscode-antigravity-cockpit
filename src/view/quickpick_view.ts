@@ -8,7 +8,7 @@ import * as vscode from 'vscode';
 import { QuotaSnapshot } from '../shared/types';
 import { configService } from '../shared/config_service';
 import { logger } from '../shared/log_service';
-import { t } from '../shared/i18n';
+import { i18n, t } from '../shared/i18n';
 import { DISPLAY_MODE } from '../shared/constants';
 import { ReactorCore } from '../engine/reactor';
 
@@ -77,12 +77,13 @@ export class QuickPickView {
      * 显示主菜单
      */
     async show(): Promise<void> {
+        const config = configService.getConfig();
+        i18n.applyLanguageSetting(config.language);
+
         if (!this.lastSnapshot) {
             vscode.window.showWarningMessage(t('dashboard.connecting'));
             return;
         }
-
-        const config = configService.getConfig();
         
         if (config.groupingEnabled && this.lastSnapshot.groups) {
             await this.showGroupedView();

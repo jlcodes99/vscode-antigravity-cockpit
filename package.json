@@ -3,7 +3,7 @@
   "displayName": "Antigravity Cockpit",
   "icon": "assets/icon.png",
   "description": "A premium, dashboard-style quota monitor for Antigravity AI.",
-  "version": "1.7.23",
+  "version": "1.7.24",
   "publisher": "jlcodes",
   "engines": {
     "vscode": "^1.90.0"
@@ -249,7 +249,7 @@
     "copy-webview": "shx mkdir -p out/view/webview && shx cp src/view/webview/*.css src/view/webview/*.js out/view/webview/",
     "lint": "eslint src --ext ts",
     "lint:fix": "eslint src --ext ts --fix",
-    "package": "vsce package",
+    "package": "npx vsce package",
     "test": "jest",
     "pretest": "npm run compile"
   },

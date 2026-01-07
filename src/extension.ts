@@ -260,6 +260,7 @@ function handleOfflineState(): void {
         groupOrder: [],
         refreshInterval: 120,
         notificationEnabled: false,
+        language: configService.getConfig().language,
     });
 }
 
