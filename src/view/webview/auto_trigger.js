@@ -726,7 +726,8 @@
                 return;
             }
             container.innerHTML = nextRuns.map((date, idx) => {
-                return `<li>${idx + 1}. ${formatDateTime(date)}</li>`;
+                const resetTime = formatResetTime(date);
+                return `<li>${idx + 1}. ${formatDateTime(date)} <span class="at-reset-hint">(resets ${resetTime})</span></li>`;
             }).join('');
             return;
         }
@@ -751,7 +752,8 @@
 
         container.innerHTML = nextRuns.map((iso, idx) => {
             const date = new Date(iso);
-            return `<li>${idx + 1}. ${formatDateTime(date)}</li>`;
+            const resetTime = formatResetTime(date);
+            return `<li>${idx + 1}. ${formatDateTime(date)} <span class="at-reset-hint">(resets ${resetTime})</span></li>`;
         }).join('');
     }
     
@@ -875,6 +877,12 @@
                            'time.thursday', 'time.friday', 'time.saturday'];
             return `${t(dayKeys[date.getDay()])} ${timeStr}`;
         }
+    }
+
+    function formatResetTime(triggerDate) {
+        // Reset time is 5 hours after trigger
+        const resetDate = new Date(triggerDate.getTime() + 5 * 60 * 60 * 1000);
+        return resetDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
     }
 
     // ============ 状态更新 ============

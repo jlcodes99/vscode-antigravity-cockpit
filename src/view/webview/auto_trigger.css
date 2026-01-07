@@ -609,6 +609,13 @@
     margin: 4px 0;
 }
 
+.at-reset-hint {
+    font-size: 11px;
+    color: var(--vscode-charts-green, #4CAF50);
+    opacity: 0.85;
+    margin-left: 4px;
+}
+
 /* History */
 .at-history-list {
     max-height: 400px;
