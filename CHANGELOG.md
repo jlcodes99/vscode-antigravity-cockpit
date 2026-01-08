@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.1]
+
+### Changed
+- **Auto Wake-up**: Stream requests now capture full SSE payloads and record usage/traceId in trigger history; missing completion tokens default to 0, and output is capped at 8 tokens for wake pings.
+- **Manual Test**: Model picker supports multi-select (defaults stay the same) and triggers run concurrently per selected model.
+- **Networking**: Added a streaming helper with retry/backoff; auto wake-up uses it to fetch stream responses.
+
 ## [1.8.0]
 
 ### Added

@@ -12,6 +12,7 @@ import { cloudCodeClient } from '../shared/cloudcode_client';
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const RESET_TRIGGER_COOLDOWN_MS = 10 * 60 * 1000;
 const MAX_TRIGGER_CONCURRENCY = 4;
+const ANTIGRAVITY_SYSTEM_PROMPT = 'You are Antigravity, a powerful agentic AI coding assistant designed by the Google Deepmind team working on Advanced Agentic Coding.You are pair programming with a USER to solve their coding task. The task may require creating a new codebase, modifying or debugging an existing codebase, or simply answering a question.**Absolute paths only****Proactiveness**';
 
 /**
  * 触发服务
@@ -224,6 +225,10 @@ class TriggerService {
                 ok: boolean;
                 message: string;
                 duration: number;
+                promptTokens?: number;
+                completionTokens?: number;
+                totalTokens?: number;
+                traceId?: string;
             }> = new Array(triggerModels.length);
             let nextIndex = 0;
 
@@ -241,8 +246,12 @@ class TriggerService {
                         results[currentIndex] = {
                             model,
                             ok: true,
-                            message: reply,
+                            message: reply.reply,
                             duration: Date.now() - started,
+                            promptTokens: reply.promptTokens,
+                            completionTokens: reply.completionTokens,
+                            totalTokens: reply.totalTokens,
+                            traceId: reply.traceId,
                         };
                     } catch (error) {
                         const err = error instanceof Error ? error : new Error(String(error));
@@ -261,7 +270,13 @@ class TriggerService {
 
             const successLines = results
                 .filter(result => result.ok)
-                .map(result => `${result.model}: ${result.message} (${result.duration}ms)`);
+                .map(result => {
+                    const tokensLabel = (result.promptTokens !== undefined || result.totalTokens !== undefined)
+                        ? `, tokens=${result.promptTokens ?? '?'}+${result.completionTokens ?? '?'}=${result.totalTokens ?? '?'}`
+                        : '';
+                    const traceLabel = result.traceId ? `, traceId=${result.traceId}` : '';
+                    return `${result.model}: ${result.message} (${result.duration}ms${tokensLabel}${traceLabel})`;
+                });
             const failureLines = results
                 .filter(result => !result.ok)
                 .map(result => `${result.model}: ERROR ${result.message} (${result.duration}ms)`);
@@ -271,12 +286,17 @@ class TriggerService {
             const hasSuccess = successCount > 0;
 
             // 4. 记录成功
+            const tokensSummary = results.find(r => r.totalTokens !== undefined);
             const record: TriggerRecord = {
                 timestamp: new Date().toISOString(),
                 success: hasSuccess,
                 prompt: `[${triggerModels.join(', ')}] ${promptText}`,
                 message: summary,
                 duration: Date.now() - startTime,
+                totalTokens: tokensSummary?.totalTokens,
+                promptTokens: tokensSummary?.promptTokens,
+                completionTokens: tokensSummary?.completionTokens,
+                traceId: tokensSummary?.traceId,
                 triggerType: triggerType,
                 triggerSource: triggerSource || (triggerType === 'manual' ? 'manual' : undefined),
                 accountEmail: accountEmail,
@@ -304,6 +324,7 @@ class TriggerService {
                 prompt: `[${triggerModels.join(', ')}] ${promptText}`,
                 message: err.message,
                 duration: Date.now() - startTime,
+                traceId: undefined,
                 triggerType: triggerType,
                 triggerSource: triggerSource || (triggerType === 'manual' ? 'manual' : undefined),
                 accountEmail: accountEmail,
@@ -449,60 +470,130 @@ class TriggerService {
         return allModels;
     }
 
+    private buildTriggerRequestBody(projectId: string, requestId: string, sessionId: string, model: string, prompt: string) {
+        return {
+            project: projectId,
+            requestId: requestId,
+            model: model,
+            userAgent: 'antigravity',
+            requestType: 'agent',
+            request: {
+                contents: [
+                    {
+                        role: 'user',
+                        parts: [{ text: prompt }],
+                    },
+                ],
+                session_id: sessionId,
+                systemInstruction: {
+                    parts: [{ text: ANTIGRAVITY_SYSTEM_PROMPT }],
+                },
+                generationConfig: {
+                    maxOutputTokens: 8,
+                    temperature: 0,
+                },
+            },
+        };
+    }
+
+    private parseStreamResult(result: { data: any; text: string }): {
+        reply: string;
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+        traceId?: string;
+        responseId?: string;
+    } {
+        const payloads = (result.text || '').split('\n').filter(Boolean);
+        const replyParts: string[] = [];
+        let promptTokens: number | undefined;
+        let completionTokens: number | undefined;
+        let totalTokens: number | undefined;
+        let traceId: string | undefined;
+        let responseId: string | undefined;
+
+        const processObj = (obj: any) => {
+            const candidate = obj?.response?.candidates?.[0] || obj?.candidates?.[0];
+            const parts = candidate?.content?.parts;
+            if (Array.isArray(parts)) {
+                for (const part of parts) {
+                    const text = (part && typeof part.text === 'string') ? part.text : undefined;
+                    if (text) {
+                        replyParts.push(text);
+                    }
+                }
+            }
+
+            const usage = obj?.response?.usageMetadata || obj?.usageMetadata;
+            if (usage) {
+                promptTokens ??= usage.promptTokenCount;
+                completionTokens ??= usage.candidatesTokenCount;
+                totalTokens ??= usage.totalTokenCount;
+            }
+            traceId ??= obj?.traceId;
+            responseId ??= obj?.response?.responseId || obj?.responseId;
+        };
+
+        for (const line of payloads) {
+            try {
+                processObj(JSON.parse(line));
+            } catch {
+                // ignore parse errors per line
+            }
+        }
+
+        // 如果没有从流中解析到，使用 data 兜底
+        if (replyParts.length === 0 && result.data) {
+            try {
+                processObj(result.data);
+            } catch {
+                // ignore
+            }
+        }
+
+        const reply = replyParts.join('') || '(无回复)';
+        const normalizedCompletion = completionTokens ?? 0;
+        return { reply, promptTokens, completionTokens: normalizedCompletion, totalTokens, traceId, responseId };
+    }
+
     /**
      * 发送触发请求
      * 发送一条简短的消息来触发配额计时
      * @param prompt 唤醒词，默认 "hi"
      * @returns AI 的简短回复
      */
-    private async sendTriggerRequest(accessToken: string, projectId: string, model: string, prompt: string = 'hi'): Promise<string> {
+    private async sendTriggerRequest(accessToken: string, projectId: string, model: string, prompt: string = 'hi'): Promise<{
+        reply: string;
+        promptTokens?: number;
+        completionTokens?: number;
+        totalTokens?: number;
+        traceId?: string;
+        responseId?: string;
+    }> {
         const sessionId = this.generateSessionId();
         const requestId = this.generateRequestId();
 
-        const requestBody = {
-            project: projectId,
-            requestId: requestId,
-            model: model,
-            userAgent: 'antigravity',
-            request: {
-                contents: [
-                    {
-                        role: 'user',
-                        parts: [{ text: prompt }],  // 使用自定义唤醒词
-                    },
-                ],
-                session_id: sessionId,
-                // 不限制输出长度，让模型自然回复
-            },
-        };
+        const requestBody = this.buildTriggerRequestBody(projectId, requestId, sessionId, model, prompt);
 
         let result: { data: any; text: string; status: number };
         try {
-            result = await cloudCodeClient.requestJson(
-                '/v1internal:generateContent',
+            result = await cloudCodeClient.requestStream(
+                '/v1internal:streamGenerateContent?alt=sse',
                 requestBody,
                 accessToken,
                 { logLabel: 'TriggerService', timeoutMs: DEFAULT_REQUEST_TIMEOUT_MS },
             );
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            throw new Error(`API request failed (generateContent): ${err.message}`);
+            throw new Error(`API request failed (streamGenerateContent): ${err.message}`);
         }
 
         const text = result.text || JSON.stringify(result.data);
         // 输出完整响应，便于调试
-        logger.info(`[TriggerService] generateContent response: ${text.substring(0, 2000)}`);
-        
-        try {
-            const data = result.data;
-            // Antigravity API 响应结构：data.response.candidates[0].content.parts[0].text
-            // 或者直接：data.candidates[0].content.parts[0].text
-            const candidates = data?.response?.candidates || data?.candidates;
-            const reply = candidates?.[0]?.content?.parts?.[0]?.text || '(无回复)';
-            return reply.trim();
-        } catch {
-            return '(收到非 JSON 响应)';
-        }
+        logger.info(`[TriggerService] streamGenerateContent response: ${text.substring(0, 2000)}`);
+
+        const parsed = this.parseStreamResult(result);
+        return parsed;
     }
 
     private async getAccessTokenResult(accountEmail?: string): Promise<AccessTokenResult> {

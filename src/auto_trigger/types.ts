@@ -98,6 +98,10 @@ export interface TriggerRecord {
     prompt?: string;    // 发送的请求内容
     message?: string;   // AI 的回复
     duration?: number;  // ms
+    totalTokens?: number; // 消耗的 token（总数）
+    promptTokens?: number; // 提示词 token
+    completionTokens?: number; // 生成 token
+    traceId?: string; // 请求 traceId
     triggerType?: 'manual' | 'auto'; // 触发类型：手动测试 | 自动触发
     triggerSource?: 'manual' | 'scheduled' | 'crontab' | 'quota_reset'; // 自动触发来源
     accountEmail?: string; // 触发账号

@@ -726,22 +726,24 @@
             return;
         }
 
-        // availableModels 现在是 ModelInfo 对象数组: { id, displayName, modelConstant }
-        // 测试模型为单选模式
         container.innerHTML = availableModels.map(model => {
-            const isSelected = testSelectedModels.length > 0 && testSelectedModels[0] === model.id;
+            const isSelected = testSelectedModels.includes(model.id);
             return `<div class="at-model-item ${isSelected ? 'selected' : ''}" data-model="${model.id}">${model.displayName}</div>`;
         }).join('');
 
         container.querySelectorAll('.at-model-item').forEach(item => {
             item.addEventListener('click', () => {
                 const modelId = item.dataset.model;
-                // 单选模式：点击选中当前项，取消其他项
-                testSelectedModels = [modelId];
-                // 更新 UI
-                container.querySelectorAll('.at-model-item').forEach(el => {
-                    el.classList.toggle('selected', el.dataset.model === modelId);
-                });
+                const idx = testSelectedModels.indexOf(modelId);
+                if (idx >= 0) {
+                    if (testSelectedModels.length > 1) {
+                        testSelectedModels.splice(idx, 1);
+                        item.classList.remove('selected');
+                    }
+                } else {
+                    testSelectedModels.push(modelId);
+                    item.classList.add('selected');
+                }
             });
         });
     }

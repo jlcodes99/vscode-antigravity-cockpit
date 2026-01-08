@@ -142,6 +142,37 @@ export class CloudCodeClient {
         return data;
     }
 
+    async requestStream<T>(
+        path: string,
+        body: object,
+        accessToken: string,
+        options?: CloudCodeRequestOptions,
+    ): Promise<CloudCodeResponse<T>> {
+        let lastError: Error | undefined;
+        for (const baseUrl of CLOUDCODE_BASE_URLS) {
+            try {
+                const data = await this.requestStreamWithRetry<T>(baseUrl, path, body, accessToken, options);
+                return data;
+            } catch (error) {
+                if (error instanceof CloudCodeAuthError) {
+                    throw error;
+                }
+                lastError = error instanceof Error ? error : new Error(String(error));
+                const retryable = error instanceof CloudCodeRequestError ? error.retryable : true;
+                if (!retryable) {
+                    throw lastError;
+                }
+                if (baseUrl !== CLOUDCODE_BASE_URLS[CLOUDCODE_BASE_URLS.length - 1]) {
+                    logger.warn(
+                        `${this.formatLabel(options)} Stream request failed (${baseUrl}${path}), trying fallback: ${lastError.message}`,
+                    );
+                }
+            }
+        }
+
+        throw lastError || new CloudCodeRequestError('Cloud Code stream request failed');
+    }
+
     async requestJson<T>(
         path: string,
         body: object,
@@ -171,6 +202,41 @@ export class CloudCodeClient {
         }
 
         throw lastError || new CloudCodeRequestError('Cloud Code request failed');
+    }
+
+    private async requestStreamWithRetry<T>(
+        baseUrl: string,
+        path: string,
+        body: object,
+        accessToken: string,
+        options?: CloudCodeRequestOptions,
+    ): Promise<CloudCodeResponse<T>> {
+        const maxAttempts = options?.maxAttempts ?? DEFAULT_ATTEMPTS;
+        let lastError: Error | undefined;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                if (attempt > 1) {
+                    const delay = this.getBackoffDelay(attempt);
+                    logger.info(`${this.formatLabel(options)} Stream retry ${attempt}/${maxAttempts} in ${delay}ms`);
+                    await this.sleep(delay);
+                }
+                return await this.requestStreamOnce<T>(baseUrl, path, body, accessToken, options);
+            } catch (error) {
+                if (error instanceof CloudCodeAuthError) {
+                    throw error;
+                }
+                lastError = error instanceof Error ? error : new Error(String(error));
+                const retryable = error instanceof CloudCodeRequestError ? error.retryable : true;
+                if (!retryable) {
+                    throw lastError;
+                }
+                if (attempt === maxAttempts) {
+                    throw lastError;
+                }
+            }
+        }
+
+        throw lastError || new CloudCodeRequestError('Cloud Code stream request failed');
     }
 
     private async requestWithRetry<T>(
@@ -205,6 +271,119 @@ export class CloudCodeClient {
             }
         }
         throw lastError || new CloudCodeRequestError('Cloud Code request failed');
+    }
+
+    private async requestStreamOnce<T>(
+        baseUrl: string,
+        path: string,
+        body: object,
+        accessToken: string,
+        options?: CloudCodeRequestOptions,
+    ): Promise<CloudCodeResponse<T>> {
+        const url = buildCloudCodeUrl(baseUrl, path);
+        logger.info(`${this.formatLabel(options)} Streaming ${url}`);
+        const controller = new AbortController();
+        const timeoutMs = options?.timeoutMs ?? TIMING.HTTP_TIMEOUT_MS;
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'User-Agent': USER_AGENT,
+                    'Content-Type': 'application/json',
+                    'Accept-Encoding': 'gzip',
+                },
+                body: JSON.stringify(body),
+                signal: controller.signal,
+            });
+
+            if (response.status === 401) {
+                throw new CloudCodeAuthError('Authorization expired', response.status);
+            }
+            if (response.status === 403) {
+                throw new CloudCodeRequestError('Cloud Code access forbidden', response.status, false);
+            }
+
+            if (!response.ok) {
+                const retryable = response.status === 429 || response.status >= 500;
+                throw new CloudCodeRequestError(
+                    `Cloud Code stream failed (${response.status})`,
+                    response.status,
+                    retryable,
+                );
+            }
+
+            if (!response.body) {
+                throw new CloudCodeRequestError('Cloud Code stream empty body', response.status, true);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            const payloads: string[] = [];
+            let lastData: T | undefined;
+            let gotEvent = false;
+
+            try {
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        break;
+                    }
+                    buffer += decoder.decode(value, { stream: true });
+                    let newlineIndex: number;
+                    while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+                        const line = buffer.slice(0, newlineIndex).trimEnd();
+                        buffer = buffer.slice(newlineIndex + 1);
+                        const trimmed = line.trim();
+                        if (!trimmed) {
+                            continue;
+                        }
+                        if (!trimmed.startsWith('data:')) {
+                            continue;
+                        }
+                        const payload = trimmed.slice(5).trim();
+                        if (payload === '[DONE]') {
+                            continue;
+                        }
+                        gotEvent = true;
+                        payloads.push(payload);
+                        try {
+                            lastData = JSON.parse(payload) as T;
+                        } catch {
+                            // JSON 解析失败时保留原始文本
+                        }
+                    }
+                }
+            } catch (error) {
+                const isAbort = error instanceof Error && error.name === 'AbortError';
+                if (!(isAbort && gotEvent)) {
+                    const err = error instanceof Error ? error : new Error(String(error));
+                    throw new CloudCodeRequestError(`Cloud Code stream read error: ${err.message}`, response.status, true);
+                }
+            } finally {
+                try {
+                    reader.releaseLock();
+                } catch {
+                    // ignore
+                }
+            }
+
+            if (!gotEvent) {
+                throw new CloudCodeRequestError('Cloud Code stream received no data', response.status, true);
+            }
+
+            return {
+                data: lastData as T,
+                text: payloads.join('\n'),
+                baseUrl,
+                status: response.status,
+            };
+        } finally {
+            clearTimeout(timeout);
+        }
     }
 
     private async requestOnce<T>(
