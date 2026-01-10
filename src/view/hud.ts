@@ -412,6 +412,7 @@ export class CockpitHUD {
         const autoTriggerStyleUri = this.getWebviewUri(webview, 'out', 'view', 'webview', 'auto_trigger.css');
         const scriptUri = this.getWebviewUri(webview, 'out', 'view', 'webview', 'dashboard.js');
         const autoTriggerScriptUri = this.getWebviewUri(webview, 'out', 'view', 'webview', 'auto_trigger.js');
+        const authUiScriptUri = this.getWebviewUri(webview, 'out', 'view', 'webview', 'auth_ui.js');
 
         // 获取国际化文本
         const translations = i18n.getAllTranslations();
@@ -525,24 +526,13 @@ export class CockpitHUD {
                 <div class="at-desc-content">${t('autoTrigger.description')}</div>
             </div>
 
+            <!-- Auth Row -->
+            <div class="quota-auth-card">
+                <div class="quota-auth-row" id="at-auth-row"></div>
+            </div>
+
             <!-- Status Overview Card -->
             <div class="at-status-card" id="at-status-card">
-                <!-- Auth Row -->
-                <div class="at-row at-auth-row" id="at-auth-row">
-                    <div class="quota-auth-info">
-                        <span class="at-auth-icon">⚠️</span>
-                        <span class="at-auth-text">${t('autoTrigger.unauthorized')}</span>
-                    </div>
-                    <div class="quota-auth-actions at-auth-actions">
-                        <label class="antigravityTools-sync-toggle">
-                            <input type="checkbox" id="at-antigravityTools-sync-checkbox">
-                            <span>${t('autoTrigger.antigravityToolsSync')}</span>
-                        </label>
-                        <button id="at-antigravityTools-import-btn" class="at-btn at-btn-secondary">${t('autoTrigger.importFromAntigravityTools')}</button>
-                        <button id="at-auth-btn" class="at-btn at-btn-primary">${t('autoTrigger.authorizeBtn')}</button>
-                    </div>
-                </div>
-
                 <!-- Status Grid (hidden when unauthorized) -->
                 <div class="at-status-grid" id="at-status-grid">
                     <div class="at-status-item">
@@ -1083,6 +1073,7 @@ export class CockpitHUD {
         window.__i18n = ${translationsJson};
         window.__autoTriggerI18n = ${translationsJson};
     </script>
+    <script nonce="${nonce}" src="${authUiScriptUri}"></script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
     <script nonce="${nonce}" src="${autoTriggerScriptUri}"></script>
 </body>

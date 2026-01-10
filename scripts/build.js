@@ -58,22 +58,35 @@ async function build() {
         format: 'iife',
     });
 
+    const authUiContext = await esbuild.context({
+        entryPoints: ['./src/view/webview/auth_ui.js'],
+        bundle: true,
+        outfile: './out/view/webview/auth_ui.js',
+        minify: isProduction,
+        sourcemap: !isProduction,
+        target: 'es2020',
+        format: 'iife',
+    });
+
     if (isWatch) {
         await Promise.all([
             extensionContext.watch(),
             webviewContext.watch(),
-            autoTriggerContext.watch()
+            autoTriggerContext.watch(),
+            authUiContext.watch()
         ]);
         console.log('Watching for changes...');
     } else {
         await Promise.all([
             extensionContext.rebuild(),
             webviewContext.rebuild(),
-            autoTriggerContext.rebuild()
+            autoTriggerContext.rebuild(),
+            authUiContext.rebuild()
         ]);
         await extensionContext.dispose();
         await webviewContext.dispose();
         await autoTriggerContext.dispose();
+        await authUiContext.dispose();
         console.log('Build finished successfully.');
     }
 

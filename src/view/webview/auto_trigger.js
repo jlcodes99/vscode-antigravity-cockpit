@@ -12,6 +12,9 @@
     // 国际化
     const i18n = window.__autoTriggerI18n || {};
     const t = (key) => i18n[key] || key;
+    const authUi = window.AntigravityAuthUI
+        ? (window.__authUi || (window.__authUi = new window.AntigravityAuthUI(vscode)))
+        : null;
 
     const baseTimeOptions = ['06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '14:00', '16:00', '18:00', '20:00', '22:00'];
 
@@ -75,9 +78,13 @@
             return;
         }
         antigravityToolsSyncEnabled = enabled;
-        const checkbox = document.getElementById('at-antigravityTools-sync-checkbox');
-        if (checkbox) {
-            checkbox.checked = enabled;
+        if (authUi) {
+            authUi.updateState(currentState?.authorization, enabled);
+        } else {
+            const checkbox = document.getElementById('at-antigravityTools-sync-checkbox');
+            if (checkbox) {
+                checkbox.checked = enabled;
+            }
         }
     }
 
@@ -1310,6 +1317,7 @@
 
     function updateAuthUI(auth) {
         const authRow = document.getElementById('at-auth-row');
+        const statusCard = document.getElementById('at-status-card');
         const statusGrid = document.getElementById('at-status-grid');
         const actions = document.getElementById('at-actions');
 
@@ -1317,76 +1325,89 @@
 
         const accounts = auth?.accounts || [];
         const hasAccounts = accounts.length > 0;
-        const activeAccount = auth?.activeAccount;
-        const activeEmail = activeAccount || auth?.email || (hasAccounts ? accounts[0].email : '');
-        const syncToggle = `
-            <label class="antigravityTools-sync-toggle">
-                <input type="checkbox" id="at-antigravityTools-sync-checkbox" ${antigravityToolsSyncEnabled ? 'checked' : ''}>
-                <span>${t('autoTrigger.antigravityToolsSync')}</span>
-            </label>
-        `;
-        const importBtn = `<button id="at-antigravityTools-import-btn" class="at-btn at-btn-secondary">${t('autoTrigger.importFromAntigravityTools')}</button>`;
+        const isAuthorized = hasAccounts || auth?.isAuthorized;
 
-        if (hasAccounts || auth?.isAuthorized) {
-            const extraCount = Math.max(accounts.length - 1, 0);
-            const accountCountBadge = extraCount > 0
-                ? `<span class="account-count-badge" title="${t('autoTrigger.manageAccounts')}">+${extraCount}</span>`
-                : '';
-            const manageBtn = accounts.length > 0
-                ? `<button id="at-account-manage-btn" class="quota-account-manage-btn" title="${t('autoTrigger.manageAccounts')}">${t('autoTrigger.manageAccounts')}</button>`
-                : '';
-
-            authRow.innerHTML = `
-                <div class="quota-auth-info quota-auth-info-clickable" title="${t('autoTrigger.manageAccounts')}">
-                    <span class="at-auth-icon">✅</span>
-                    <span class="at-auth-text">${t('autoTrigger.authorized')}</span>
-                    <span class="quota-auth-email">${activeEmail}</span>
-                    ${accountCountBadge}
-                    ${manageBtn}
-                </div>
-                <div class="quota-auth-actions at-auth-actions">
-                    ${syncToggle}
-                    ${importBtn}
-                </div>
+        if (authUi) {
+            authUi.updateState(auth, antigravityToolsSyncEnabled);
+            authUi.renderAuthRow(authRow, { showSyncToggleInline: false });
+        } else {
+            const activeAccount = auth?.activeAccount;
+            const activeEmail = activeAccount || auth?.email || (hasAccounts ? accounts[0].email : '');
+            const syncToggle = `
+                <label class="antigravityTools-sync-toggle">
+                    <input type="checkbox" id="at-antigravityTools-sync-checkbox" ${antigravityToolsSyncEnabled ? 'checked' : ''}>
+                    <span>${t('autoTrigger.antigravityToolsSync')}</span>
+                </label>
             `;
+            const importBtn = `<button id="at-antigravityTools-import-btn" class="at-btn at-btn-secondary">${t('autoTrigger.importFromAntigravityTools')}</button>`;
+
+            if (isAuthorized) {
+                const extraCount = Math.max(accounts.length - 1, 0);
+                const accountCountBadge = extraCount > 0
+                    ? `<span class="account-count-badge" title="${t('autoTrigger.manageAccounts')}">+${extraCount}</span>`
+                    : '';
+                const manageBtn = accounts.length > 0
+                    ? `<button id="at-account-manage-btn" class="quota-account-manage-btn" title="${t('autoTrigger.manageAccounts')}">${t('autoTrigger.manageAccounts')}</button>`
+                    : '';
+
+                authRow.innerHTML = `
+                    <div class="quota-auth-info quota-auth-info-clickable" title="${t('autoTrigger.manageAccounts')}">
+                        <span class="at-auth-icon">✅</span>
+                        <span class="at-auth-text">${t('autoTrigger.authorized')}</span>
+                        <span class="quota-auth-email">${activeEmail}</span>
+                        ${accountCountBadge}
+                        ${manageBtn}
+                    </div>
+                    <div class="quota-auth-actions at-auth-actions">
+                        ${syncToggle}
+                        ${importBtn}
+                    </div>
+                `;
+
+                // 点击授权信息区域打开账号管理弹框
+                authRow.querySelector('.quota-auth-info')?.addEventListener('click', () => {
+                    if (typeof window.openAccountManageModal === 'function') {
+                        window.openAccountManageModal();
+                    }
+                });
+
+                // 管理账号按钮
+                document.getElementById('at-account-manage-btn')?.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (typeof window.openAccountManageModal === 'function') {
+                        window.openAccountManageModal();
+                    }
+                });
+                attachAntigravityToolsSyncActions();
+            } else {
+                // No accounts - show authorize button
+                authRow.innerHTML = `
+                    <div class="quota-auth-info">
+                        <span class="at-auth-icon">⚠️</span>
+                        <span class="at-auth-text">${t('autoTrigger.unauthorized')}</span>
+                    </div>
+                    <div class="quota-auth-actions at-auth-actions">
+                        ${syncToggle}
+                        ${importBtn}
+                        <button id="at-auth-btn" class="at-btn at-btn-primary">${t('autoTrigger.authorizeBtn')}</button>
+                    </div>
+                `;
+
+                document.getElementById('at-auth-btn')?.addEventListener('click', () => {
+                    vscode.postMessage({ command: 'autoTrigger.authorize' });
+                });
+                attachAntigravityToolsSyncActions();
+            }
+        }
+
+        if (isAuthorized) {
+            statusCard?.classList.remove('hidden');
             statusGrid?.classList.remove('hidden');
             actions?.classList.remove('hidden');
-
-            // 点击授权信息区域打开账号管理弹框
-            authRow.querySelector('.quota-auth-info')?.addEventListener('click', () => {
-                if (typeof window.openAccountManageModal === 'function') {
-                    window.openAccountManageModal();
-                }
-            });
-
-            // 管理账号按钮
-            document.getElementById('at-account-manage-btn')?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (typeof window.openAccountManageModal === 'function') {
-                    window.openAccountManageModal();
-                }
-            });
-            attachAntigravityToolsSyncActions();
         } else {
-            // No accounts - show authorize button
-            authRow.innerHTML = `
-                <div class="quota-auth-info">
-                    <span class="at-auth-icon">⚠️</span>
-                    <span class="at-auth-text">${t('autoTrigger.unauthorized')}</span>
-                </div>
-                <div class="quota-auth-actions at-auth-actions">
-                    ${syncToggle}
-                    ${importBtn}
-                    <button id="at-auth-btn" class="at-btn at-btn-primary">${t('autoTrigger.authorizeBtn')}</button>
-                </div>
-            `;
+            statusCard?.classList.add('hidden');
             statusGrid?.classList.add('hidden');
             actions?.classList.add('hidden');
-
-            document.getElementById('at-auth-btn')?.addEventListener('click', () => {
-                vscode.postMessage({ command: 'autoTrigger.authorize' });
-            });
-            attachAntigravityToolsSyncActions();
         }
     }
 

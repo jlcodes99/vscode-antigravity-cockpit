@@ -24,6 +24,9 @@
 
     // 国际化文本
     const i18n = window.__i18n || {};
+    const authUi = window.AntigravityAuthUI
+        ? (window.__authUi || (window.__authUi = new window.AntigravityAuthUI(vscode)))
+        : null;
 
     // 状态
     let isRefreshing = false;
@@ -713,9 +716,17 @@
                 if (modal && !modal.classList.contains('hidden')) {
                     const accounts = authorizationStatus?.accounts || [];
                     if (accounts.length === 0) {
-                        closeAccountManageModal();
+                        if (authUi) {
+                            modal.classList.add('hidden');
+                        } else {
+                            closeAccountManageModal();
+                        }
                     } else {
-                        renderAccountManageList();
+                        if (authUi) {
+                            authUi.renderAccountManageList();
+                        } else {
+                            renderAccountManageList();
+                        }
                     }
                 }
             }
@@ -1161,6 +1172,11 @@
 
         card.classList.remove('hidden');
         const auth = authorizationStatus;
+        if (authUi) {
+            authUi.updateState(auth, antigravityToolsSyncEnabled);
+            authUi.renderAuthRow(row, { showSyncToggleInline: false });
+            return;
+        }
         const accounts = auth?.accounts || [];
         const hasAccounts = accounts.length > 0;
         const activeAccount = auth?.activeAccount;
@@ -1692,7 +1708,13 @@
 
     window.retryConnection = retryConnection;
     window.openLogs = openLogs;
-    window.openAccountManageModal = openAccountManageModal;
+    window.openAccountManageModal = () => {
+        if (authUi) {
+            authUi.openAccountManageModal();
+        } else {
+            openAccountManageModal();
+        }
+    };
 
     // ============ 拖拽排序 ============
 

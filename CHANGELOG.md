@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.32]
+
+### Changed
+- **Auth UI**: Unified the authorized account bar across dashboard and auto wake-up via a shared component.
+- **Auto Wake-up**: Moved the authorized account bar into a standalone card to match the dashboard layout.
+- **Build**: Bundle the shared auth UI script for webview reuse.
+
 ## [1.8.31]
 
 ### Added
