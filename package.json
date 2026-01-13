@@ -3,7 +3,7 @@
   "displayName": "Antigravity Cockpit",
   "icon": "assets/icon.png",
   "description": "A premium, dashboard-style quota monitor for Antigravity AI.",
-  "version": "1.8.35",
+  "version": "1.8.36",
   "publisher": "jlcodes",
   "engines": {
     "vscode": "^1.90.0"
@@ -256,6 +256,7 @@
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
+    "@types/sql.js": "^1.4.9",
     "@types/vscode": "^1.90.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
@@ -268,6 +269,7 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
-    "cron-parser": "^5.4.0"
+    "cron-parser": "^5.4.0",
+    "sql.js": "^1.13.0"
   }
 }

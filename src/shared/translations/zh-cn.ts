@@ -540,4 +540,9 @@ export const zhCN = {
     'atSyncConfig.importNow': '立即导入账户',
     'atSyncConfig.importLocal': '导入本地账户',
     'atSyncConfig.importTools': '导入 Antigravity Tools 账户',
+
+    // Switch to Client Account 切换至当前登录账户
+    'autoTrigger.switchToClientAccount': '切换至当前登录账户',
+    'antigravityToolsSync.noClientAccount': '未检测到客户端登录账户',
+    'antigravityToolsSync.switchFailed': '切换失败: {message}',
 };

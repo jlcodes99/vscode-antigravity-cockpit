@@ -503,4 +503,9 @@ export const tr = {
     'atSyncConfig.manualImportTitle': 'Manuel İçe Aktarma',
     'atSyncConfig.manualImportDesc': 'Antigravity Tools\'taki mevcut aktif hesabı hemen içe aktarın. Tek seferlik bir işlem.',
     'atSyncConfig.importNow': 'Hesabı Şimdi İçe Aktar',
+
+    // Switch to Client Account Mevcut hesaba geç
+    'autoTrigger.switchToClientAccount': 'Mevcut giriş hesabına geç',
+    'antigravityToolsSync.noClientAccount': 'İstemci giriş hesabı algılanamadı',
+    'antigravityToolsSync.switchFailed': 'Geçiş başarısız: {message}',
 };

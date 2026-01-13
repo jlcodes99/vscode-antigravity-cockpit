@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.36]
+
+### Fixed
+- **Windows Local Auth Import**: Fixed `spawn sqlite3 ENOENT` error on Windows when importing local accounts. Replaced system `sqlite3` command-line tool with pure JavaScript `sql.js` library for cross-platform compatibility.
+- **Account Switching**: Fixed issue where manually switching accounts in the Manage Accounts modal would be reverted to the original account during quota refresh.
+
+### Added
+- **Switch to Current Login**: Added "Switch to Current Login" button on the authorized account row. Click to quickly sync to the account currently logged in on Antigravity Tools or the local client. If the account exists, it switches directly; if not, an import confirmation dialog appears.
+
 ## [1.8.35]
 
 ### Changed

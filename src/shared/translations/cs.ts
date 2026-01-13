@@ -503,4 +503,9 @@ export const cs = {
     'atSyncConfig.manualImportTitle': 'Ruční import',
     'atSyncConfig.manualImportDesc': 'Okamžitě importujte aktuálně aktivní účet z Antigravity Tools. Jednorázová akce.',
     'atSyncConfig.importNow': 'Importovat účet nyní',
+
+    // Switch to Client Account Přepnout na aktuální
+    'autoTrigger.switchToClientAccount': 'Přepnout na aktuální přihlašovací účet',
+    'antigravityToolsSync.noClientAccount': 'Nebyl detekován žádný přihlašovací účet klienta',
+    'antigravityToolsSync.switchFailed': 'Přepnutí selhalo: {message}',
 };

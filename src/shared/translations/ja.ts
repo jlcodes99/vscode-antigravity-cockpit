@@ -539,4 +539,9 @@ export const ja = {
     'atSyncConfig.importNow': '今すぐアカウントをインポート',
     'atSyncConfig.importLocal': 'ローカルアカウントをインポート',
     'atSyncConfig.importTools': 'Antigravity Tools アカウントをインポート',
+
+    // Switch to Client Account 現在のログインアカウントに切り替え
+    'autoTrigger.switchToClientAccount': '現在のログインアカウントに切り替え',
+    'antigravityToolsSync.noClientAccount': 'クライアントのログインアカウントが検出されませんでした',
+    'antigravityToolsSync.switchFailed': '切り替えに失敗しました: {message}',
 };

@@ -540,4 +540,9 @@ export const zhTW = {
     'atSyncConfig.importNow': '立即導入帳戶',
     'atSyncConfig.importLocal': '導入本地帳號',
     'atSyncConfig.importTools': '導入 Antigravity Tools 帳號',
+
+    // Switch to Client Account 切換至當前登錄帳戶
+    'autoTrigger.switchToClientAccount': '切換至當前登錄帳戶',
+    'antigravityToolsSync.noClientAccount': '未檢測到客戶端登錄帳戶',
+    'antigravityToolsSync.switchFailed': '切換失敗: {message}',
 };

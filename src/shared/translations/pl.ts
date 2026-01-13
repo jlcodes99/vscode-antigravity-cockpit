@@ -539,4 +539,9 @@ export const pl = {
     'atSyncConfig.importNow': 'Importuj konto teraz',
     'atSyncConfig.importLocal': 'Importuj konto lokalne',
     'atSyncConfig.importTools': 'Importuj konto Antigravity Tools',
+
+    // Switch to Client Account Przełącz na aktualne konto
+    'autoTrigger.switchToClientAccount': 'Przełącz na aktualnie zalogowane konto',
+    'antigravityToolsSync.noClientAccount': 'Nie wykryto zalogowanego konta klienta',
+    'antigravityToolsSync.switchFailed': 'Przełączanie nie powiodło się: {message}',
 };

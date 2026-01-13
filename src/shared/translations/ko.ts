@@ -539,4 +539,9 @@ export const ko = {
     'atSyncConfig.importNow': '지금 계정 가져오기',
     'atSyncConfig.importLocal': '로컬 계정 가져오기',
     'atSyncConfig.importTools': 'Antigravity Tools 계정 가져오기',
+
+    // Switch to Client Account 현재 로그인 계정으로 전환
+    'autoTrigger.switchToClientAccount': '현재 로그인 계정으로 전환',
+    'antigravityToolsSync.noClientAccount': '클라이언트 로그인 계정이 감지되지 않았습니다',
+    'antigravityToolsSync.switchFailed': '전환 실패: {message}',
 };

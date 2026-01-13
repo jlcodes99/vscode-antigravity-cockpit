@@ -414,25 +414,9 @@ export class ReactorCore {
     private async syncTelemetryCore(): Promise<void> {
         const config = configService.getConfig();
         if (config.quotaSource === 'authorized') {
-            const autoSwitchEnabled = configService.getStateFlag('antigravityToolsAutoSwitchEnabled', true);
-            if (autoSwitchEnabled) {
-                const toolsMatchedEmail = await this.resolveToolsAuthorizedEmail();
-                if (toolsMatchedEmail) {
-                    await this.ensureActiveAccount(toolsMatchedEmail);
-                } else {
-                    const localSnapshot = await this.tryFetchLocalTelemetry();
-                    const localEmail = localSnapshot?.userInfo?.email;
-                    const localEmailValid = Boolean(
-                        localEmail && localEmail.trim() && localEmail !== 'N/A' && localEmail.includes('@'),
-                    );
-                    if (localEmail && localEmailValid) {
-                        const localMatchedEmail = await this.resolveAuthorizedEmail(localEmail);
-                        if (localMatchedEmail) {
-                            await this.ensureActiveAccount(localMatchedEmail);
-                        }
-                    }
-                }
-            }
+            // 注意：移除了每次配额刷新时的自动账户切换逻辑
+            // 用户可以通过"切换至当前登录账户"按钮手动触发切换
+            // 这样可以避免用户手动切换账户后被自动覆盖回去的问题
 
             try {
                 const hasAuth = await credentialStorage.hasValidCredential();

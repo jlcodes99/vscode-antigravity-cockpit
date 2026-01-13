@@ -538,4 +538,9 @@ export const es = {
     'atSyncConfig.importNow': 'Importar cuenta ahora',
     'atSyncConfig.importLocal': 'Importar cuentas locales',
     'atSyncConfig.importTools': 'Importar desde Antigravity Tools',
+
+    // Switch to Client Account Cambiar a la cuenta actual
+    'autoTrigger.switchToClientAccount': 'Cambiar a la cuenta de inicio de sesión actual',
+    'antigravityToolsSync.noClientAccount': 'No se detectó ninguna cuenta de inicio de sesión del cliente',
+    'antigravityToolsSync.switchFailed': 'Error al cambiar: {message}',
 };

@@ -364,6 +364,7 @@ export type WebviewMessageType =
     | 'antigravityToolsSync.importConfirm'
     | 'antigravityToolsSync.toggle'
     | 'antigravityToolsSync.toggleAutoSwitch'
+    | 'antigravityToolsSync.switchToClient'
     // General
     | 'openUrl'
     | 'executeCommand'

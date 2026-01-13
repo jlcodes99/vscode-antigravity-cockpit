@@ -1,15 +1,25 @@
 import * as os from 'os';
 import * as path from 'path';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
+import * as fs from 'fs';
+// 使用 sql.js 的纯 JavaScript 版本（不需要 .wasm 文件）
+import initSqlJs, { Database } from 'sql.js/dist/sql-asm.js';
 import { credentialStorage } from './credential_storage';
 import { oauthService } from './oauth_service';
 import { OAuthCredential } from './types';
 import { logger } from '../shared/log_service';
 
-const execFileAsync = promisify(execFile);
-
 const STATE_KEY = 'jetskiStateSync.agentManagerInitState';
+
+// sql.js 初始化缓存
+let sqlJsPromise: ReturnType<typeof initSqlJs> | null = null;
+
+async function getSqlJs(): Promise<Awaited<ReturnType<typeof initSqlJs>>> {
+    if (!sqlJsPromise) {
+        // 纯 JavaScript 版本不需要加载 .wasm 文件
+        sqlJsPromise = initSqlJs();
+    }
+    return sqlJsPromise;
+}
 
 interface LocalTokenInfo {
     accessToken?: string;
@@ -47,19 +57,39 @@ function getAntigravityStateDbPath(): string {
 }
 
 async function readStateValue(dbPath: string): Promise<string> {
-    const { stdout } = await execFileAsync(
-        'sqlite3',
-        ['-readonly', dbPath, `SELECT value FROM ItemTable WHERE key = '${STATE_KEY}';`],
-        { maxBuffer: 10 * 1024 * 1024 },
-    );
-    const line = stdout
-        .split(/\r?\n/)
-        .map(value => value.trim())
-        .find(value => value.length > 0);
-    if (!line) {
-        throw new Error('No state value found');
+    // 检查数据库文件是否存在
+    if (!fs.existsSync(dbPath)) {
+        throw new Error(`Database file not found: ${dbPath}`);
     }
-    return line;
+
+    const SQL = await getSqlJs();
+    const fileBuffer = fs.readFileSync(dbPath);
+    let db: Database | null = null;
+
+    try {
+        db = new SQL.Database(fileBuffer);
+        const stmt = db.prepare(`SELECT value FROM ItemTable WHERE key = ?`);
+        stmt.bind([STATE_KEY]);
+
+        if (stmt.step()) {
+            const row = stmt.get();
+            stmt.free();
+            if (row && row[0]) {
+                const value = String(row[0]).trim();
+                if (value.length > 0) {
+                    return value;
+                }
+            }
+        } else {
+            stmt.free();
+        }
+
+        throw new Error('No state value found');
+    } finally {
+        if (db) {
+            db.close();
+        }
+    }
 }
 
 function readVarint(data: Buffer, offset: number): [number, number] {

@@ -539,4 +539,9 @@ export const ptBR = {
     'atSyncConfig.importNow': 'Importar conta agora',
     'atSyncConfig.importLocal': 'Importar contas locais',
     'atSyncConfig.importTools': 'Importar do Antigravity Tools',
+
+    // Switch to Client Account Alternar para a conta atual
+    'autoTrigger.switchToClientAccount': 'Alternar para a conta de login atual',
+    'antigravityToolsSync.noClientAccount': 'Nenhuma conta de login do cliente detectada',
+    'antigravityToolsSync.switchFailed': 'Falha ao alternar: {message}',
 };

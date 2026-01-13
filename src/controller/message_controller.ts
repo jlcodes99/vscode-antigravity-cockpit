@@ -446,6 +446,11 @@ export class MessageController {
                     }
                     break;
 
+                case 'antigravityToolsSync.switchToClient':
+                    // 切换至当前登录账户
+                    await this.handleSwitchToClientAccount();
+                    break;
+
                 case 'updateLanguage':
                     // 更新语言设置
                     if (message.language !== undefined) {
@@ -998,6 +1003,80 @@ export class MessageController {
             });
 
             vscode.window.showWarningMessage(err);
+        }
+    }
+
+    /**
+     * 切换至当前登录账户
+     * 检测 Antigravity Tools 或本地客户端的当前账户：
+     * - 如果账户已存在于 Cockpit，直接切换
+     * - 如果账户不存在，走导入弹框流程
+     */
+    private async handleSwitchToClientAccount(): Promise<void> {
+        try {
+            const detection = await antigravityToolsSyncService.detect();
+            
+            if (!detection || !detection.currentEmail) {
+                // 未检测到客户端账户
+                vscode.window.showWarningMessage(
+                    t('antigravityToolsSync.noClientAccount') || '未检测到客户端登录账户'
+                );
+                return;
+            }
+
+            const activeEmail = await credentialStorage.getActiveAccount();
+            const currentEmail = detection.currentEmail;
+            const currentEmailLower = currentEmail.toLowerCase();
+            
+            // 检查是否已是当前账户
+            if (activeEmail && activeEmail.toLowerCase() === currentEmailLower) {
+                vscode.window.showInformationMessage(
+                    t('antigravityToolsSync.alreadySynced') || '已是当前账户'
+                );
+                return;
+            }
+
+            // 检查账户是否已存在于 Cockpit
+            const accounts = await credentialStorage.getAllCredentials();
+            const existingEmail = Object.keys(accounts).find(
+                email => email.toLowerCase() === currentEmailLower
+            );
+
+            if (existingEmail) {
+                // 账户已存在，直接切换
+                logger.info(`[SwitchToClient] Switching to existing account: ${existingEmail}`);
+                await credentialStorage.setActiveAccount(existingEmail);
+                const state = await autoTriggerController.getState();
+                this.hud.sendMessage({ type: 'autoTriggerState', data: state });
+                
+                if (configService.getConfig().quotaSource === 'authorized') {
+                    this.reactor.syncTelemetry();
+                }
+                
+                vscode.window.showInformationMessage(
+                    t('autoTrigger.accountSwitched', { email: existingEmail }) 
+                    || `已切换至: ${existingEmail}`
+                );
+            } else {
+                // 账户不存在，走导入弹框流程
+                logger.info(`[SwitchToClient] Account not found, showing import prompt for: ${currentEmail}`);
+                this.hud.sendMessage({
+                    type: 'antigravityToolsSyncPrompt',
+                    data: {
+                        promptType: 'new_accounts',
+                        newEmails: [currentEmail],
+                        currentEmail: currentEmail,
+                        sameAccount: false,
+                        autoConfirm: false,
+                    },
+                });
+            }
+        } catch (error) {
+            const err = error instanceof Error ? error.message : String(error);
+            logger.warn(`[SwitchToClient] Failed: ${err}`);
+            vscode.window.showWarningMessage(
+                t('antigravityToolsSync.switchFailed', { message: err }) || `切换失败: ${err}`
+            );
         }
     }
 }

@@ -77,6 +77,9 @@
                     ? `<span class="account-count-badge" title="${t('autoTrigger.manageAccounts')}">+${extraCount}</span>`
                     : '';
 
+                // 切换至当前登录账户按钮 - 使用和"管理账号"相同的样式
+                const switchToClientBtn = `<button class="quota-account-manage-btn at-switch-to-client-btn" title="${t('autoTrigger.switchToClientAccount')}">${t('autoTrigger.switchToClientAccount')}</button>`;
+
                 container.innerHTML = `
                     <div class="quota-auth-info quota-auth-info-clickable" title="${t('autoTrigger.manageAccounts')}">
                         <span class="quota-auth-icon">✅</span>
@@ -84,6 +87,7 @@
                         <span class="quota-auth-email">${activeEmail}</span>
                         ${accountCountBadge}
                         ${manageBtn}
+                        ${switchToClientBtn}
                     </div>
                     <div class="quota-auth-actions">
                         ${syncActionsHtml}
@@ -140,6 +144,12 @@
             // Inline Import
             container.querySelector('.at-import-btn')?.addEventListener('click', () => {
                 postMessage({ command: 'antigravityToolsSync.import' });
+            });
+
+            // Switch to Client Account - 切换至当前登录账户
+            container.querySelector('.at-switch-to-client-btn')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                postMessage({ command: 'antigravityToolsSync.switchToClient' });
             });
 
             // Import local credential (moved to sync config modal)

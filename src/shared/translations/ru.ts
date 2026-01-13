@@ -539,4 +539,9 @@ export const ru = {
     'atSyncConfig.importNow': 'Импортировать аккаунт сейчас',
     'atSyncConfig.importLocal': 'Импорт локальных аккаунтов',
     'atSyncConfig.importTools': 'Импорт из Antigravity Tools',
+
+    // Switch to Client Account Переключиться на текущий
+    'autoTrigger.switchToClientAccount': 'Переключиться на текущий аккаунт',
+    'antigravityToolsSync.noClientAccount': 'Аккаунт клиента не обнаружен',
+    'antigravityToolsSync.switchFailed': 'Ошибка переключения: {message}',
 };
