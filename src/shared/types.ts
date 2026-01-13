@@ -87,6 +87,8 @@ export interface QuotaSnapshot {
     isConnected: boolean;
     /** 错误信息 */
     errorMessage?: string;
+    /** 本地账户邮箱（local 模式下使用远端 API 时） */
+    localAccountEmail?: string;
 }
 
 /** 配额健康状态 */

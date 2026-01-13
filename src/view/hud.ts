@@ -369,6 +369,8 @@ export class CockpitHUD {
                     supportedMimeTypes: m.supportedMimeTypes,
                 })),
             })),
+            // 本地账户邮箱（local 模式下使用远端 API 时）
+            localAccountEmail: snapshot.localAccountEmail,
         };
     }
 
@@ -472,7 +474,8 @@ export class CockpitHUD {
             <button id="toggle-grouping-btn" class="refresh-btn" title="${t('grouping.toggleHint')}">
                 ${t('grouping.title')}
             </button>
-            <button id="toggle-profile-btn" class="refresh-btn" title="${t('profile.togglePlan')}">
+            <!-- 计划按钮已隐藏 -->
+            <button id="toggle-profile-btn" class="refresh-btn hidden" title="${t('profile.togglePlan')}">
                 ${t('profile.planDetails')}
             </button>
             <button id="announcement-btn" class="refresh-btn icon-only" title="${t('announcement.title')}">

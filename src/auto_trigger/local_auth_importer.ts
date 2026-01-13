@@ -245,3 +245,51 @@ export async function importLocalCredential(fallbackEmail?: string): Promise<{ e
     const result = await commitLocalCredential({ overwrite: true, fallbackEmail });
     return { email: result.email };
 }
+
+/**
+ * 确保本地 Antigravity 账户已导入到 credentialStorage
+ * 用于 local 配额模式下通过远端 API 获取配额数据
+ * - 如果 credentialStorage 已有有效凭证，直接返回当前账户邮箱
+ * - 如果没有，尝试从 state.vscdb 读取并保存到 credentialStorage
+ * @returns 账户邮箱或 null
+ */
+export async function ensureLocalCredentialImported(): Promise<{ email: string } | null> {
+    // 首先检查是否已有有效凭证
+    const hasValid = await credentialStorage.hasValidCredential();
+    if (hasValid) {
+        const activeEmail = await credentialStorage.getActiveAccount();
+        if (activeEmail) {
+            logger.debug(`[LocalAuth] Using existing credential: ${activeEmail}`);
+            return { email: activeEmail };
+        }
+    }
+
+    // 没有有效凭证，尝试从 state.vscdb 导入
+    try {
+        const tokenInfo = await readLocalTokenInfo();
+        if (!tokenInfo.refreshToken) {
+            logger.debug('[LocalAuth] No refresh token found in state.vscdb');
+            return null;
+        }
+
+        const credential = await oauthService.buildCredentialFromRefreshToken(
+            tokenInfo.refreshToken,
+            undefined,
+        );
+
+        if (!credential.email || !credential.accessToken) {
+            logger.debug('[LocalAuth] Failed to build credential: missing email or accessToken');
+            return null;
+        }
+
+        // 保存到 credentialStorage（自动导入）
+        await credentialStorage.saveCredential(credential);
+        logger.info(`[LocalAuth] Auto-imported credential for ${credential.email}`);
+        return { email: credential.email };
+    } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        logger.debug(`[LocalAuth] Failed to import local credential: ${err.message}`);
+        return null;
+    }
+}
+

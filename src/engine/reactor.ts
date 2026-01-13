@@ -22,7 +22,7 @@ import { captureError } from '../shared/error_reporter';
 import { AntigravityError, isServerError } from '../shared/errors';
 import { cloudCodeClient, CloudCodeAuthError, CloudCodeRequestError } from '../shared/cloudcode_client';
 import { autoTriggerController } from '../auto_trigger/controller';
-import { oauthService, credentialStorage } from '../auto_trigger';
+import { oauthService, credentialStorage, ensureLocalCredentialImported } from '../auto_trigger';
 import { antigravityToolsSyncService } from '../antigravityTools_sync';
 
 const AUTH_RECOMMENDED_LABELS = [
@@ -125,6 +125,10 @@ export class ReactorCore {
     private hasSuccessfulSync: boolean = false;
     /** 初始化同步重试标识，用于中断本地重试流程 */
     private initRetryToken: number = 0;
+    /** 本地模式下的账户邮箱（从 state.vscdb 读取） */
+    private localAccountEmail?: string;
+    /** 本地模式是否使用远端 API */
+    private localUsingRemoteApi: boolean = false;
 
     constructor() {
         logger.debug('ReactorCore Online');
@@ -482,12 +486,47 @@ export class ReactorCore {
             }
         }
 
+        // Local 模式：优先尝试 state.vscdb 账户 + 远端 API，失败则兜底本地进程
         try {
-            const telemetry = await this.fetchLocalTelemetry();
+            const telemetry = await this.fetchLocalTelemetryWithRemoteFallback();
             this.publishTelemetry(telemetry, 'local');
         } catch (error) {
             throw this.wrapSyncError(error, 'local');
         }
+    }
+
+    /**
+     * 获取本地配额数据，优先使用远端 API（自动导入 state.vscdb 账户）
+     * 如果远端 API 失败，兜底到本地进程 API
+     */
+    private async fetchLocalTelemetryWithRemoteFallback(): Promise<QuotaSnapshot> {
+        // 第一优先级：确保本地账户已导入，然后使用远端 API
+        try {
+            const importResult = await ensureLocalCredentialImported();
+            if (importResult) {
+                logger.info(`[LocalQuota] Using remote API with account: ${importResult.email}`);
+                
+                // 复用授权模式的逻辑获取配额
+                const telemetry = await this.fetchAuthorizedTelemetry();
+                
+                this.localAccountEmail = importResult.email;
+                this.localUsingRemoteApi = true;
+                this.lastLocalFetchedAt = Date.now();
+                
+                // 添加本地账户信息到快照
+                telemetry.localAccountEmail = importResult.email;
+                return telemetry;
+            }
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.warn(`[LocalQuota] Remote API failed, falling back to local process: ${err.message}`);
+        }
+
+        // 第二优先级：兜底到本地进程 API
+        logger.info('[LocalQuota] Using local process API');
+        this.localUsingRemoteApi = false;
+        this.localAccountEmail = undefined;
+        return await this.fetchLocalTelemetry();
     }
 
     private async fetchLocalTelemetry(): Promise<QuotaSnapshot> {

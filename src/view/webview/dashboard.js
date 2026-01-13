@@ -1386,8 +1386,23 @@
             return;
         }
 
+        // Local 模式下显示本地账户信息（只读）
         if (currentQuotaSource !== 'authorized') {
-            card.classList.add('hidden');
+            const localEmail = lastSnapshot?.localAccountEmail;
+            if (localEmail) {
+                // 使用远端 API + 本地账户
+                card.classList.remove('hidden');
+                row.innerHTML = `
+                    <div class="quota-auth-info">
+                        <span class="quota-auth-icon">👤</span>
+                        <span class="quota-auth-text">${i18n['quotaSource.localAccountLabel'] || '当前账户'}</span>
+                        <span class="quota-auth-email">${localEmail}</span>
+                    </div>
+                `;
+            } else {
+                // 使用本地进程 API
+                card.classList.add('hidden');
+            }
             return;
         }
 

@@ -260,6 +260,7 @@ export const zhCN = {
     'quotaSource.importLocalFailed': '导入失败: {message}',
     'quotaSource.switchToAuthorized': '切换到授权监控',
     'quotaSource.switchToLocal': '切换到本地监控',
+    'quotaSource.localAccountLabel': '当前账户',
     'quotaSource.retryLocal': '重新检测',
     'quotaSource.guideTitle': '选择配额监控方式',
     'quotaSource.guideSubtitle': '请选择配额数据的获取方式，之后可在右上角随时切换。',

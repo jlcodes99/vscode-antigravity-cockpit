@@ -260,6 +260,7 @@ export const en = {
     'quotaSource.importLocalFailed': 'Import failed: {message}',
     'quotaSource.switchToAuthorized': 'Switch to Authorized',
     'quotaSource.switchToLocal': 'Switch to Local',
+    'quotaSource.localAccountLabel': 'Current Account',
     'quotaSource.retryLocal': 'Retry detection',
     'quotaSource.guideTitle': 'Choose Quota Monitoring',
     'quotaSource.guideSubtitle': 'Select how to fetch quota data. You can switch anytime from the top right.',

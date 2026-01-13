@@ -127,7 +127,7 @@ class ConfigService {
             criticalThreshold: config.get<number>(CONFIG_KEYS.CRITICAL_THRESHOLD, QUOTA_THRESHOLDS.CRITICAL_DEFAULT),
             quotaSource: quotaSourceResolved,
             displayMode: config.get<string>(CONFIG_KEYS.DISPLAY_MODE, DISPLAY_MODE.WEBVIEW),
-            profileHidden: config.get<boolean>(CONFIG_KEYS.PROFILE_HIDDEN, false),
+            profileHidden: config.get<boolean>(CONFIG_KEYS.PROFILE_HIDDEN, true),
             dataMasked: config.get<boolean>(CONFIG_KEYS.DATA_MASKED, false),
             language: this.getStateValue<string>(CONFIG_KEYS.LANGUAGE, 'auto'),
         };

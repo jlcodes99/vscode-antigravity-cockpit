@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.8.34]
+
+### Changed
+- **Local Quota**: Optimized local quota fetching to prioritize remote API using local account credentials (from `state.vscdb`), with local process API as fallback. This improves data accuracy while maintaining compatibility.
+- **Auto Import**: Local account credentials are now automatically imported to credential storage on first use, enabling seamless switching between local and authorized modes.
+- **UI**: Hidden the "Plan" button by default and collapsed the Plan Details section.
+
+### Added
+- **Local Account Display**: Local mode now displays the current account email when using remote API.
+
 ## [1.8.33]
 
 ### Added
