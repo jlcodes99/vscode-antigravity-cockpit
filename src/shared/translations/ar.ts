@@ -273,7 +273,7 @@ export const ar = {
     'quotaSource.switchTimeout': 'يستغرق التبديل وقتاً أطول من المتوقع. يمكنك المحاولة مرة أخرى.',
 
     // Language Settings
-    'language.title': 'الغة',
+    'language.title': 'اللغة',
     'language.auto': 'تلقائي (يتبع VS Code)',
     'language.changed': 'تم تغيير اللغة. أعد فتح اللوحة للتطبيق.',
     'language.hint': 'تجاوز لغة VS Code لهذا الامتداد',
