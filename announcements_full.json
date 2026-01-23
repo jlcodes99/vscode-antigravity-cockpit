@@ -2,101 +2,32 @@
   "version": "1.0",
   "announcements": [
     {
-      "id": "ann-2026-01-02-auto-wakeup",
-      "type": "feature",
-      "priority": 100,
-      "title": "🎉 New Feature: Auto Wake-up",
-      "summary": "Wake up your quota cycle automatically! Try it now.",
-      "content": "⏰ Auto Wake-up\n\nSet scheduled requests to AI models to trigger quota reset cycles early.\n\n🔐 Security: \nCredentials encrypted in VS Code Secret Storage, used locally only.\n\nScenario: \nIf you start work at 9:00, set wake-up at 6:00. By 9:00, the cycle has run for 3 hours. After 2 hours of heavy use (11:00), you get your first reset early!\n\n⚠️ Note: Requires Antigravity enabled and network connected.",
-      "action": {
-        "type": "tab",
-        "target": "auto-trigger",
-        "label": "Check it out"
-      },
+      "id": "ann-2026-01-community-groups-v1",
+      "type": "info",
+      "priority": 130,
+      "title": "💬 加入交流群",
+      "summary": "微信群5个群都扫码上限了，欢迎加入QQ交流群",
+      "content": "📢 近期优化\n建议更新到最新版本：修复账户时序问题 · 账户切换完全跟随本地客户端\n\n💬 技术交流群\n微信群已满员，目前请通过 QQ 群加入交流。\n\n扫码加入 👇",
+      "images": [
+        {
+          "url": "https://raw.githubusercontent.com/jlcodes99/vscode-antigravity-cockpit/main/docs/qq_group.png",
+          "label": "QQ群"
+        }
+      ],
       "locales": {
         "zh-cn": {
-          "title": "🎉 发现新功能：自动唤醒",
-          "summary": "自动唤醒您的配额周期！快来体验全新的自动唤醒功能。",
-          "content": "⏰ 自动唤醒\n\n设置定时向 AI 大模型发送请求，提前消耗少量配额以触发重置周期。\n\n🔐 安全保障：\n凭证加密存储于 VS Code Secret Storage，仅本地运行使用。\n\n场景示例：\n若您 9:00 上班，可设置 6:00 自动唤醒。这样当您开始工作时，配额周期已运行 3 小时，您在高强度使用 2 小时后（11:00）即可获得首次重置，比平时更早恢复满血状态。\n\n⚠️ 注意：需保持 Antigravity 开启 且 网络通畅 才能生效。",
-          "actionLabel": "立即体验"
-        },
-        "zh-tw": {
-          "title": "🎉 發現新功能：自動喚醒",
-          "summary": "自動喚醒您的配額週期！快來體驗全新的自動喚醒功能。",
-          "content": "⏰ 自動喚醒\n\n設置定時向 AI 大模型發送請求，提前消耗少量配額以觸發重置週期。\n\n🔐 安全保障：\n憑證加密存儲於 VS Code Secret Storage，僅本地運行使用。\n\n場景示例：\n若您 9:00 上班，可設置 6:00 自動喚醒。這樣當您開始工作時，配額週期已運行 3 小時，您在高強度使用 2 小時後（11:00）即可獲得首次重置，比平時更早恢復滿血狀態。\n\n⚠️ 注意：需保持 Antigravity 開啟 且 網絡通暢 才能生效。",
-          "actionLabel": "立即體驗"
-        },
-        "ja": {
-          "title": "🎉 新機能：自動ウェイクアップ",
-          "summary": "クォータサイクルを自動的にウェイクアップします！今すぐお試しください。",
-          "content": "⏰ 自動ウェイクアップ\n\nAIモデルへのリクエストを定期的にスケジュールし、クォータのリセットサイクルを事前にトリガーします。\n\n🔐 セキュリティ：\n認証情報はVS CodeのSecret Storageに暗号化されて保存され、ローカルでのみ使用されます。\n\nシナリオ例：\n9:00に業務を開始する場合、6:00にウェイクアップを設定します。これにより、業務開始時にサイクルが既に3時間経過しており、2時間の集中利用後（11:00）には最初のクォータリセットが通常より早く行われます。\n\n⚠️ 注意：有効にするにはAntigravityが起動しており、ネットワークに接続されている必要があります。",
-          "actionLabel": "今すぐ体験"
-        },
-        "ko": {
-          "title": "🎉 새로운 기능: 자동 깨우기",
-          "summary": "할당량 주기를 자동으로 깨우세요! 지금 바로 체험해 보세요.",
-          "content": "⏰ 자동 깨우기\n\nAI 모델에 대한 요청을 예약하여 할당량 재설정 주기를 미리 트리거합니다.\n\n🔐 보안:\n자격 증명은 VS Code Secret Storage에 암호화되어 저장되며 로컬에서만 사용됩니다.\n\n사용 시나리오:\n오전 9시에 업무를 시작하는 경우, 오전 6시에 깨우기를 설정하십시오. 이 경우 업무 시작 시 이미 주기가 3시간 동안 실행되었으므로, 2시간 정도 집중적으로 사용한 후(오전 11시) 평소보다 일찍 할당량이 복구됩니다.\n\n⚠️ 참고: Antigravity가 활성화되어 있고 네트워크가 연결되어 있어야 작동합니다.",
-          "actionLabel": "지금 체험"
-        },
-        "fr": {
-          "title": "🎉 Nouvelle fonctionnalité : Réveil automatique",
-          "summary": "Réveillez votre cycle de quota automatiquement ! Essayez maintenant.",
-          "content": "⏰ Réveil automatique\n\nPlanifiez des requêtes automatisées vers les modèles IA pour déclencher les cycles de réinitialisation de quota à l'avance.\n\n🔐 Sécurité :\nLes identifiants sont cryptés dans le Secret Storage de VS Code, utilisés uniquement localement.\n\nScénario :\nSi vous commencez à travailler à 9h00, réglez le réveil à 6h00. À 9h00, le cycle aura tourné pendant 3 heures. Après 2 heures d'utilisation intensive (11h00), vous obtenez votre première réinitialisation plus tôt !\n\n⚠️ Note : Nécessite qu'Antigravity soit activé et connecté au réseau.",
-          "actionLabel": "Essayer maintenant"
-        },
-        "de": {
-          "title": "🎉 Neue Funktion: Automatisches Aufwachen",
-          "summary": "Wecken Sie Ihren Quotenzyklus automatisch auf! Jetzt ausprobieren.",
-          "content": "⏰ Automatisches Aufwachen\n\nPlanen Sie automatisierte Anfragen an KI-Modelle, um Quoten-Reset-Zyklen vorzeitig auszulösen.\n\n🔐 Sicherheit:\nZugangsdaten werden im VS Code Secret Storage verschlüsselt gespeichert und nur lokal verwendet.\n\nSzenario:\nWenn Sie um 9:00 Uhr mit der Arbeit beginnen, stellen Sie das Aufwachen auf 6:00 Uhr ein. Um 9:00 Uhr ist der Zyklus bereits seit 3 Stunden aktiv. Nach 2 Stunden intensiver Nutzung (11:00 Uhr) erhalten Sie Ihren ersten Reset früher!\n\n⚠️ Hinweis: Antigravity muss aktiviert und online sein.",
-          "actionLabel": "Jetzt testen"
-        },
-        "es": {
-          "title": "🎉 Nueva función: Despertar automático",
-          "summary": "¡Despierta tu ciclo de cuota automáticamente! Pruébalo ahora.",
-          "content": "⏰ Despertar automático\n\nPrograma solicitudes automáticas a modelos de IA para activar los ciclos de reinicio de cuota por adelantado.\n\n🔐 Seguridad:\nLas credenciales se guardan cifradas en el Secret Storage de VS Code y solo se usan localmente.\n\nEjemplo:\nSi empiezas a trabajar a las 9:00, configura el despertar a las 6:00. A las 9:00, el ciclo ya habrá corrido 3 horas. Tras 2 horas de uso intenso (11:00), recibirás tu primer reinicio antes de lo habitual.\n\n⚠️ Nota: Requiere que Antigravity esté activo y conectado a la red.",
-          "actionLabel": "Probar ahora"
-        },
-        "it": {
-          "title": "🎉 Nuova funzione: Sveglia automatica",
-          "summary": "Sveglia il tuo ciclo di quota automaticamente! Provalo ora.",
-          "content": "⏰ Sveglia automatica\n\nProgramma richieste automatiche ai modelli IA per attivare in anticipo i cicli di ripristino della quota.\n\n🔐 Sicurezza:\nLe credenziali sono criptate nel Secret Storage di VS Code, usate solo localmente.\n\nEsempio:\nSe inizi a lavorare alle 9:00, imposta la sveglia alle 6:00. Alle 9:00, il ciclo sarà attivo da 3 ore. Dopo 2 ore di uso intenso (11:00), otterrai il primo ripristino in anticipo!\n\n⚠️ Nota: Richiede Antigravity attivo e connessione di rete.",
-          "actionLabel": "Prova ora"
-        },
-        "ru": {
-          "title": "🎉 Новая функция: Авто-пробуждение",
-          "summary": "Пробуждайте цикл квот автоматически! Попробуйте сейчас.",
-          "content": "⏰ Авто-пробуждение\n\nНастраивайте запланированные запросы к ИИ-моделям, чтобы заранее запускать циклы сброса квот.\n\n🔐 Безопасность:\nУчетные данные шифруются в Secret Storage VS Code и используются только локально.\n\nПример:\nЕсли вы начинаете работу в 9:00, установите пробуждение на 6:00. К 9:00 цикл будет идти уже 3 часа. После 2 часов интенсивной работы (11:00) вы получите первый сброс квоты раньше обычного!\n\n⚠️ Примечание: Требуется запущенный Antigravity и наличие сети.",
-          "actionLabel": "Попробовать"
-        },
-        "pt-br": {
-          "title": "🎉 Nova função: Despertar Automático",
-          "summary": "Desperte seu ciclo de cota automaticamente! Tente agora.",
-          "content": "⏰ Despertar Automático\n\nAgende solicitações automáticas para modelos de IA para acionar os ciclos de redefinição de cota com antecedência.\n\n🔐 Segurança:\nAs credenciais são criptografadas no Secret Storage do VS Code e usadas apenas localmente.\n\nCenário:\nSe você começa a trabalhar às 9:00, defina o despertar para as 6:00. Às 9:00, o ciclo já terá corrido por 3 horas. Após 2 horas de uso intenso (11:00), você recebe sua primeira redefinição mais cedo!\n\n⚠️ Nota: Requer o Antigravity ativo e conexão com a rede.",
-          "actionLabel": "Experimentar"
-        },
-        "tr": {
-          "title": "🎉 Yeni Özellik: Otomatik Uyandırma",
-          "summary": "Kota döngünüzü otomatik olarak uyandırın! Şimdi deneyin.",
-          "content": "⏰ Otomatik Uyandırma\n\nKota sıfırlama döngülerini önceden tetiklemek için yapay zeka modellerine zamanlanmış istekler ayarlayın.\n\n🔐 Güvenlik:\nKimlik bilgileri VS Code Secret Storage'da şifrelenir ve yalnızca yerel olarak kullanılır.\n\nSenaryo:\nİşe saat 09:00'da başlıyorsanız, uyandırmayı 06:00'ya ayarlayın. Saat 09:00'da döngü 3 saattir çalışıyor olacaktır. 2 saatlik yoğun kullanımdan sonra (11:00), ilk sıfırlamanızı erkenden alırsınız!\n\n⚠️ Not: Antigravity'nin açık ve ağa bağlı olması gerekir.",
-          "actionLabel": "Hemen Dene"
-        },
-        "pl": {
-          "title": "🎉 Nova funkcja: Automatyczne budzenie",
-          "summary": "Automatycznie budź swój cykl limitów! Wypróbuj teraz.",
-          "content": "⏰ Automatyczne budzenie\n\nUstaw harmonogram zapytań do modeli AI, aby wcześniej wyzwalać cykle resetowania limitów.\n\n🔐 Bezpieczeństwo:\nDane uwierzytelniające są szyfrowane w Secret Storage VS Code i używane tylko lokalnie.\n\nScenariusz:\nJeśli zaczynasz pracę o 9:00, ustaw budzenie na 6:00. O  Polish 9:00 cykl będzie trwał już 3 godziny. Po 2 godzinach intensywnego użytkowania (11:00) otrzymasz pierwszy reset wcześniej niż zwykle!\n\n⚠️ Uwaga: Wymaga włączonego Antigravity i połączenia z siecią.",
-          "actionLabel": "Sprawdź teraz"
-        },
-        "cs": {
-          "title": "🎉 Nová funkce: Automatické probuzení",
-          "summary": "Probouzejte svůj cyklus kvót automaticky! Vyzkoušejte hned.",
-          "content": "⏰ Automatické probuzení\n\nNastavte plánované požadavky na modely AI pro předčasné spuštění cyklů resetování kvót.\n\n🔐 Bezpečnost:\nAkreditace jsou šifrovány v Secret Storage VS Code a používány pouze lokálně.\n\nScénář:\nPokud začínáte pracovat v 9:00, nastavte probuzení na 6:00. V 9:00 již cyklus poběží 3 hodiny. Po 2 hodinách intenzivního používání (11:00) získáte první reset dříve !\n\n⚠️ Poznámka: Vyžaduje zapnutý Antigravity a připojení k síti.",
-          "actionLabel": "Vyzkoušet"
+          "title": "💬 加入交流群",
+          "summary": "微信群5个群都扫码上限了，欢迎加入QQ交流群",
+          "content": "📢 近期优化\n建议更新到最新版本：修复账户时序问题 · 账户切换完全跟随本地客户端\n\n💬 技术交流群\n微信群已满员，目前请通过 QQ 群加入交流。\n\n扫码加入 👇"
         }
       },
-      "targetVersions": ">=1.6.0",
+      "targetVersions": "*",
+      "targetLanguages": [
+        "zh-cn"
+      ],
       "showOnce": true,
       "popup": true,
-      "createdAt": "2026-01-01T00:00:00Z",
+      "createdAt": "2026-01-07T00:00:00Z",
       "expiresAt": null
     },
     {
@@ -195,39 +126,6 @@
       "showOnce": true,
       "popup": false,
       "createdAt": "2025-12-01T00:00:00Z",
-      "expiresAt": null
-    },
-    {
-      "id": "ann-2026-01-community-groups-v1",
-      "type": "info",
-      "priority": 130,
-      "title": "💬 加入交流群",
-      "summary": "作者新建了技术交流群，欢迎加入！",
-      "content": "📢 近期优化\n建议更新到最新版本：支持手动切换界面语言 · 授权配额支持显示模型能力标签 · 修复插件重载后 Webview 遗失问题\n\n💬 技术交流群\n作者新建了交流群，目前人还不多，希望国内开发者们加群一起热闹热闹！\n反馈问题 · 交流心得 · 讨论技术 · 摸鱼吹牛逼\n扫码加入 👇\n\n微信号：lijie_agent",
-      "images": [
-        {
-          "url": "https://raw.githubusercontent.com/jlcodes99/vscode-antigravity-cockpit/main/docs/wechat_group_qr.png",
-          "label": "微信群"
-        },
-        {
-          "url": "https://raw.githubusercontent.com/jlcodes99/vscode-antigravity-cockpit/main/docs/wechat_info.png",
-          "label": "个人名片"
-        }
-      ],
-      "locales": {
-        "zh-cn": {
-          "title": "💬 加入交流群",
-          "summary": "作者新建了技术交流群，欢迎加入！",
-          "content": "📢 近期优化\n建议更新到最新版本：支持手动切换界面语言 · 授权配额支持显示模型能力标签 · 修复插件重载后 Webview 遗失问题\n\n💬 技术交流群\n作者新建了交流群，目前人还不多，希望国内开发者们加群一起热闹热闹！\n反馈问题 · 交流心得 · 讨论技术 · 摸鱼吹牛逼\n扫码加入 👇\n\n微信号：lijie_agent"
-        }
-      },
-      "targetVersions": "*",
-      "targetLanguages": [
-        "zh-cn"
-      ],
-      "showOnce": true,
-      "popup": true,
-      "createdAt": "2026-01-07T00:00:00Z",
       "expiresAt": null
     }
   ]
