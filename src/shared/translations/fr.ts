@@ -43,8 +43,10 @@ export const fr = {
     'history.accountLabel': 'Compte',
     'history.modelLabel': 'Modèle',
     'history.range24h': '24h',
-    'history.range7j': '7j',
-    'history.range30j': '30j',
+    'history.range7d': '7j',
+
+    'history.range30d': '30j',
+
     'history.noData': 'Pas encore d\'historique. Nous enregistrerons les changements de quota.',
     'history.noAccounts': 'Aucun compte',
     'history.noModels': 'Aucun modèle',
@@ -64,6 +66,14 @@ export const fr = {
     'history.paginationPrev': 'Précédent',
     'history.paginationNext': 'Suivant',
     'history.pageInfo': 'Page {current} / {total}',
+    'history.clearTitle': 'Effacer l\'historique',
+    'history.clearConfirm': 'Êtes-vous sûr de vouloir effacer l\'historique des quotas pour {email} ?',
+    'history.clearConfirmDefault': 'Êtes-vous sûr de vouloir effacer l\'historique des quotas ?',
+    'history.clearThis': 'Effacer ce compte',
+    'history.clearAll': 'Effacer tous les comptes',
+    'history.cleared': 'Historique effacé.',
+    'history.allCleared': 'Tout l\'historique effacé.',
+    'history.clearing': 'Effacement...',
 
     // Notifications
     'notify.refreshing': 'Actualisation des données de quota...',

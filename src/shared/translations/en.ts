@@ -69,6 +69,14 @@ export const en = {
     'history.paginationPrev': 'Prev',
     'history.paginationNext': 'Next',
     'history.pageInfo': 'Page {current} / {total}',
+    'history.clearTitle': 'Clear History',
+    'history.clearConfirm': 'Are you sure you want to clear quota history for {email}?',
+    'history.clearConfirmDefault': 'Are you sure you want to clear quota history?',
+    'history.clearThis': 'Clear This Account',
+    'history.clearAll': 'Clear All Accounts',
+    'history.cleared': 'History cleared.',
+    'history.allCleared': 'All history cleared.',
+    'history.clearing': 'Clearing...',
 
     // 通知
     'notify.refreshing': 'Refreshing quota data...',

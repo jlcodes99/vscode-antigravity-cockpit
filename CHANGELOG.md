@@ -8,7 +8,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.1] - 2026-01-26
+
+### Added
+- **Quota History Clearing**: Users can now clear quota history logs.
+  - Clear history for a specific account or all accounts globally.
+  - Added confirmation dialogs to prevent accidental deletion.
+- **Multilingual Support**: Fully aligned and completed translation keys across all 16 supported languages.
+  - Added missing history labels and dashboard details for Russian, Vietnamese, Czech, Polish, Italian, and Arabic.
+  - Extensive Turkish translation update including auth and account management flows.
+  - Traditional Chinese consistency improvements.
+
+### Changed
+- **UI/UX**: Refined the dashboard history table layout with localized headers and time formats.
+- **Maintenance**: Standardized i18n key naming conventions (e.g., globalized `history.range*d` keys).
+
+### Fixed
+- **i18n**: Resolved duplicate translation blocks in Russian and Polish files.
+- **i18n**: Fixed traditional/simplified Chinese mixed characters in certain labels.
+
 ## [2.1.0] - 2026-01-26
+
 
 ### Added
 - **Quota History**: History tab to track quota changes.

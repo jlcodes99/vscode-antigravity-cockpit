@@ -1421,6 +1421,24 @@ input:checked+.slider:before {
     vertical-align: middle;
 }
 
+/* Start 标签 (History Table) */
+.tag-start {
+    background: linear-gradient(135deg, #ff6b9d 0%, #c77dff 100%);
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    animation: tagPulse 2s ease-in-out infinite;
+    white-space: nowrap;
+    vertical-align: middle;
+    display: inline-block;
+}
+
 @keyframes tagPulse {
 
     0%,
@@ -3199,4 +3217,22 @@ input:checked+.slider:before {
 .at-btn-outline:hover {
     background: var(--accent);
     color: white;
+}
+
+/* Reset 标签 (History Table) */
+.tag-reset {
+    background: linear-gradient(135deg, #0ACF83 0%, #019D5A 100%);
+    color: #fff;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    animation: tagPulse 2s ease-in-out infinite;
+    white-space: nowrap;
+    vertical-align: middle;
+    display: inline-block;
 }

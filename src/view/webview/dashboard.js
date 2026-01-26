@@ -337,6 +337,59 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
             });
         });
 
+
+        const historyClearBtn = document.getElementById('history-clear-btn');
+        const historyClearModal = document.getElementById('history-clear-modal');
+        const historyClearThisBtn = document.getElementById('history-clear-this-btn');
+        const historyClearAllBtn = document.getElementById('history-clear-all-btn');
+        const historyClearCancelBtn = document.getElementById('history-clear-cancel');
+        const historyClearCloseBtn = document.getElementById('history-clear-close');
+        
+        if (historyClearBtn && historyClearModal) {
+            historyClearBtn.addEventListener('click', () => {
+                if (historyState.selectedEmail) {
+                    const msgEl = document.getElementById('history-clear-message');
+                    if (msgEl) {
+                        msgEl.textContent = (i18n['history.clearConfirm'] || 'Are you sure you want to clear quota history for {email}?').replace('{email}', historyState.selectedEmail);
+                    }
+                    if (historyClearThisBtn) {
+                        historyClearThisBtn.textContent = `🗑️ ${i18n['history.clearThis'] || 'Clear This Account'}`;
+                    }
+                    historyClearModal.classList.remove('hidden');
+                }
+            });
+        }
+        
+        const closeHistoryClearModal = () => {
+            if (historyClearModal) {
+                historyClearModal.classList.add('hidden');
+            }
+        };
+
+        if (historyClearCloseBtn) historyClearCloseBtn.addEventListener('click', closeHistoryClearModal);
+        if (historyClearCancelBtn) historyClearCancelBtn.addEventListener('click', closeHistoryClearModal);
+        
+        if (historyClearThisBtn) {
+            historyClearThisBtn.addEventListener('click', () => {
+                if (historyState.selectedEmail) {
+                    vscode.postMessage({
+                        command: 'clearHistorySingle',
+                        email: historyState.selectedEmail,
+                    });
+                    closeHistoryClearModal();
+                }
+            });
+        }
+        
+        if (historyClearAllBtn) {
+            historyClearAllBtn.addEventListener('click', () => {
+                vscode.postMessage({
+                    command: 'clearHistoryAll',
+                });
+                closeHistoryClearModal();
+            });
+        }
+
         if (historyPrevBtn) {
             historyPrevBtn.addEventListener('click', () => {
                 if (historyState.page > 1) {
@@ -407,6 +460,10 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
         });
     }
 
+    function handleQuotaHistoryCleared() {
+        requestQuotaHistory();
+    }
+
     function handleQuotaHistoryData(payload) {
         const data = payload || {};
         const accounts = Array.isArray(data.accounts) ? data.accounts : [];
@@ -435,6 +492,8 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
             historyState.needsRender = true;
         }
     }
+
+
 
     function updateHistoryAccountSelect() {
         if (!historyAccountSelect) {
@@ -609,7 +668,7 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
             left: 52,
             right: 20,
             top: 20,
-            bottom: 24,
+            bottom: 42,
         };
         const chartWidth = Math.max(1, width - padding.left - padding.right);
         const chartHeight = Math.max(1, height - padding.top - padding.bottom);
@@ -647,6 +706,75 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
             const y = padding.top + (chartHeight / 5) * i;
             ctx.fillText(`${value}%`, labelX, y);
         }
+        ctx.restore();
+
+        // Draw Time Axis Labels (Data-Driven)
+        ctx.save();
+        ctx.fillStyle = textSecondary;
+        ctx.font = `11px ${getCssVar('--font-family', 'sans-serif')}`;
+        ctx.textBaseline = 'top';
+        ctx.textAlign = 'center';
+
+        const labelY = padding.top + chartHeight + 12;
+        const minLabelDist = 60; // minimum pixels between label centers
+        let lastLabelX = -1;
+
+        // Iterate backwards (from right to left) to prioritize latest data
+        // We calculate coords for all points first to know where to draw text
+        const pointCoords = points.map(point => {
+            const ratio = (point.timestamp - startTime) / (endTime - startTime);
+            return {
+                x: padding.left + Math.min(1, Math.max(0, ratio)) * chartWidth,
+                timestamp: point.timestamp
+            };
+        });
+
+        // We process points from right (newest) to left (oldest)
+        // strict logic: rightmost point always shows (if inside view),
+        // then others show only if enough space.
+        const reversedCoords = [...pointCoords].reverse();
+        
+        reversedCoords.forEach((coord, index) => {
+            // Always try to show the latest point (index 0)
+            // Or if distance is enough from the previously drawn label (which is to the right)
+            
+            // Note: Since we go Right -> Left, 'lastLabelX' represents the label *to the right*.
+            // So we check if (lastLabelX - coord.x) >= minLabelDist
+            
+            const isLatest = (index === 0);
+            const canDraw = (lastLabelX === -1) || ((lastLabelX - coord.x) >= minLabelDist);
+
+            if (isLatest || canDraw) {
+                const date = new Date(coord.timestamp);
+                let labelParts = [];
+                if (historyState.rangeDays <= 1) {
+                    labelParts = [
+                        String(date.getHours()).padStart(2, '0') + ':' + 
+                        String(date.getMinutes()).padStart(2, '0')
+                    ];
+                } else {
+                    labelParts = [
+                        String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+                        String(date.getDate()).padStart(2, '0')
+                    ];
+                }
+                const labelText = labelParts.join(' ');
+                
+                // Boundary check: ensure label doesn't go off-canvas too much
+                // Simple logic: clamp text position or alignment
+                
+                // Draw tick mark (optional, but helps alignment)
+                ctx.globalAlpha = 0.5;
+                ctx.beginPath();
+                ctx.moveTo(coord.x, padding.top + chartHeight);
+                ctx.lineTo(coord.x, padding.top + chartHeight + 5);
+                ctx.stroke();
+                ctx.globalAlpha = 1.0;
+
+                ctx.fillText(labelText, coord.x, labelY);
+                lastLabelX = coord.x;
+            }
+        });
         ctx.restore();
 
         const coords = points.map(point => {
@@ -748,7 +876,7 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
                     <td>${formatHistoryPercent(point.remainingPercentage)}</td>
                     <td class="history-delta ${deltaClass}">${deltaText}</td>
                     <td>${formatHistoryTimestamp(point.resetTime)}</td>
-                    <td>${formatHistoryCountdownLabel(point.countdownSeconds, point.isStart)}</td>
+                    <td>${formatHistoryCountdownLabel(point.countdownSeconds, point.isStart, point.isReset)}</td>
                 </tr>
             `;
         }).join('');
@@ -799,15 +927,24 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
         return `${days}d ${remainingHours}h ${remainingMinutes}m`;
     }
 
-    function formatHistoryCountdownLabel(seconds, isStart) {
+    function formatHistoryCountdownLabel(seconds, isStart, isReset) {
         const text = formatHistoryCountdown(seconds);
-        if (!isStart) {
+        if (!isStart && !isReset) {
             return text;
         }
-        if (text === '--') {
-            return 'START';
+        
+        let badges = '';
+        if (isStart) {
+            badges += `<span class="tag-start">START</span>`;
         }
-        return `START ${text}`;
+        if (isReset) {
+            badges += `<span class="tag-reset">RESET</span>`;
+        }
+        
+        if (text === '--') {
+            return badges;
+        }
+        return `${text} ${badges}`;
     }
 
     function formatHistoryTimestamp(timestamp) {
@@ -1265,6 +1402,9 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
 
         if (message.type === 'quotaHistoryData') {
             handleQuotaHistoryData(message.data);
+        }
+        if (message.type === 'quotaHistoryCleared') {
+            handleQuotaHistoryCleared();
         }
         if (message.type === 'quotaHistoryUpdated') {
             const updatedEmail = message.data?.email;

@@ -64,6 +64,14 @@ export const ko = {
     'history.paginationPrev': '이전',
     'history.paginationNext': '다음',
     'history.pageInfo': '{current} / {total} 페이지',
+    'history.clearTitle': '기록 삭제 확인',
+    'history.clearConfirm': '{email}의 할당량 기록을 삭제하시겠습니까?',
+    'history.clearConfirmDefault': '할당량 기록을 삭제하시겠습니까?',
+    'history.clearThis': '이 계정만 삭제',
+    'history.clearAll': '모든 계정 삭제',
+    'history.cleared': '기록이 삭제되었습니다.',
+    'history.allCleared': '모든 기록이 삭제되었습니다.',
+    'history.clearing': '삭제 중...',
 
     // 알림
     'notify.refreshing': '할당량 데이터 새로고침 중...',

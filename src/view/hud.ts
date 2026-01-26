@@ -594,6 +594,7 @@ export class CockpitHUD {
                         <button class="history-range-btn" data-range="1">${t('history.range24h')}</button>
                         <button class="history-range-btn" data-range="7">${t('history.range7d')}</button>
                         <button class="history-range-btn" data-range="30">${t('history.range30d')}</button>
+                        <button id="history-clear-btn" class="history-range-btn icon-only" title="${t('history.clearTooltip') || 'Clear History'}" style="margin-left: 8px;">🗑️</button>
                     </div>
                 </div>
             </div>
@@ -897,6 +898,24 @@ export class CockpitHUD {
             <div class="modal-footer">
                 <button id="at-revoke-cancel" class="btn-secondary">${t('common.cancel')}</button>
                 <button id="at-revoke-confirm" class="btn-primary" style="background: var(--vscode-errorForeground);">🗑️ ${t('autoTrigger.confirmRevoke')}</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Clear Confirm Modal -->
+    <div id="history-clear-modal" class="modal hidden">
+        <div class="modal-content modal-content-small">
+            <div class="modal-header">
+                <h3>⚠️ ${t('history.clearTitle')}</h3>
+                <button id="history-clear-close" class="close-btn">×</button>
+            </div>
+            <div class="modal-body" style="text-align: center; padding: 20px;">
+                <p id="history-clear-message" style="margin-bottom: 20px;">${t('history.clearConfirmDefault') || 'Are you sure you want to clear quota history?'}</p>
+            </div>
+            <div class="modal-footer" style="flex-direction: column; gap: 8px;">
+                <button id="history-clear-this-btn" class="btn-primary" style="background: var(--vscode-errorForeground); width: 100%;">🗑️ ${t('history.clearThis') || 'Clear This Account'}</button>
+                <button id="history-clear-all-btn" class="btn-secondary" style="width: 100%; color: var(--vscode-errorForeground); border-color: var(--vscode-errorForeground);">🗑️ ${t('history.clearAll') || 'Clear All Accounts'}</button>
+                <button id="history-clear-cancel" class="btn-secondary" style="width: 100%; margin-top: 4px;">${t('common.cancel')}</button>
             </div>
         </div>
     </div>

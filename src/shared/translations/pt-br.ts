@@ -64,6 +64,14 @@ export const ptBR = {
     'history.paginationPrev': 'Anterior',
     'history.paginationNext': 'Próximo',
     'history.pageInfo': 'Página {current} / {total}',
+    'history.clearTitle': 'Limpar histórico',
+    'history.clearConfirm': 'Tem certeza que deseja limpar o histórico de {email}?',
+    'history.clearConfirmDefault': 'Tem certeza que deseja limpar o histórico?',
+    'history.clearThis': 'Limpar apenas esta conta',
+    'history.clearAll': 'Limpar todas as contas',
+    'history.cleared': 'Histórico limpo.',
+    'history.allCleared': 'Todo o histórico limpo.',
+    'history.clearing': 'Limpando...',
 
     // Notificações
     'notify.refreshing': 'Atualizando dados de cota...',

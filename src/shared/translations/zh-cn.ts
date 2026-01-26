@@ -69,6 +69,14 @@ export const zhCN = {
     'history.paginationPrev': '上一页',
     'history.paginationNext': '下一页',
     'history.pageInfo': '第 {current} / {total} 页',
+    'history.clearTitle': '清空历史确认',
+    'history.clearConfirm': '确定要清空 {email} 的配额历史吗？',
+    'history.clearConfirmDefault': '确定要清空配额历史吗？',
+    'history.clearThis': '仅清空此账号',
+    'history.clearAll': '清空所有账号',
+    'history.cleared': '历史已清空。',
+    'history.allCleared': '所有历史已清空。',
+    'history.clearing': '正在清空...',
 
     // 通知
     'notify.refreshing': '正在刷新配额数据...',

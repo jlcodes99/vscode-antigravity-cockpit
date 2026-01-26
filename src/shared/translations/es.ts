@@ -64,6 +64,14 @@ export const es = {
     'history.paginationPrev': 'Anterior',
     'history.paginationNext': 'Siguiente',
     'history.pageInfo': 'Página {current} / {total}',
+    'history.clearTitle': 'Borrar historial',
+    'history.clearConfirm': '¿Seguro que quieres borrar el historial de cuota de {email}?',
+    'history.clearConfirmDefault': '¿Seguro que quieres borrar el historial de cuota?',
+    'history.clearThis': 'Borrar solo esta cuenta',
+    'history.clearAll': 'Borrar todas las cuentas',
+    'history.cleared': 'Historial borrado.',
+    'history.allCleared': 'Todo el historial borrado.',
+    'history.clearing': 'Borrando...',
 
     // Notificaciones
     'notify.refreshing': 'Actualizando datos de cuota...',

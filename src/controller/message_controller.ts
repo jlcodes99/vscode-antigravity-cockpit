@@ -13,7 +13,7 @@ import { previewLocalCredential, commitLocalCredential } from '../auto_trigger/l
 import { announcementService } from '../announcement';
 import { antigravityToolsSyncService } from '../antigravityTools_sync';
 import { cockpitToolsWs, AccountInfo } from '../services/cockpitToolsWs';
-import { getQuotaHistory } from '../services/quota_history';
+import { getQuotaHistory, clearHistory, clearAllHistory } from '../services/quota_history';
 
 export class MessageController {
     // 跟踪已通知的模型以避免重复弹窗 (虽然主要逻辑在 TelemetryController，但 CheckAndNotify 可能被消息触发吗? 不, 主要是 handleMessage)
@@ -554,7 +554,7 @@ export class MessageController {
                     break;
 
                 case 'quotaHistory.get': {
-                    const isValidEmail = (value?: string | null) => typeof value === 'string' && value.includes('@');
+                    const isValidEmail = (value?: string | null): value is string => typeof value === 'string' && value.includes('@');
                     const requestedEmail = message.email;
                     const activeEmail = await credentialStorage.getActiveAccount();
                     const latestSnapshot = this.reactor.getLatestSnapshot();
@@ -584,6 +584,22 @@ export class MessageController {
                     });
                     break;
                 }
+
+                case 'clearHistorySingle':
+                    if (message.email) {
+                        logger.info(`User clearing history for account: ${message.email}`);
+                        await clearHistory(message.email);
+                        this.hud.sendMessage({ type: 'quotaHistoryCleared' });
+                        vscode.window.showInformationMessage(t('history.cleared') || 'History cleared.');
+                    }
+                    break;
+
+                case 'clearHistoryAll':
+                    logger.info('User clearing all history');
+                    await clearAllHistory();
+                    this.hud.sendMessage({ type: 'quotaHistoryCleared' });
+                    vscode.window.showInformationMessage(t('history.allCleared') || 'All history cleared.');
+                    break;
 
                 case 'autoTrigger.authorize':
                     logger.info('User triggered OAuth authorization');

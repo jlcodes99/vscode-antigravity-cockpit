@@ -374,7 +374,9 @@ export type WebviewMessageType =
     // General
     | 'openUrl'
     | 'executeCommand'
-    | 'updateVisibleModels';
+    | 'updateVisibleModels'
+    | 'clearHistorySingle'
+    | 'clearHistoryAll';
 
 /** Webview 消息 */
 export interface WebviewMessage {

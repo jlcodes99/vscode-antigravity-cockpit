@@ -64,6 +64,14 @@ export const de = {
     'history.paginationPrev': 'Zurück',
     'history.paginationNext': 'Weiter',
     'history.pageInfo': 'Seite {current} / {total}',
+    'history.clearTitle': 'Verlauf löschen',
+    'history.clearConfirm': 'Möchten Sie den Verlauf für {email} wirklich löschen?',
+    'history.clearConfirmDefault': 'Möchten Sie den Verlauf wirklich löschen?',
+    'history.clearThis': 'Nur dieses Konto löschen',
+    'history.clearAll': 'Alle Konten löschen',
+    'history.cleared': 'Verlauf gelöscht.',
+    'history.allCleared': 'Gesamter Verlauf gelöscht.',
+    'history.clearing': 'Löschen...',
 
     // Benachrichtigungen
     'notify.refreshing': 'Kontingentdaten aktualisieren...',

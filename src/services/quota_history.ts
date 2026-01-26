@@ -12,6 +12,7 @@ export interface QuotaHistoryPoint {
     resetTime?: number;
     countdownSeconds?: number;
     isStart?: boolean;
+    isReset?: boolean;
 }
 
 export interface QuotaHistoryModelRecord {
@@ -199,7 +200,7 @@ function resolvePointAction(
     last: QuotaHistoryPoint | undefined,
     next: QuotaHistoryPoint,
     record: QuotaHistoryModelRecord,
-): { action: PointAction; isStart?: boolean } {
+): { action: PointAction; isStart?: boolean; isReset?: boolean } {
     if (!last) {
         if (next.remainingPercentage !== 100) {
             record.hasCountdownDropAt100 = false;
@@ -222,6 +223,9 @@ function resolvePointAction(
             }
             record.hasCountdownDropAt100 = true;
             return { action: 'add', isStart: true };
+        }
+        if (nextDisplay > lastDisplay + 10) {
+            return { action: 'add', isReset: true };
         }
         return { action: 'overwrite' };
     }
@@ -260,6 +264,31 @@ async function writeHistory(record: QuotaHistoryRecord): Promise<void> {
     const tempPath = `${filePath}.tmp`;
     await fs.writeFile(tempPath, JSON.stringify(record, null, 2), 'utf8');
     await fs.rename(tempPath, filePath);
+}
+
+export async function clearHistory(email: string): Promise<boolean> {
+    try {
+        const filePath = getHistoryFilePath(email);
+        await fs.unlink(filePath);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+export async function clearAllHistory(): Promise<boolean> {
+    try {
+        await fs.mkdir(HISTORY_ROOT, { recursive: true });
+        const files = await fs.readdir(HISTORY_ROOT);
+        await Promise.all(
+            files
+                .filter(file => file.endsWith('.json'))
+                .map(file => fs.unlink(path.join(HISTORY_ROOT, file)))
+        );
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 function buildModelOptions(record: QuotaHistoryRecord): QuotaHistoryModelOption[] {
@@ -336,9 +365,15 @@ export async function recordQuotaHistory(email: string | null | undefined, snaps
             if (decision.isStart) {
                 nextPoint.isStart = true;
             }
+            if (decision.isReset) {
+                nextPoint.isReset = true;
+            }
             if (decision.action === 'overwrite' && modelRecord.points.length > 0) {
                 if (lastPoint?.isStart) {
                     nextPoint.isStart = true;
+                }
+                if (lastPoint?.isReset) {
+                    nextPoint.isReset = true;
                 }
                 modelRecord.points[modelRecord.points.length - 1] = nextPoint;
             } else {

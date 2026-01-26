@@ -66,6 +66,14 @@ export const zhTW = {
     'history.paginationPrev': '上一頁',
     'history.paginationNext': '下一頁',
     'history.pageInfo': '第 {current} / {total} 頁',
+    'history.clearTitle': '清空歷史確認',
+    'history.clearConfirm': '確定要清空 {email} 的配額歷史嗎？',
+    'history.clearConfirmDefault': '確定要清空配額歷史嗎？',
+    'history.clearThis': '僅清空此帳號',
+    'history.clearAll': '清空所有帳號',
+    'history.cleared': '歷史已清空。',
+    'history.allCleared': '所有歷史已清空。',
+    'history.clearing': '正在清空...',
 
     // 通知
     'notify.refreshing': '正在重新整理配額資料...',
@@ -134,6 +142,9 @@ export const zhTW = {
     'grouping.autoGroupHint': '根據目前配額重新計算分組',
     'grouping.description': '此模式將共享配額的模型聚合展示，支援重新命名、排序並同步至狀態列。您可以點擊右側「自動分組」智慧歸類，或點擊上方「配額分組」切換回全部模型檢視。',
     'grouping.autoGroupApplied': '自動分組已套用：共 {count} 個模型',
+    'grouping.nameEmpty': '分組名稱不能為空',
+    'grouping.renamed': '分組已重新命名為 {name}',
+
 
     // Custom Grouping
     'customGrouping.title': '分組管理',
@@ -155,6 +166,15 @@ export const zhTW = {
     'customGrouping.resetMismatch': '重置時間不一致',
     'customGrouping.saved': '分組已保存',
     'customGrouping.emptyGroupWarning': '存在空分組，是否繼續保存？',
+    'customGrouping.other': '其他',
+    'customGrouping.smartGroupCount': '自動分組：共 {count} 個分組',
+
+    // 分組節點 Tooltip
+    'groupNode.group': '分組',
+    'groupNode.quota': '配額',
+    'groupNode.reset': '重置',
+    'groupNode.modelsCount': '包含 {count} 個模型',
+
 
     // 模型重新命名
     'model.rename': '重新命名模型',
@@ -191,6 +211,9 @@ export const zhTW = {
     'statusBarFormat.standard': '完整顯示 (預設)',
     'statusBarFormat.standardDesc': '🟢 Sonnet: 95%',
     'statusBarFormat.changed': '狀態列已切換: {format}',
+    'statusBarFormat.manualRefresh': '手動重新整理 (10秒冷卻)',
+    'statusBarFormat.resetOrderTooltip': '重置為預設排序',
+
 
     // 回饋與設定
     'feedback.title': '回饋',
@@ -292,6 +315,8 @@ export const zhTW = {
     'quotaSource.guideConfirm': '確認選擇',
     'quotaSource.guideLater': '稍後再說',
     'quotaSource.switchTimeout': '切換耗時較長，可稍後重試。',
+    'quotaSource.localAccountLabel': '目前帳戶',
+
 
     // Language Settings
     'language.title': '語言',

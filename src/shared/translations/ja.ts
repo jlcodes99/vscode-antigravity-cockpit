@@ -64,6 +64,14 @@ export const ja = {
     'history.paginationPrev': '前へ',
     'history.paginationNext': '次へ',
     'history.pageInfo': '{current} / {total} ページ',
+    'history.clearTitle': '履歴クリアの確認',
+    'history.clearConfirm': '{email} のクォータ履歴をクリアしてもよろしいですか？',
+    'history.clearConfirmDefault': 'クォータ履歴をクリアしてもよろしいですか？',
+    'history.clearThis': 'このアカウントのみクリア',
+    'history.clearAll': 'すべてのアカウントをクリア',
+    'history.cleared': '履歴をクリアしました。',
+    'history.allCleared': 'すべての履歴をクリアしました。',
+    'history.clearing': 'クリア中...',
 
     // 通知
     'notify.refreshing': 'クォータデータを更新中...',
