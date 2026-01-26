@@ -283,7 +283,7 @@ export async function clearAllHistory(): Promise<boolean> {
         await Promise.all(
             files
                 .filter(file => file.endsWith('.json'))
-                .map(file => fs.unlink(path.join(HISTORY_ROOT, file)))
+                .map(file => fs.unlink(path.join(HISTORY_ROOT, file))),
         );
         return true;
     } catch {

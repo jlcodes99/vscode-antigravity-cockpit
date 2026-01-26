@@ -376,7 +376,19 @@ export type WebviewMessageType =
     | 'executeCommand'
     | 'updateVisibleModels'
     | 'clearHistorySingle'
-    | 'clearHistoryAll';
+    | 'clearHistoryAll'
+    | 'refreshAll'
+    | 'refreshAccount'
+    | 'switchAccount'
+    | 'deleteAccount'
+    | 'deleteAccounts'
+    | 'addAccount'
+    | 'importTokens'
+    | 'importFromExtension'
+    | 'importFromLocal'
+    | 'importFromTools'
+    | 'exportAccounts'
+    | 'openDashboard';
 
 /** Webview 消息 */
 export interface WebviewMessage {
@@ -449,6 +461,12 @@ export interface WebviewMessage {
     targetEmail?: string;
     /** 是否覆盖已有账号 (autoTrigger.importLocalConfirm) */
     overwrite?: boolean;
+    /** 导入内容 (importTokens) */
+    content?: string;
+    /**邮箱列表 (deleteAccounts, exportAccounts) */
+    emails?: string[];
+    /** 模式 (addAccount) */
+    mode?: string;
 }
 
 /** 调度配置 */

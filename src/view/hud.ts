@@ -31,7 +31,7 @@ export class CockpitHUD {
     constructor(
         extensionUri: vscode.Uri, 
         context: vscode.ExtensionContext,
-        private readonly refreshService?: AccountsRefreshService
+        private readonly refreshService?: AccountsRefreshService,
     ) {
         this.extensionUri = extensionUri;
         this.context = context;
@@ -467,7 +467,20 @@ export class CockpitHUD {
     /**
      * 转换配额分组数据 (复用于 Webview)
      */
-    private convertGroups(snapshot: QuotaSnapshot): any[] {
+    private convertGroups(snapshot: QuotaSnapshot): Array<{
+        groupId: string;
+        groupName: string;
+        percentage: number;
+        resetTime: string;
+        resetTimeFormatted: string;
+        models: Array<{
+            label: string;
+            modelId: string;
+            percentage: number;
+            resetTime: string;
+            resetTimeFormatted: string;
+        }>;
+    }> {
         if (!snapshot.groups || snapshot.groups.length === 0) {
             return snapshot.models.map(model => ({
                 groupId: model.modelId || model.label,

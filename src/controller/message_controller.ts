@@ -92,7 +92,7 @@ export class MessageController {
         });
 
         this.hud.onSignal(async (msg: WebviewMessage) => {
-            const message = msg as any;
+            const message = msg;
             switch (message.command) {
                 case 'togglePin':
                     logger.info(`Received togglePin signal: ${JSON.stringify(message)}`);
@@ -866,7 +866,7 @@ export class MessageController {
                     // ... existing logic ...
                     break; 
 
-                // ============ Accounts Overview Handlers ============
+                    // ============ Accounts Overview Handlers ============
 
                 case 'refreshAll':
                     if (this.refreshService) {
@@ -890,7 +890,7 @@ export class MessageController {
                         // Reusing autoTrigger.switchLoginAccount logic basically
                         const email = message.email;
                         logger.info(`[MsgCtrl] Switching account to: ${email}`);
-                         if (!cockpitToolsWs.isConnected) {
+                        if (!cockpitToolsWs.isConnected) {
                             vscode.window.showWarningMessage(t('accountTree.cockpitToolsNotRunning'));
                             return;
                         }
@@ -900,62 +900,62 @@ export class MessageController {
                             if (account && account.id) {
                                 const result = await cockpitToolsWs.switchAccount(account.id);
                                 if (result.success) {
-                                     // active account updated via WS event
+                                    // active account updated via WS event
                                     this.hud.sendMessage({
                                         type: 'actionResult',
-                                        data: { status: 'success', message: t('accountsOverview.switchSuccess', { email }) }
+                                        data: { status: 'success', message: t('accountsOverview.switchSuccess', { email }) },
                                     });
                                 } else {
                                     this.hud.sendMessage({
                                         type: 'actionResult',
-                                        data: { status: 'error', message: result.message }
+                                        data: { status: 'error', message: result.message },
                                     });
                                 }
                             }
                         } catch (e) {
-                             const err = e instanceof Error ? e : new Error(String(e));
-                             this.hud.sendMessage({
+                            const err = e instanceof Error ? e : new Error(String(e));
+                            this.hud.sendMessage({
                                 type: 'actionResult',
-                                data: { status: 'error', message: err.message }
+                                data: { status: 'error', message: err.message },
                             });
                         }
                     }
                     break;
 
                 case 'deleteAccount':
-                     if (typeof message.email === 'string') {
+                    if (typeof message.email === 'string') {
                         try {
                             await autoTriggerController.removeAccount(message.email);
-                            if (this.refreshService) await this.refreshService.refresh();
+                            if (this.refreshService) {await this.refreshService.refresh();}
                             this.hud.sendMessage({
                                 type: 'actionResult',
-                                data: { status: 'success', message: t('accountsOverview.deleteSuccess', { email: message.email }) }
+                                data: { status: 'success', message: t('accountsOverview.deleteSuccess', { email: message.email }) },
                             });
                         } catch (e) {
                             const err = e instanceof Error ? e : new Error(String(e));
                             this.hud.sendMessage({
                                 type: 'actionResult',
-                                data: { status: 'error', message: err.message }
+                                data: { status: 'error', message: err.message },
                             });
                         }
-                     }
+                    }
                     break;
 
                 case 'deleteAccounts':
                     if (Array.isArray(message.emails)) {
                         let successCount = 0;
                         for (const email of message.emails) {
-                             try {
+                            try {
                                 await autoTriggerController.removeAccount(email);
                                 successCount++;
                             } catch (error) {
                                 logger.warn(`Failed to delete ${email}: ${error}`);
                             }
                         }
-                        if (this.refreshService) await this.refreshService.refresh();
-                         this.hud.sendMessage({
+                        if (this.refreshService) {await this.refreshService.refresh();}
+                        this.hud.sendMessage({
                             type: 'actionResult',
-                            data: { status: 'success', message: t('accountsOverview.deleteBatchSuccess', { count: successCount }) }
+                            data: { status: 'success', message: t('accountsOverview.deleteBatchSuccess', { count: successCount }) },
                         });
                     }
                     break;
@@ -977,15 +977,15 @@ export class MessageController {
                                 // Default flow
                                 const success = await oauthService.startAuthorization();
                                 if (success) {
-                                    if (this.refreshService) await this.refreshService.refresh();
+                                    if (this.refreshService) {await this.refreshService.refresh();}
                                     this.hud.sendMessage({
                                         type: 'actionResult',
-                                        data: { status: 'success', message: t('accountsOverview.addSuccess'), closeModal: true }
+                                        data: { status: 'success', message: t('accountsOverview.addSuccess'), closeModal: true },
                                     });
                                 } else {
                                     this.hud.sendMessage({
                                         type: 'actionResult',
-                                        data: { status: 'error', message: t('accountsOverview.addFailed', { error: 'Unknown' }) }
+                                        data: { status: 'error', message: t('accountsOverview.addFailed', { error: 'Unknown' }) },
                                     });
                                 }
                             }
@@ -993,76 +993,76 @@ export class MessageController {
                             const err = e instanceof Error ? e : new Error(String(e));
                             this.hud.sendMessage({
                                 type: 'actionResult',
-                                data: { status: 'error', message: err.message }
+                                data: { status: 'error', message: err.message },
                             });
                         }
                     }
                     break;
 
                 case 'importTokens':
-                     if (typeof message.content === 'string') {
-                         // Note: Logic needs to be implemented or imported. 
-                         // For now, let's defer or implement basic parsing if possible.
-                         // But imported refresh tokens need to be saved to DB.
-                         // autoTriggerController doesn't expose raw import? 
-                         // Actually `credentialStorage` has `saveCredential`.
-                         // Let's implement basic JSON parsing here.
-                         try {
-                             let tokens: any[] = [];
-                             try {
-                                 const parsed = JSON.parse(message.content);
-                                 tokens = Array.isArray(parsed) ? parsed : [parsed];
-                             } catch {
-                                 tokens = message.content.split('\n').filter(line => line.trim()).map(line => ({ refresh_token: line.trim() }));
-                             }
+                    if (typeof message.content === 'string') {
+                        // Note: Logic needs to be implemented or imported. 
+                        // For now, let's defer or implement basic parsing if possible.
+                        // But imported refresh tokens need to be saved to DB.
+                        // autoTriggerController doesn't expose raw import? 
+                        // Actually `credentialStorage` has `saveCredential`.
+                        // Let's implement basic JSON parsing here.
+                        try {
+                            let tokens: Record<string, unknown>[] = [];
+                            try {
+                                const parsed = JSON.parse(message.content);
+                                tokens = Array.isArray(parsed) ? parsed : [parsed];
+                            } catch {
+                                tokens = message.content.split('\n').filter(line => line.trim()).map(line => ({ refresh_token: line.trim() }));
+                            }
                              
-                             let count = 0;
-                             let errors = 0;
-                             for (const item of tokens) {
-                                 const anyItem = item as any;
-                                 if (anyItem.refresh_token) {
-                                     try {
-                                         // 显式断言 email 为 string | undefined，虽然 buildCredentialFromRefreshToken 接受 optional
-                                         const emailArg = typeof anyItem.email === 'string' ? anyItem.email : undefined;
-                                         const credential = await oauthService.buildCredentialFromRefreshToken(anyItem.refresh_token, emailArg);
-                                         await credentialStorage.saveCredentialForAccount(credential.email, credential);
-                                         count++;
-                                     } catch (error) {
-                                         const err = error instanceof Error ? error : new Error(String(error));
-                                         errors++;
-                                         logger.warn(`Failed to import token: ${err.message}`);
-                                     }
-                                 }
-                             }
+                            let count = 0;
+                            let errors = 0;
+                            for (const item of tokens) {
+                                const refreshToken = item.refresh_token as string | undefined;
+                                if (typeof refreshToken === 'string' && refreshToken) {
+                                    try {
+                                        // 显式断言 email 为 string | undefined
+                                        const emailArg = typeof item.email === 'string' ? item.email : undefined;
+                                        const credential = await oauthService.buildCredentialFromRefreshToken(refreshToken, emailArg);
+                                        await credentialStorage.saveCredentialForAccount(credential.email, credential);
+                                        count++;
+                                    } catch (error) {
+                                        const err = error instanceof Error ? error : new Error(String(error));
+                                        errors++;
+                                        logger.warn(`Failed to import token: ${err.message}`);
+                                    }
+                                }
+                            }
                              
-                             if (count > 0 && this.refreshService) {
-                                 await this.refreshService.refresh();
-                             }
+                            if (count > 0 && this.refreshService) {
+                                await this.refreshService.refresh();
+                            }
 
-                             let messageText = '';
-                             let status: 'success' | 'error' = 'success';
-                             if (count > 0) {
-                                 messageText = t('accountsOverview.tokenImportSuccess') || `Successfully imported ${count} accounts.`;
-                                 if (errors > 0) {
+                            let messageText = '';
+                            let status: 'success' | 'error' | 'warning' = 'success';
+                            if (count > 0) {
+                                messageText = t('accountsOverview.tokenImportSuccess') || `Successfully imported ${count} accounts.`;
+                                if (errors > 0) {
                                     messageText += ` (${errors} failed)`;
-                                    status = 'warning' as any;
-                                 }
-                             } else {
-                                 messageText = t('accountsOverview.tokenImportFailed') || 'Import failed.';
-                                 status = 'error';
-                             }
+                                    status = 'warning';
+                                }
+                            } else {
+                                messageText = t('accountsOverview.tokenImportFailed') || 'Import failed.';
+                                status = 'error';
+                            }
 
-                             this.hud.sendMessage({
+                            this.hud.sendMessage({
                                 type: 'actionResult',
-                                data: { status, message: messageText, closeModal: count > 0 }
+                                data: { status, message: messageText, closeModal: count > 0 },
                             });
-                         } catch (e) {
-                             this.hud.sendMessage({
+                        } catch (e) {
+                            this.hud.sendMessage({
                                 type: 'actionResult',
-                                data: { status: 'error', message: 'Invalid JSON format' }
+                                data: { status: 'error', message: 'Invalid JSON format' },
                             });
-                         }
-                     }
+                        }
+                    }
                     break;
 
                 case 'importFromExtension':
@@ -1075,29 +1075,29 @@ export class MessageController {
                     break;
                 
                 case 'importFromTools':
-                     // Same as antigravityToolsSync.import
-                     await this.handleAntigravityToolsImport(false);
+                    // Same as antigravityToolsSync.import
+                    await this.handleAntigravityToolsImport(false);
                     break;
 
                 case 'exportAccounts':
-                     // Generate JSON of accounts and copy to clipboard
-                     if (Array.isArray(message.emails)) {
-                         const creds = await credentialStorage.getAllCredentials();
-                         const exportData = message.emails
+                    // Generate JSON of accounts and copy to clipboard
+                    if (Array.isArray(message.emails)) {
+                        const creds = await credentialStorage.getAllCredentials();
+                        const exportData = message.emails
                             .filter((e: string) => creds[e])
                             .map((e: string) => ({ email: e, refresh_token: creds[e].refreshToken }));
                          
-                         const jsonStr = JSON.stringify(exportData, null, 2);
-                         await vscode.env.clipboard.writeText(jsonStr);
+                        const jsonStr = JSON.stringify(exportData, null, 2);
+                        await vscode.env.clipboard.writeText(jsonStr);
                          
-                         this.hud.sendMessage({
+                        this.hud.sendMessage({
                             type: 'actionResult',
                             data: { 
                                 status: 'success', 
-                                message: t('accountsOverview.exportSuccess', { count: exportData.length }) || `Successfully exported ${exportData.length} accounts to clipboard.` 
-                            }
+                                message: t('accountsOverview.exportSuccess', { count: exportData.length }) || `Successfully exported ${exportData.length} accounts to clipboard.`, 
+                            },
                         });
-                     }
+                    }
                     break;
 
                     // 重新授权指定账号（先删除再重新授权）
