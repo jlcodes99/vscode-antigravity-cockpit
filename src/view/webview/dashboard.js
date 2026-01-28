@@ -4,6 +4,8 @@
  */
 
 import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../shared/recommended_models';
+import { createHistoryModule } from './dashboard_history';
+import { createAnnouncementModule } from './dashboard_announcements';
 
 (function () {
     'use strict';
@@ -75,6 +77,35 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
         pageSize: 20,
         needsRender: false,
     };
+
+    const historyModule = createHistoryModule({
+        vscode,
+        i18n,
+        dom: {
+            historyAccountSelect,
+            historyModelSelect,
+            historyRangeButtons,
+            historyCanvas,
+            historyEmpty,
+            historyMetricLabel,
+            historySummary,
+            historyTableBody,
+            historyTableEmpty,
+            historyPrevBtn,
+            historyNextBtn,
+            historyPageInfo,
+        },
+        historyState,
+        authorizationStatusGetter: () => authorizationStatus,
+    });
+
+    const announcementModule = createAnnouncementModule({
+        vscode,
+        i18n,
+        showToast,
+        switchToTab,
+        escapeHtml,
+    });
 
     // 刷新冷却时间（秒）
     let refreshCooldown = 10;
@@ -231,23 +262,7 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
 
 
         // Announcement Events
-        const announcementBtn = document.getElementById('announcement-btn');
-        if (announcementBtn) announcementBtn.addEventListener('click', openAnnouncementList);
-
-        const announcementListClose = document.getElementById('announcement-list-close');
-        if (announcementListClose) announcementListClose.addEventListener('click', closeAnnouncementList);
-
-        const announcementMarkAllRead = document.getElementById('announcement-mark-all-read');
-        if (announcementMarkAllRead) announcementMarkAllRead.addEventListener('click', markAllAnnouncementsRead);
-
-        const announcementPopupLater = document.getElementById('announcement-popup-later');
-        if (announcementPopupLater) announcementPopupLater.addEventListener('click', closeAnnouncementPopup);
-
-        const announcementPopupGotIt = document.getElementById('announcement-popup-got-it');
-        if (announcementPopupGotIt) announcementPopupGotIt.addEventListener('click', handleAnnouncementGotIt);
-
-        const announcementPopupAction = document.getElementById('announcement-popup-action');
-        if (announcementPopupAction) announcementPopupAction.addEventListener('click', handleAnnouncementAction);
+        announcementModule.initAnnouncementEvents();
 
         // 事件委托：处理置顶开关
         dashboard.addEventListener('change', (e) => {
@@ -264,8 +279,8 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
 
         // Tab 导航切换
         initTabNavigation();
-        initHistoryTab();
-        window.addEventListener('resize', handleHistoryResize);
+        historyModule.initHistoryTab();
+        window.addEventListener('resize', historyModule.handleHistoryResize);
 
         renderLoadingCard(currentQuotaSource);
 
@@ -299,680 +314,11 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
                 // 通知扩展 Tab 切换（可用于状态同步）
                 vscode.postMessage({ command: 'tabChanged', tab: targetTab });
                 if (targetTab === 'history') {
-                    activateHistoryTab();
+                    historyModule.activateHistoryTab();
                 }
             });
         });
     }
-
-    // ============ 历史记录 Tab ============
-
-    function initHistoryTab() {
-        if (historyAccountSelect) {
-            historyAccountSelect.addEventListener('change', () => {
-                historyState.selectedEmail = historyAccountSelect.value || null;
-                historyState.page = 1;
-                requestQuotaHistory();
-            });
-        }
-
-        if (historyModelSelect) {
-            historyModelSelect.addEventListener('change', () => {
-                historyState.selectedModelId = historyModelSelect.value || null;
-                historyState.page = 1;
-                requestQuotaHistory();
-            });
-        }
-
-        historyRangeButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const range = normalizeHistoryRange(parseInt(btn.dataset.range || '', 10));
-                if (historyState.rangeDays === range) {
-                    return;
-                }
-                historyState.rangeDays = range;
-                updateHistoryRangeButtons();
-                historyState.page = 1;
-                requestQuotaHistory();
-            });
-        });
-
-
-        const historyClearBtn = document.getElementById('history-clear-btn');
-        const historyClearModal = document.getElementById('history-clear-modal');
-        const historyClearThisBtn = document.getElementById('history-clear-this-btn');
-        const historyClearAllBtn = document.getElementById('history-clear-all-btn');
-        const historyClearCancelBtn = document.getElementById('history-clear-cancel');
-        const historyClearCloseBtn = document.getElementById('history-clear-close');
-        
-        if (historyClearBtn && historyClearModal) {
-            historyClearBtn.addEventListener('click', () => {
-                if (historyState.selectedEmail) {
-                    const msgEl = document.getElementById('history-clear-message');
-                    if (msgEl) {
-                        msgEl.textContent = (i18n['history.clearConfirm'] || 'Are you sure you want to clear quota history for {email}?').replace('{email}', historyState.selectedEmail);
-                    }
-                    if (historyClearThisBtn) {
-                        historyClearThisBtn.textContent = `🗑️ ${i18n['history.clearThis'] || 'Clear This Account'}`;
-                    }
-                    historyClearModal.classList.remove('hidden');
-                }
-            });
-        }
-        
-        const closeHistoryClearModal = () => {
-            if (historyClearModal) {
-                historyClearModal.classList.add('hidden');
-            }
-        };
-
-        if (historyClearCloseBtn) historyClearCloseBtn.addEventListener('click', closeHistoryClearModal);
-        if (historyClearCancelBtn) historyClearCancelBtn.addEventListener('click', closeHistoryClearModal);
-        
-        if (historyClearThisBtn) {
-            historyClearThisBtn.addEventListener('click', () => {
-                if (historyState.selectedEmail) {
-                    vscode.postMessage({
-                        command: 'clearHistorySingle',
-                        email: historyState.selectedEmail,
-                    });
-                    closeHistoryClearModal();
-                }
-            });
-        }
-        
-        if (historyClearAllBtn) {
-            historyClearAllBtn.addEventListener('click', () => {
-                vscode.postMessage({
-                    command: 'clearHistoryAll',
-                });
-                closeHistoryClearModal();
-            });
-        }
-
-        if (historyPrevBtn) {
-            historyPrevBtn.addEventListener('click', () => {
-                if (historyState.page > 1) {
-                    historyState.page -= 1;
-                    renderHistoryDetails();
-                }
-            });
-        }
-
-        if (historyNextBtn) {
-            historyNextBtn.addEventListener('click', () => {
-                historyState.page += 1;
-                renderHistoryDetails();
-            });
-        }
-
-        updateHistoryRangeButtons();
-    }
-
-    function handleHistoryResize() {
-        if (!isHistoryTabActive()) {
-            historyState.needsRender = true;
-            return;
-        }
-        renderHistoryChart();
-    }
-
-    function normalizeHistoryRange(rangeDays) {
-        if (typeof rangeDays !== 'number' || !Number.isFinite(rangeDays) || rangeDays <= 0) {
-            return 7;
-        }
-        if (rangeDays <= 1) {
-            return 1;
-        }
-        if (rangeDays <= 7) {
-            return 7;
-        }
-        return 30;
-    }
-
-    function isHistoryTabActive() {
-        const tab = document.getElementById('tab-history');
-        return Boolean(tab && tab.classList.contains('active'));
-    }
-
-    function activateHistoryTab() {
-        // Auto-switch to active account when entering tab
-        const activeEmail = authorizationStatus?.activeAccount;
-        if (activeEmail) {
-            historyState.selectedEmail = activeEmail;
-        }
-
-        updateHistoryRangeButtons();
-        updateHistoryAccountSelect();
-        updateHistoryModelSelect();
-        requestQuotaHistory();
-        if (historyState.needsRender) {
-            renderHistoryChart();
-            renderHistoryDetails();
-        }
-    }
-
-    function requestQuotaHistory() {
-        if (!historyCanvas || !isHistoryTabActive()) {
-            return;
-        }
-        const rangeDays = normalizeHistoryRange(historyState.rangeDays);
-        historyState.rangeDays = rangeDays;
-        vscode.postMessage({
-            command: 'quotaHistory.get',
-            email: historyState.selectedEmail || undefined,
-            modelId: historyState.selectedModelId || undefined,
-            rangeDays,
-        });
-    }
-
-    function handleQuotaHistoryCleared() {
-        requestQuotaHistory();
-    }
-
-    function handleQuotaHistoryData(payload) {
-        const data = payload || {};
-        const accounts = Array.isArray(data.accounts) ? data.accounts : [];
-        historyState.accounts = accounts;
-        historyState.models = Array.isArray(data.models) ? data.models : [];
-        if (typeof data.rangeDays === 'number') {
-            historyState.rangeDays = normalizeHistoryRange(data.rangeDays);
-        }
-        if (typeof data.email === 'string' && data.email.includes('@')) {
-            historyState.selectedEmail = data.email;
-        }
-        if (typeof data.modelId === 'string') {
-            historyState.selectedModelId = data.modelId;
-        }
-        historyState.points = Array.isArray(data.points) ? data.points : [];
-        historyState.page = 1;
-
-        updateHistoryAccountSelect();
-        updateHistoryModelSelect();
-        updateHistoryRangeButtons();
-        updateHistoryFooter();
-        if (isHistoryTabActive()) {
-            renderHistoryChart();
-            renderHistoryDetails();
-        } else {
-            historyState.needsRender = true;
-        }
-    }
-
-
-
-    function updateHistoryAccountSelect() {
-        if (!historyAccountSelect) {
-            return;
-        }
-        historyAccountSelect.innerHTML = '';
-
-        const accounts = Array.isArray(historyState.accounts) ? historyState.accounts : [];
-        if (accounts.length === 0) {
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = i18n['history.noAccounts'] || 'No accounts';
-            historyAccountSelect.appendChild(option);
-            historyAccountSelect.disabled = true;
-            historyState.selectedEmail = null;
-            return;
-        }
-
-        const activeEmail = authorizationStatus?.activeAccount;
-        historyAccountSelect.disabled = false;
-        accounts.forEach(email => {
-            const option = document.createElement('option');
-            option.value = email;
-            const isCurrent = activeEmail && email === activeEmail;
-            option.textContent = isCurrent ? `✅ ${email}` : email;
-            historyAccountSelect.appendChild(option);
-        });
-
-        if (historyState.selectedEmail && accounts.includes(historyState.selectedEmail)) {
-            historyAccountSelect.value = historyState.selectedEmail;
-        } else if (activeEmail && accounts.includes(activeEmail)) {
-            historyAccountSelect.value = activeEmail;
-            historyState.selectedEmail = activeEmail;
-        } else {
-            historyState.selectedEmail = accounts[0];
-            historyAccountSelect.value = accounts[0];
-        }
-    }
-
-    function updateHistoryModelSelect() {
-        if (!historyModelSelect) {
-            return;
-        }
-        historyModelSelect.innerHTML = '';
-
-        const models = Array.isArray(historyState.models) ? historyState.models : [];
-        if (models.length === 0) {
-            const option = document.createElement('option');
-            option.value = '';
-            option.textContent = i18n['history.noModels'] || (i18n['models.empty'] || 'No models');
-            historyModelSelect.appendChild(option);
-            historyModelSelect.disabled = true;
-            historyState.selectedModelId = null;
-            return;
-        }
-
-        historyModelSelect.disabled = false;
-        models.forEach(model => {
-            const option = document.createElement('option');
-            option.value = model.modelId;
-            option.textContent = model.label || model.modelId;
-            historyModelSelect.appendChild(option);
-        });
-
-        const modelIds = models.map(model => model.modelId);
-        if (!historyState.selectedModelId || !modelIds.includes(historyState.selectedModelId)) {
-            historyState.selectedModelId = models[0].modelId;
-        }
-        historyModelSelect.value = historyState.selectedModelId || '';
-    }
-
-    function updateHistoryRangeButtons() {
-        historyRangeButtons.forEach(btn => {
-            const range = normalizeHistoryRange(parseInt(btn.dataset.range || '', 10));
-            if (range === historyState.rangeDays) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
-        });
-    }
-
-    function getSelectedModelLabel() {
-        const models = Array.isArray(historyState.models) ? historyState.models : [];
-        const selected = models.find(model => model.modelId === historyState.selectedModelId);
-        return selected?.label || selected?.modelId || '';
-    }
-
-    function getHistoryPoints() {
-        if (!Array.isArray(historyState.points)) {
-            return [];
-        }
-        return historyState.points
-            .filter(point =>
-                point
-                && typeof point.timestamp === 'number'
-                && Number.isFinite(point.timestamp)
-                && typeof point.remainingPercentage === 'number'
-                && Number.isFinite(point.remainingPercentage),
-            )
-            .sort((a, b) => a.timestamp - b.timestamp);
-    }
-
-    function updateHistoryFooter() {
-        if (!historyMetricLabel || !historySummary) {
-            return;
-        }
-        const modelLabel = getSelectedModelLabel();
-        if (modelLabel) {
-            historyMetricLabel.textContent = `${i18n['history.modelLabel'] || 'Model'}: ${modelLabel}`;
-        } else {
-            historyMetricLabel.textContent = '';
-        }
-
-        const points = getHistoryPoints();
-        if (points.length === 0) {
-            historySummary.textContent = '';
-            return;
-        }
-
-        const latest = points[points.length - 1];
-        const summaryParts = [];
-        summaryParts.push(`${i18n['history.currentValue'] || 'Current'}: ${formatHistoryPercent(latest.remainingPercentage)}`);
-        if (typeof latest.resetTime === 'number' && Number.isFinite(latest.resetTime)) {
-            summaryParts.push(`${i18n['history.resetTime'] || 'Reset'}: ${formatHistoryTimestamp(latest.resetTime)}`);
-        }
-        if (typeof latest.countdownSeconds === 'number' && Number.isFinite(latest.countdownSeconds)) {
-            summaryParts.push(`${i18n['history.countdown'] || 'Countdown'}: ${formatHistoryCountdown(latest.countdownSeconds)}`);
-        }
-        summaryParts.push(`${i18n['history.updatedAt'] || 'Updated'}: ${formatHistoryTimestamp(latest.timestamp)}`);
-        historySummary.textContent = summaryParts.join(' · ');
-    }
-
-    function renderHistoryChart() {
-        if (!historyCanvas) {
-            return;
-        }
-        if (!isHistoryTabActive()) {
-            historyState.needsRender = true;
-            return;
-        }
-
-        const rect = historyCanvas.getBoundingClientRect();
-        if (rect.width <= 0 || rect.height <= 0) {
-            historyState.needsRender = true;
-            return;
-        }
-        historyState.needsRender = false;
-
-        const ctx = historyCanvas.getContext('2d');
-        if (!ctx) {
-            return;
-        }
-
-        const dpr = window.devicePixelRatio || 1;
-        historyCanvas.width = Math.max(1, Math.round(rect.width * dpr));
-        historyCanvas.height = Math.max(1, Math.round(rect.height * dpr));
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.clearRect(0, 0, rect.width, rect.height);
-
-        const points = getHistoryPoints();
-        const hasPoints = points.length > 0;
-        if (historyEmpty) {
-            const emptyMessage = historyState.accounts.length === 0
-                ? (i18n['history.noAccounts'] || 'No accounts')
-                : (historyState.models.length === 0
-                    ? (i18n['history.noModels'] || 'No models')
-                    : (i18n['history.noData'] || 'No history yet.'));
-            historyEmpty.textContent = emptyMessage;
-            historyEmpty.classList.toggle('hidden', hasPoints);
-        }
-        if (!hasPoints) {
-            return;
-        }
-
-        const width = rect.width;
-        const height = rect.height;
-        const padding = {
-            left: 52,
-            right: 20,
-            top: 20,
-            bottom: 42,
-        };
-        const chartWidth = Math.max(1, width - padding.left - padding.right);
-        const chartHeight = Math.max(1, height - padding.top - padding.bottom);
-        const now = Date.now();
-        const rangeMs = normalizeHistoryRange(historyState.rangeDays) * 24 * 60 * 60 * 1000;
-        const startTime = now - rangeMs;
-        const endTime = now;
-
-        const accent = getCssVar('--accent', '#2f81f7');
-        const gridColor = getCssVar('--border-color', 'rgba(255,255,255,0.08)');
-        const textSecondary = getCssVar('--text-secondary', '#8b949e');
-
-        ctx.save();
-        ctx.strokeStyle = gridColor;
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        for (let i = 0; i <= 5; i++) {
-            const y = padding.top + (chartHeight / 5) * i;
-            ctx.beginPath();
-            ctx.moveTo(padding.left, y);
-            ctx.lineTo(width - padding.right, y);
-            ctx.stroke();
-        }
-        ctx.setLineDash([]);
-        ctx.restore();
-
-        ctx.save();
-        ctx.fillStyle = textSecondary;
-        ctx.font = `11px ${getCssVar('--font-family', 'sans-serif')}`;
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-        const labelX = Math.max(12, padding.left - 8);
-        for (let i = 0; i <= 5; i++) {
-            const value = 100 - i * 20;
-            const y = padding.top + (chartHeight / 5) * i;
-            ctx.fillText(`${value}%`, labelX, y);
-        }
-        ctx.restore();
-
-        // Draw Time Axis Labels (Data-Driven)
-        ctx.save();
-        ctx.fillStyle = textSecondary;
-        ctx.font = `11px ${getCssVar('--font-family', 'sans-serif')}`;
-        ctx.textBaseline = 'top';
-        ctx.textAlign = 'center';
-
-        const labelY = padding.top + chartHeight + 12;
-        const minLabelDist = 60; // minimum pixels between label centers
-        let lastLabelX = -1;
-
-        // Iterate backwards (from right to left) to prioritize latest data
-        // We calculate coords for all points first to know where to draw text
-        const pointCoords = points.map(point => {
-            const ratio = (point.timestamp - startTime) / (endTime - startTime);
-            return {
-                x: padding.left + Math.min(1, Math.max(0, ratio)) * chartWidth,
-                timestamp: point.timestamp
-            };
-        });
-
-        // We process points from right (newest) to left (oldest)
-        // strict logic: rightmost point always shows (if inside view),
-        // then others show only if enough space.
-        const reversedCoords = [...pointCoords].reverse();
-        
-        reversedCoords.forEach((coord, index) => {
-            // Always try to show the latest point (index 0)
-            // Or if distance is enough from the previously drawn label (which is to the right)
-            
-            // Note: Since we go Right -> Left, 'lastLabelX' represents the label *to the right*.
-            // So we check if (lastLabelX - coord.x) >= minLabelDist
-            
-            const isLatest = (index === 0);
-            const canDraw = (lastLabelX === -1) || ((lastLabelX - coord.x) >= minLabelDist);
-
-            if (isLatest || canDraw) {
-                const date = new Date(coord.timestamp);
-                let labelParts = [];
-                if (historyState.rangeDays <= 1) {
-                    labelParts = [
-                        String(date.getHours()).padStart(2, '0') + ':' + 
-                        String(date.getMinutes()).padStart(2, '0')
-                    ];
-                } else {
-                    labelParts = [
-                        String(date.getMonth() + 1).padStart(2, '0') + '-' + 
-                        String(date.getDate()).padStart(2, '0')
-                    ];
-                }
-                const labelText = labelParts.join(' ');
-                
-                // Boundary check: ensure label doesn't go off-canvas too much
-                // Simple logic: clamp text position or alignment
-                
-                // Draw tick mark (optional, but helps alignment)
-                ctx.globalAlpha = 0.5;
-                ctx.beginPath();
-                ctx.moveTo(coord.x, padding.top + chartHeight);
-                ctx.lineTo(coord.x, padding.top + chartHeight + 5);
-                ctx.stroke();
-                ctx.globalAlpha = 1.0;
-
-                ctx.fillText(labelText, coord.x, labelY);
-                lastLabelX = coord.x;
-            }
-        });
-        ctx.restore();
-
-        const coords = points.map(point => {
-            const clamped = Math.min(100, Math.max(0, point.remainingPercentage));
-            const ratio = (point.timestamp - startTime) / (endTime - startTime);
-            const x = padding.left + Math.min(1, Math.max(0, ratio)) * chartWidth;
-            const y = padding.top + (1 - clamped / 100) * chartHeight;
-            return { x, y, raw: point };
-        });
-
-        if (coords.length === 1) {
-            ctx.fillStyle = accent;
-            ctx.beginPath();
-            ctx.arc(coords[0].x, coords[0].y, 3, 0, Math.PI * 2);
-            ctx.fill();
-            return;
-        }
-
-        ctx.save();
-        ctx.globalAlpha = 0.18;
-        ctx.fillStyle = accent;
-        ctx.beginPath();
-        ctx.moveTo(coords[0].x, coords[0].y);
-        coords.forEach(point => ctx.lineTo(point.x, point.y));
-        ctx.lineTo(coords[coords.length - 1].x, padding.top + chartHeight);
-        ctx.lineTo(coords[0].x, padding.top + chartHeight);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-
-        ctx.strokeStyle = accent;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        coords.forEach((point, index) => {
-            if (index === 0) {
-                ctx.moveTo(point.x, point.y);
-            } else {
-                ctx.lineTo(point.x, point.y);
-            }
-        });
-        ctx.stroke();
-
-        ctx.fillStyle = accent;
-        coords.forEach(point => {
-            ctx.beginPath();
-            ctx.arc(point.x, point.y, 2, 0, Math.PI * 2);
-            ctx.fill();
-        });
-
-        const last = coords[coords.length - 1];
-        ctx.beginPath();
-        ctx.arc(last.x, last.y, 3.5, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    function renderHistoryDetails() {
-        if (!historyTableBody || !historyPageInfo || !historyPrevBtn || !historyNextBtn) {
-            return;
-        }
-
-        const pointsDesc = getHistoryPoints().slice().sort((a, b) => b.timestamp - a.timestamp);
-        const total = pointsDesc.length;
-        const pageSize = historyState.pageSize;
-        const totalPages = total > 0 ? Math.ceil(total / pageSize) : 0;
-
-        if (total === 0) {
-            historyTableBody.innerHTML = '';
-            if (historyTableEmpty) {
-                historyTableEmpty.textContent = i18n['history.tableEmpty'] || (i18n['history.noData'] || 'No data');
-                historyTableEmpty.classList.remove('hidden');
-            }
-            historyPageInfo.textContent = '';
-            historyPrevBtn.disabled = true;
-            historyNextBtn.disabled = true;
-            return;
-        }
-
-        if (historyTableEmpty) {
-            historyTableEmpty.classList.add('hidden');
-        }
-
-        historyState.page = Math.min(Math.max(historyState.page, 1), totalPages);
-        const start = (historyState.page - 1) * pageSize;
-        const pagePoints = pointsDesc.slice(start, start + pageSize);
-
-        historyTableBody.innerHTML = pagePoints.map((point, index) => {
-            const nextPoint = pointsDesc[start + index + 1];
-            const delta = nextPoint
-                ? point.remainingPercentage - nextPoint.remainingPercentage
-                : null;
-            const deltaText = delta === null ? '--' : formatHistoryDelta(delta);
-            const deltaClass = delta === null
-                ? 'neutral'
-                : (delta > 0 ? 'positive' : (delta < 0 ? 'negative' : 'neutral'));
-
-            return `
-                <tr>
-                    <td>${formatHistoryTimestamp(point.timestamp)}</td>
-                    <td>${formatHistoryPercent(point.remainingPercentage)}</td>
-                    <td class="history-delta ${deltaClass}">${deltaText}</td>
-                    <td>${formatHistoryTimestamp(point.resetTime)}</td>
-                    <td>${formatHistoryCountdownLabel(point.countdownSeconds, point.isStart, point.isReset)}</td>
-                </tr>
-            `;
-        }).join('');
-
-        const pageInfo = i18n['history.pageInfo'] || 'Page {current} / {total}';
-        historyPageInfo.textContent = pageInfo
-            .replace('{current}', String(historyState.page))
-            .replace('{total}', String(totalPages));
-        historyPrevBtn.disabled = historyState.page <= 1;
-        historyNextBtn.disabled = historyState.page >= totalPages;
-    }
-
-    function formatHistoryPercent(value) {
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-            return '--';
-        }
-        const rounded = Math.round(value * 10) / 10;
-        return `${rounded}%`;
-    }
-
-    function formatHistoryDelta(value) {
-        if (typeof value !== 'number' || !Number.isFinite(value)) {
-            return '--';
-        }
-        const rounded = Math.round(value * 10) / 10;
-        const sign = rounded > 0 ? '+' : '';
-        return `${sign}${rounded}%`;
-    }
-
-    function formatHistoryCountdown(seconds) {
-        if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
-            return '--';
-        }
-        if (seconds <= 0) {
-            return i18n['dashboard.online'] || 'Restoring Soon';
-        }
-        const totalMinutes = Math.ceil(seconds / 60);
-        if (totalMinutes < 60) {
-            return `${totalMinutes}m`;
-        }
-        const totalHours = Math.floor(totalMinutes / 60);
-        const remainingMinutes = totalMinutes % 60;
-        if (totalHours < 24) {
-            return `${totalHours}h ${remainingMinutes}m`;
-        }
-        const days = Math.floor(totalHours / 24);
-        const remainingHours = totalHours % 24;
-        return `${days}d ${remainingHours}h ${remainingMinutes}m`;
-    }
-
-    function formatHistoryCountdownLabel(seconds, isStart, isReset) {
-        const text = formatHistoryCountdown(seconds);
-        if (!isStart && !isReset) {
-            return text;
-        }
-        
-        let badges = '';
-        if (isStart) {
-            badges += `<span class="tag-start">START</span>`;
-        }
-        if (isReset) {
-            badges += `<span class="tag-reset">RESET</span>`;
-        }
-        
-        if (text === '--') {
-            return badges;
-        }
-        return `${text} ${badges}`;
-    }
-
-    function formatHistoryTimestamp(timestamp) {
-        if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) {
-            return '--';
-        }
-        return new Date(timestamp).toLocaleString();
-    }
-
-    function getCssVar(name, fallback) {
-        const value = getComputedStyle(document.documentElement).getPropertyValue(name);
-        const trimmed = value ? value.trim() : '';
-        return trimmed || fallback;
-    }
-
     // ============ 设置模态框 ============
 
     function openSettingsModal() {
@@ -1406,26 +752,26 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
             render(message.data, message.config);
             lastSnapshot = message.data; // Update global snapshot
             updateQuotaSourceUI(message.data?.isConnected);
-            if (isHistoryTabActive()) {
-                requestQuotaHistory();
+            if (historyModule.isHistoryTabActive()) {
+                historyModule.requestQuotaHistory();
             }
 
             // 自动同步已移至后端 TelemetryController 处理，前端不再主动触发
         }
 
         if (message.type === 'quotaHistoryData') {
-            handleQuotaHistoryData(message.data);
+            historyModule.handleQuotaHistoryData(message.data);
         }
         if (message.type === 'quotaHistoryCleared') {
-            handleQuotaHistoryCleared();
+            historyModule.handleQuotaHistoryCleared();
         }
         if (message.type === 'quotaHistoryUpdated') {
             const updatedEmail = message.data?.email;
-            if (isHistoryTabActive()) {
+            if (historyModule.isHistoryTabActive()) {
                 if (updatedEmail && historyState.selectedEmail && updatedEmail !== historyState.selectedEmail) {
                     return;
                 }
-                requestQuotaHistory();
+                historyModule.requestQuotaHistory();
             }
         }
 
@@ -1456,7 +802,7 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
 
         // 处理公告状态更新
         if (message.type === 'announcementState') {
-            handleAnnouncementState(message.data);
+            announcementModule.handleAnnouncementState(message.data);
         }
 
         if (message.type === 'quotaSourceError') {
@@ -2902,7 +2248,7 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
 
         vscode.postMessage({ command: 'tabChanged', tab: tabId });
         if (tabId === 'history') {
-            activateHistoryTab();
+            historyModule.activateHistoryTab();
         }
     }
 
@@ -4275,363 +3621,6 @@ import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../share
 
         dashboard.appendChild(card);
     }
-
-    // ============ 公告系统 ============
-
-    // 公告状态
-    let announcementState = {
-        announcements: [],
-        unreadIds: [],
-        popupAnnouncement: null,
-    };
-    let currentPopupAnnouncement = null;
-    let shownPopupIds = new Set();  // 记录已弹过的公告 ID，避免重复弹框
-
-    function updateAnnouncementBadge() {
-        const badge = document.getElementById('announcement-badge');
-        if (badge) {
-            const count = announcementState.unreadIds.length;
-            if (count > 0) {
-                badge.textContent = count > 9 ? '9+' : count;
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
-            }
-        }
-    }
-
-    function openAnnouncementList() {
-        vscode.postMessage({ command: 'announcement.getState' });
-        const modal = document.getElementById('announcement-list-modal');
-        if (modal) modal.classList.remove('hidden');
-    }
-
-    function closeAnnouncementList() {
-        const modal = document.getElementById('announcement-list-modal');
-        if (modal) modal.classList.add('hidden');
-    }
-
-    function renderAnnouncementList() {
-        const container = document.getElementById('announcement-list');
-        if (!container) return;
-
-        const announcements = announcementState.announcements || [];
-        if (announcements.length === 0) {
-            container.innerHTML = `<div class="announcement-empty">${i18n['announcement.empty'] || 'No notifications'}</div>`;
-            return;
-        }
-
-        const typeIcons = {
-            feature: '✨',
-            warning: '⚠️',
-            info: 'ℹ️',
-            urgent: '🚨',
-        };
-
-        container.innerHTML = announcements.map(ann => {
-            const isUnread = announcementState.unreadIds.includes(ann.id);
-            const icon = typeIcons[ann.type] || 'ℹ️';
-            const timeAgo = formatTimeAgo(ann.createdAt);
-
-            return `
-                <div class="announcement-item ${isUnread ? 'unread' : ''}" data-id="${ann.id}">
-                    <span class="announcement-icon">${icon}</span>
-                    <div class="announcement-info">
-                        <div class="announcement-title">
-                            ${isUnread ? '<span class="announcement-unread-dot"></span>' : ''}
-                            <span>${ann.title}</span>
-                        </div>
-                        <div class="announcement-summary">${ann.summary}</div>
-                        <div class="announcement-time">${timeAgo}</div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        // 绑定点击事件
-        container.querySelectorAll('.announcement-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const id = item.dataset.id;
-                const ann = announcements.find(a => a.id === id);
-                if (ann) {
-                    // 若未读，点击即标记已读
-                    if (announcementState.unreadIds.includes(id)) {
-                        vscode.postMessage({
-                            command: 'announcement.markAsRead',
-                            id: id
-                        });
-                        // 乐观更新本地状态
-                        announcementState.unreadIds = announcementState.unreadIds.filter(uid => uid !== id);
-                        updateAnnouncementBadge();
-                        item.classList.remove('unread');
-                        const dot = item.querySelector('.announcement-unread-dot');
-                        if (dot) dot.remove();
-                    }
-                    showAnnouncementPopup(ann, true);
-                    closeAnnouncementList();
-                }
-            });
-        });
-    }
-
-    function formatTimeAgo(dateStr) {
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
-
-        if (diffMins < 1) return i18n['announcement.timeAgo.justNow'] || 'Just now';
-        if (diffMins < 60) return (i18n['announcement.timeAgo.minutesAgo'] || '{count}m ago').replace('{count}', diffMins);
-        if (diffHours < 24) return (i18n['announcement.timeAgo.hoursAgo'] || '{count}h ago').replace('{count}', diffHours);
-        return (i18n['announcement.timeAgo.daysAgo'] || '{count}d ago').replace('{count}', diffDays);
-    }
-
-    function showAnnouncementPopup(ann, fromList = false) {
-        currentPopupAnnouncement = ann;
-
-        const typeLabels = {
-            feature: i18n['announcement.type.feature'] || '✨ New Feature',
-            warning: i18n['announcement.type.warning'] || '⚠️ Warning',
-            info: i18n['announcement.type.info'] || 'ℹ️ Info',
-            urgent: i18n['announcement.type.urgent'] || '🚨 Urgent',
-        };
-
-        const popupType = document.getElementById('announcement-popup-type');
-        const popupTitle = document.getElementById('announcement-popup-title');
-        const popupContent = document.getElementById('announcement-popup-content');
-        const popupAction = document.getElementById('announcement-popup-action');
-        const popupGotIt = document.getElementById('announcement-popup-got-it');
-
-        // Header buttons
-        const backBtn = document.getElementById('announcement-popup-back');
-        const closeBtn = document.getElementById('announcement-popup-close');
-
-        if (popupType) {
-            popupType.textContent = typeLabels[ann.type] || typeLabels.info;
-            popupType.className = `announcement-type-badge ${ann.type}`;
-        }
-        if (popupTitle) popupTitle.textContent = ann.title;
-
-        // 渲染内容和图片
-        if (popupContent) {
-            let contentHtml = `<div class="announcement-text">${escapeHtml(ann.content).replace(/\n/g, '<br>')}</div>`;
-            
-            // 如果有图片，渲染图片区域（带骨架屏占位符）
-            if (ann.images && ann.images.length > 0) {
-                contentHtml += '<div class="announcement-images">';
-                for (const img of ann.images) {
-                    contentHtml += `
-                        <div class="announcement-image-item">
-                            <img src="${escapeHtml(img.url)}" 
-                                 alt="${escapeHtml(img.alt || img.label || '')}" 
-                                 class="announcement-image"
-                                 data-preview-url="${escapeHtml(img.url)}"
-                                 title="${i18n['announcement.clickToEnlarge'] || 'Click to enlarge'}" />
-                            <div class="image-skeleton"></div>
-                            ${img.label ? `<div class="announcement-image-label">${escapeHtml(img.label)}</div>` : ''}
-                        </div>
-                    `;
-                }
-                contentHtml += '</div>';
-            }
-
-            popupContent.innerHTML = contentHtml;
-            
-            // 绑定图片加载事件
-            popupContent.querySelectorAll('.announcement-image').forEach(imgEl => {
-                // 图片加载完成
-                imgEl.addEventListener('load', () => {
-                    imgEl.classList.add('loaded');
-                });
-                
-                // 图片加载失败
-                imgEl.addEventListener('error', () => {
-                    const item = imgEl.closest('.announcement-image-item');
-                    if (item) {
-                        const skeleton = item.querySelector('.image-skeleton');
-                        if (skeleton) skeleton.remove();
-                        imgEl.style.display = 'none';
-                        const errorDiv = document.createElement('div');
-                        errorDiv.className = 'image-load-error';
-                        errorDiv.innerHTML = `
-                            <span class="icon">🖼️</span>
-                            <span>${i18n['announcement.imageLoadFailed'] || 'Image failed to load'}</span>
-                        `;
-                        item.insertBefore(errorDiv, item.firstChild);
-                    }
-                });
-                
-                // 点击放大
-                imgEl.addEventListener('click', () => {
-                    const url = imgEl.getAttribute('data-preview-url');
-                    if (url) showImagePreview(url);
-                });
-            });
-        }
-
-        // 处理操作按钮
-        if (ann.action && ann.action.label) {
-            if (popupAction) {
-                popupAction.textContent = ann.action.label;
-                popupAction.classList.remove('hidden');
-            }
-            if (popupGotIt) popupGotIt.classList.add('hidden');
-        } else {
-            if (popupAction) popupAction.classList.add('hidden');
-            if (popupGotIt) popupGotIt.classList.remove('hidden');
-        }
-
-        // 处理返回/关闭按钮显示
-        if (fromList) {
-            if (backBtn) {
-                backBtn.classList.remove('hidden');
-                backBtn.onclick = () => {
-                    closeAnnouncementPopup(true); // 跳过动画
-                    openAnnouncementList(); // 返回列表
-                };
-            }
-            // 从列表进入时，关闭也跳过动画
-            if (closeBtn) {
-                closeBtn.onclick = () => {
-                    closeAnnouncementPopup(true);
-                };
-            }
-        } else {
-            if (backBtn) backBtn.classList.add('hidden');
-            // 自动弹窗时，关闭使用动画
-            if (closeBtn) {
-                closeBtn.onclick = () => {
-                    closeAnnouncementPopup();
-                };
-            }
-        }
-
-        const modal = document.getElementById('announcement-popup-modal');
-        if (modal) modal.classList.remove('hidden');
-    }
-
-    function closeAnnouncementPopup(skipAnimation = false) {
-        const modal = document.getElementById('announcement-popup-modal');
-        const modalContent = modal?.querySelector('.announcement-popup-content');
-        const bellBtn = document.getElementById('announcement-btn');
-
-        if (modal && modalContent && bellBtn && !skipAnimation) {
-            // 获取铃铛按钮的位置
-            const bellRect = bellBtn.getBoundingClientRect();
-            const contentRect = modalContent.getBoundingClientRect();
-
-            // 计算目标位移
-            const targetX = bellRect.left + bellRect.width / 2 - (contentRect.left + contentRect.width / 2);
-            const targetY = bellRect.top + bellRect.height / 2 - (contentRect.top + contentRect.height / 2);
-
-            // 添加飞向铃铛的动画
-            modalContent.style.transition = 'transform 0.4s ease-in, opacity 0.4s ease-in';
-            modalContent.style.transform = `translate(${targetX}px, ${targetY}px) scale(0.1)`;
-            modalContent.style.opacity = '0';
-
-            // 铃铛抖动效果
-            bellBtn.classList.add('bell-shake');
-
-            // 动画结束后隐藏模态框并重置样式
-            setTimeout(() => {
-                modal.classList.add('hidden');
-                modalContent.style.transition = '';
-                modalContent.style.transform = '';
-                modalContent.style.opacity = '';
-                bellBtn.classList.remove('bell-shake');
-            }, 400);
-        } else if (modal) {
-            modal.classList.add('hidden');
-        }
-
-        currentPopupAnnouncement = null;
-    }
-
-    function handleAnnouncementGotIt() {
-        if (currentPopupAnnouncement) {
-            vscode.postMessage({
-                command: 'announcement.markAsRead',
-                id: currentPopupAnnouncement.id
-            });
-        }
-        closeAnnouncementPopup();
-    }
-
-    function handleAnnouncementAction() {
-        if (currentPopupAnnouncement && currentPopupAnnouncement.action) {
-            const action = currentPopupAnnouncement.action;
-
-            // 先标记已读
-            vscode.postMessage({
-                command: 'announcement.markAsRead',
-                id: currentPopupAnnouncement.id
-            });
-
-            // 执行操作
-            if (action.type === 'tab') {
-                switchToTab(action.target);
-            } else if (action.type === 'url') {
-                vscode.postMessage({ command: 'openUrl', url: action.target });
-            } else if (action.type === 'command') {
-                vscode.postMessage({
-                    command: 'executeCommand',
-                    commandId: action.target,
-                    commandArgs: action.arguments || []
-                });
-            }
-        }
-        closeAnnouncementPopup();
-    }
-
-    function markAllAnnouncementsRead() {
-        vscode.postMessage({ command: 'announcement.markAllAsRead' });
-        showToast(i18n['announcement.markAllRead'] || 'All marked as read', 'success');
-    }
-
-    function handleAnnouncementState(state) {
-        announcementState = state;
-        updateAnnouncementBadge();
-        renderAnnouncementList();
-
-        // 检查是否需要弹出公告（只弹未弹过的）
-        if (state.popupAnnouncement && !shownPopupIds.has(state.popupAnnouncement.id)) {
-            shownPopupIds.add(state.popupAnnouncement.id);
-            // 延迟弹出，等待页面渲染完成
-            setTimeout(() => {
-                showAnnouncementPopup(state.popupAnnouncement);
-            }, 600);
-        }
-    }
-
-    // ============ 图片预览 ============
-
-    function showImagePreview(imageUrl) {
-        // 创建预览遮罩
-        const overlay = document.createElement('div');
-        overlay.className = 'image-preview-overlay';
-        overlay.innerHTML = `
-            <div class="image-preview-container">
-                <img src="${imageUrl}" class="image-preview-img" />
-                <div class="image-preview-hint">${i18n['announcement.clickToClose'] || 'Click to close'}</div>
-            </div>
-        `;
-
-        // 点击关闭
-        overlay.addEventListener('click', () => {
-            overlay.classList.add('closing');
-            setTimeout(() => overlay.remove(), 200);
-        });
-
-        document.body.appendChild(overlay);
-
-        // 触发动画
-        requestAnimationFrame(() => overlay.classList.add('visible'));
-    }
-
-    // 暴露到 window 供 onclick 调用
-    window.showImagePreview = showImagePreview;
 
     // ============ 启动 ============
 

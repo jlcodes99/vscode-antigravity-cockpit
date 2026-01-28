@@ -1,0 +1,700 @@
+/**
+ * Antigravity Cockpit - Dashboard 样式
+ * 支持 VS Code 主题适配
+ */
+
+:root {
+    /* 主题适配变量 - 优先使用 VS Code 主题，提供暗色默认值 */
+    --bg-color: var(--vscode-editor-background, #0d1117);
+    --card-bg: var(--vscode-sideBar-background, #161b22);
+    --text-primary: var(--vscode-editor-foreground, #e6edf3);
+    --text-secondary: var(--vscode-descriptionForeground, #8b949e);
+    --accent: var(--vscode-button-background, #2f81f7);
+    --accent-hover: var(--vscode-button-hoverBackground, #1f6feb);
+    --border-color: var(--vscode-widget-border, #30363d);
+    --font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif);
+
+    /* 语义色 - 使用更鲜艳的终端/图表颜色 */
+    --success: var(--vscode-terminal-ansiGreen, var(--vscode-charts-green, #4cca6d));
+    --warning: var(--vscode-terminal-ansiYellow, var(--vscode-charts-yellow, #f1e05a));
+    --danger: var(--vscode-terminal-ansiRed, var(--vscode-charts-red, #da3633));
+
+    /* Tooltip 专用 */
+    --tooltip-bg: var(--vscode-editorWidget-background, #1e1e1e);
+    --tooltip-fg: var(--vscode-editorWidget-foreground, #cccccc);
+    --tooltip-border: var(--vscode-editorWidget-border, #454545);
+}
+
+/* Global utility class */
+.hidden {
+    display: none !important;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: var(--font-family);
+    padding: 20px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+}
+
+/* ============ 头部区域 ============ */
+
+.header {
+    font-size: 24px;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-primary);
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 10px;
+    width: 100%;
+    max-width: 1200px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-title .icon {
+    font-size: 28px;
+}
+
+.controls {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    font-size: 14px;
+    flex-wrap: wrap;
+}
+
+/* ============ 状态信息 ============ */
+
+#status {
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.status-connecting {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.quota-auth-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    border-radius: 10px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+}
+
+.quota-auth-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+}
+
+.quota-source-info {
+    display: flex;
+    align-items: center;
+    margin-left: 16px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.quota-source-info.hidden {
+    display: none;
+}
+
+.quota-source-info .quota-source-info-content {
+    color: var(--text-secondary);
+}
+
+.quota-source-info .quota-source-info-text {
+    color: var(--text-secondary);
+}
+
+.quota-auth-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.account-count-badge {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    background: rgba(47, 129, 247, 0.15);
+    color: var(--accent);
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+
+.quota-auth-info-clickable {
+    cursor: pointer;
+}
+
+.quota-auth-info-clickable:hover {
+    color: var(--accent);
+}
+
+.quota-auth-email {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.quota-auth-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.antigravityTools-sync-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.antigravityTools-sync-toggle input {
+    margin: 0;
+}
+
+/* Multi-Account Authorization Styles */
+.quota-auth-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 12px;
+}
+
+.quota-auth-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.quota-auth-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+}
+
+.quota-account-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.quota-account-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.quota-account-item:hover {
+    border-color: var(--accent);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.quota-account-item.active {
+    border-color: var(--success);
+    background: rgba(76, 175, 80, 0.08);
+}
+
+.quota-account-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.quota-account-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.quota-account-email {
+    font-size: 13px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.quota-account-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    background: rgba(76, 175, 80, 0.2);
+    color: var(--success);
+    border-radius: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.quota-account-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: 12px;
+}
+
+/* 下拉箭头按钮 */
+.quota-account-manage-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px 10px;
+    margin-left: 6px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    vertical-align: middle;
+}
+
+.quota-account-manage-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(47, 129, 247, 0.1);
+}
+
+/* 账号总览按钮 */
+.quota-account-overview-btn {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px 10px;
+    margin-left: 6px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    vertical-align: middle;
+}
+
+.quota-account-overview-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(47, 129, 247, 0.1);
+}
+
+/* ============ 账号管理弹框 ============ */
+
+.account-manage-content {
+    max-width: 800px;
+    min-width: 600px;
+    width: 90vw;
+}
+
+.account-manage-content .modal-body {
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.account-manage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.account-manage-empty {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 40px 20px;
+    font-style: italic;
+}
+
+.account-manage-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--vscode-input-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    gap: 12px;
+    cursor: pointer;
+}
+
+.account-manage-item:hover {
+    border-color: var(--accent);
+    background: rgba(47, 129, 247, 0.05);
+}
+
+.account-manage-item.active {
+    border-color: var(--success);
+    background: rgba(76, 175, 80, 0.08);
+    cursor: default;
+}
+
+.account-manage-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.account-manage-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+.account-manage-email {
+    font-size: 13px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.account-manage-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    background: rgba(76, 175, 80, 0.2);
+    color: var(--success);
+    border-radius: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.account-manage-badge.expired {
+    background: rgba(255, 152, 0, 0.2);
+    color: #ff9800;
+}
+
+.account-manage-item.expired {
+    border-color: #ff9800;
+    background: rgba(255, 152, 0, 0.05);
+}
+
+.account-manage-item.expired:hover {
+    border-color: #ff9800;
+    background: rgba(255, 152, 0, 0.1);
+}
+
+.account-manage-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.model-manager-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 60vh;
+}
+
+.model-manager-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.model-manager-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.model-manager-count {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.model-manager-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+    padding: 4px 0;
+    overflow-y: auto;
+}
+
+.model-manager-empty {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding: 12px;
+    text-align: center;
+}
+
+.model-manager-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.model-manager-item input {
+    margin: 0;
+}
+
+.spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ============ 离线状态卡片 ============ */
+
+.offline-card {
+    background: var(--card-bg);
+    border: 1px solid var(--danger);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    max-width: 500px;
+    margin: 40px auto;
+    box-shadow: 0 8px 32px rgba(218, 54, 51, 0.15);
+}
+
+.offline-card .icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    filter: grayscale(50%);
+}
+
+.offline-card h2 {
+    color: var(--danger);
+    margin: 0 0 15px;
+    font-size: 24px;
+}
+
+.offline-card p {
+    color: var(--text-secondary);
+    margin-bottom: 15px;
+    line-height: 1.6;
+}
+
+.offline-card .offline-hint {
+    font-size: 13px;
+    color: var(--accent);
+    margin-top: 20px;
+    padding: 10px 16px;
+    background: rgba(47, 129, 247, 0.1);
+    border-radius: 8px;
+    border: 1px dashed rgba(47, 129, 247, 0.3);
+}
+
+.offline-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.offline-actions button {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.offline-card.local-card {
+    border-color: rgba(59, 130, 246, 0.6);
+    box-shadow: 0 8px 32px rgba(59, 130, 246, 0.18);
+}
+
+.offline-card.local-card h2 {
+    color: var(--text-primary);
+}
+
+.offline-card.authorized-card {
+    border-color: rgba(234, 179, 8, 0.6);
+    box-shadow: 0 8px 32px rgba(234, 179, 8, 0.18);
+}
+
+.offline-card.authorized-card h2 {
+    color: var(--text-primary);
+}
+
+.offline-card .icon.offline-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0;
+}
+
+.offline-card .icon.offline-spinner .spinner {
+    width: 36px;
+    height: 36px;
+    border-width: 3px;
+}
+
+.offline-detail {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.btn-primary {
+    background: var(--accent);
+    border: none;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+/* ============ 开关组件 ============ */
+
+.switch-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--border-color);
+    transition: 0.3s;
+    border-radius: 20px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+input:checked+.slider {
+    background-color: var(--accent);
+}
+
+input:checked+.slider:before {
+    transform: translateX(16px);
+}
+
+/* ============ 刷新按钮 ============ */
+
+.refresh-btn {
+    background: transparent;
+    border: 1px solid var(--text-secondary);
+    color: var(--text-primary);
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 6px 14px;
+    font-size: 12px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s;
+    min-width: 80px;
+}
+
+.refresh-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(47, 129, 247, 0.1);
+}
+
+.refresh-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+.refresh-btn .spinner {
+    width: 12px;
+    height: 12px;
+    border-width: 1.5px;
+}
+

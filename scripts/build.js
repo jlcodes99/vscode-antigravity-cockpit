@@ -110,6 +110,9 @@ async function build() {
         fs.mkdirSync(webviewDir, { recursive: true });
     }
     fs.copyFileSync('./src/view/webview/dashboard.css', './out/view/webview/dashboard.css');
+    fs.copyFileSync('./src/view/webview/dashboard_core.css', './out/view/webview/dashboard_core.css');
+    fs.copyFileSync('./src/view/webview/dashboard_cards.css', './out/view/webview/dashboard_cards.css');
+    fs.copyFileSync('./src/view/webview/dashboard_modals_tabs.css', './out/view/webview/dashboard_modals_tabs.css');
     fs.copyFileSync('./src/view/webview/shared_modals.css', './out/view/webview/shared_modals.css');
     fs.copyFileSync('./src/view/webview/auto_trigger.css', './out/view/webview/auto_trigger.css');
     fs.copyFileSync('./src/view/webview/accounts_overview.css', './out/view/webview/accounts_overview.css');

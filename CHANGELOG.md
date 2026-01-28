@@ -8,7 +8,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [2.1.3] - 2026-01-28
+## [2.1.4]
+
+### Improved
+- **Architecture**: Refactored the dashboard codebase by modularizing CSS styles and JavaScript logic, improving maintainability and load performance.
+- **UX**: Enhanced the announcement system to automatically mark notifications as read when the popup is closed, streamlining the user experience.
+- **Quota History**: Adjusted history tagging logic: at 100% it now uses countdown deltas for START/RESET, and below 100% it only records entries when the percentage changes.
+
+## [2.1.3]
 
 ### Improved
 - **UX**: Enhanced the "Cockpit Tools Not Running" warning when switching accounts. Added "Launch" and "Download" buttons for quicker access to the manager tool.

@@ -1207,7 +1207,18 @@
         if (modal) modal.classList.remove('hidden');
     }
 
+    function markCurrentAnnouncementAsRead() {
+        if (!currentPopupAnnouncement) return;
+        const id = currentPopupAnnouncement.id;
+        vscode.postMessage({ command: 'announcement.markAsRead', id });
+        if (announcementState.unreadIds.includes(id)) {
+            announcementState.unreadIds = announcementState.unreadIds.filter(uid => uid !== id);
+            updateAnnouncementBadge();
+        }
+    }
+
     function closeAnnouncementPopup(skipAnimation = false) {
+        markCurrentAnnouncementAsRead();
         const modal = document.getElementById('announcement-popup-modal');
         const modalContent = modal?.querySelector('.announcement-popup-content');
         const bellBtn = document.getElementById('announcement-btn');
@@ -1239,17 +1250,12 @@
     }
 
     function handleAnnouncementGotIt() {
-        if (currentPopupAnnouncement) {
-            vscode.postMessage({ command: 'announcement.markAsRead', id: currentPopupAnnouncement.id });
-        }
         closeAnnouncementPopup();
     }
 
     function handleAnnouncementAction() {
         if (currentPopupAnnouncement && currentPopupAnnouncement.action) {
             const action = currentPopupAnnouncement.action;
-
-            vscode.postMessage({ command: 'announcement.markAsRead', id: currentPopupAnnouncement.id });
 
             if (action.type === 'tab') {
                 vscode.postMessage({ command: 'openDashboard', tab: action.target });

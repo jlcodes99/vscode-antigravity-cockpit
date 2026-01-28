@@ -202,38 +202,49 @@ function resolvePointAction(
     record: QuotaHistoryModelRecord,
 ): { action: PointAction; isStart?: boolean; isReset?: boolean } {
     if (!last) {
-        if (next.remainingPercentage !== 100) {
-            record.hasCountdownDropAt100 = false;
+        return { action: 'add' };
+    }
+    const lastPct = last.remainingPercentage;
+    const nextPct = next.remainingPercentage;
+
+    if (nextPct < 100) {
+        record.hasCountdownDropAt100 = false;
+        if (lastPct === 100 && nextPct < 100) {
+            return { action: 'add', isStart: true };
+        }
+        if (lastPct === nextPct) {
+            return { action: 'skip' };
+        }
+        if (nextPct > lastPct) {
+            return { action: 'add', isReset: true };
         }
         return { action: 'add' };
     }
-    if (next.remainingPercentage === 100) {
-        if (last.remainingPercentage !== 100) {
-            record.hasCountdownDropAt100 = false;
-            return { action: 'add', isReset: true };
-        }
-        const lastDisplay = getCountdownDisplayMinutes(last.countdownSeconds);
-        const nextDisplay = getCountdownDisplayMinutes(next.countdownSeconds);
-        if (lastDisplay === null || nextDisplay === null) {
-            return { action: 'overwrite' };
-        }
-        if (nextDisplay < lastDisplay) {
-            if (record.hasCountdownDropAt100) {
-                return { action: 'skip' };
-            }
-            record.hasCountdownDropAt100 = true;
-            return { action: 'add', isStart: true };
-        }
-        if (nextDisplay > lastDisplay + 10) {
-            return { action: 'add', isReset: true };
-        }
+
+    if (lastPct < 100) {
+        record.hasCountdownDropAt100 = false;
+        return { action: 'add', isReset: true };
+    }
+
+    const lastDisplay = getCountdownDisplayMinutes(last.countdownSeconds);
+    const nextDisplay = getCountdownDisplayMinutes(next.countdownSeconds);
+    if (lastDisplay === null || nextDisplay === null) {
         return { action: 'overwrite' };
     }
-    record.hasCountdownDropAt100 = false;
-    if (last.remainingPercentage === next.remainingPercentage) {
-        return { action: 'skip' };
+
+    const delta = nextDisplay - lastDisplay;
+    if (delta > 1) {
+        record.hasCountdownDropAt100 = false;
+        return { action: 'add', isReset: true };
     }
-    return { action: 'add' };
+    if (delta < -2) {
+        if (record.hasCountdownDropAt100) {
+            return { action: 'overwrite' };
+        }
+        record.hasCountdownDropAt100 = true;
+        return { action: 'add', isStart: true };
+    }
+    return { action: 'overwrite' };
 }
 
 function trimPoints(points: QuotaHistoryPoint[], now: number): QuotaHistoryPoint[] {
