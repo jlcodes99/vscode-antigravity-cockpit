@@ -39,20 +39,27 @@ export class AccountNode extends vscode.TreeItem {
         public readonly email: string,
         public readonly isCurrent: boolean,
         public readonly hasDeviceBound: boolean,
+        public readonly isInvalid?: boolean,
     ) {
         super(email, vscode.TreeItemCollapsibleState.Expanded);
 
-        // Icon with star for current account
-        if (isCurrent) {
+        // 图标优先级：失效 > 当前 > 普通
+        if (isInvalid) {
+            // ⚠️ 失效账号显示警告图标（红色）
+            this.iconPath = new vscode.ThemeIcon('warning', new vscode.ThemeColor('errorForeground'));
+        } else if (isCurrent) {
+            // ⭐ 当前账号显示星星
             this.iconPath = new vscode.ThemeIcon('star-full', new vscode.ThemeColor('charts.yellow'));
         } else {
+            // 👤 普通账号
             this.iconPath = new vscode.ThemeIcon('account');
         }
 
         // Tooltip
         const parts = [
             `${t('accountTree.tooltipEmail')}: ${email}`,
-            isCurrent ? t('accountTree.currentAccount') : '',
+            isInvalid ? `⚠️ ${t('accountsRefresh.authExpired')}` : '',
+            isCurrent && !isInvalid ? t('accountTree.currentAccount') : '',
             hasDeviceBound ? t('accountTree.fingerprintBound') : t('accountTree.fingerprintUnbound'),
         ].filter(Boolean);
         this.tooltip = parts.join('\n');
@@ -250,7 +257,7 @@ export class AccountTreeProvider implements vscode.TreeDataProvider<AccountTreeI
         // 保持账号原始顺序，不按当前账号排序
         const nodes: AccountNode[] = [];
         for (const [email, account] of accounts) {
-            nodes.push(new AccountNode(email, account.isCurrent, account.hasDeviceBound));
+            nodes.push(new AccountNode(email, account.isCurrent, account.hasDeviceBound, account.isInvalid));
         }
 
         return nodes;

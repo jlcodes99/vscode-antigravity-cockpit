@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.5]
+
+### Added
+- **Account Invalid State Management**: Unified management of invalid account flags (`isInvalid`) across the sidebar, accounts overview, and management modal for consistent status display.
+  - Invalid accounts in the sidebar now display a ⚠️ red warning icon with "Authorization expired" tooltip
+  - Enhanced error detection supports multiple authorization failure types (401 UNAUTHENTICATED, invalid_grant, Authorization expired, etc.)
+  - Automatically skips quota refresh for invalid accounts to optimize performance and prevent UI freezing
+
+### Improved
+- **Performance Optimization**: Data change notifications (`dataChanged`) now only sync the account list without refreshing quotas.
+  - Eliminated high-frequency invalid quota queries caused by credential updates (Token refresh)
+  - Quota refresh is now handled exclusively by scheduled tasks and manual operations, significantly reducing resource consumption
+  - Newly added accounts temporarily show no quota data with proper "No quota data" placeholder message
+
+### i18n
+- **Internationalization**: Added `accountsRefresh.authExpired` translation key with Chinese and English support
+
 ## [2.1.4]
 
 ### Improved

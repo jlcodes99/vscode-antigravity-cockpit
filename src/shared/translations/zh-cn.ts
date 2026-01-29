@@ -770,4 +770,5 @@ export const zhCN = {
     'accountsRefresh.loadFailed': '加载失败: {error}',
     'accountsRefresh.refreshCooldown': '请等待 {seconds} 秒后再刷新',
     'accountsRefresh.notImported': '插件未导入该账号',
+    'accountsRefresh.authExpired': '授权已过期，请重新登录',
 };

@@ -756,4 +756,5 @@ export const ja = {
     'accountsRefresh.loadFailed': '読み込み失敗: {error}',
     'accountsRefresh.refreshCooldown': '{seconds} 秒待ってから更新してください',
     'accountsRefresh.notImported': 'プラグインにインポートされていないアカウントです',
+    'accountsRefresh.authExpired': '認証の期限が切れました。再ログインしてください',
 };

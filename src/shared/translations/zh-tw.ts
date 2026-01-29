@@ -775,4 +775,5 @@ export const zhTW = {
     'accountsRefresh.loadFailed': '載入失敗: {error}',
     'accountsRefresh.refreshCooldown': '請等待 {seconds} 秒後再重新整理',
     'accountsRefresh.notImported': '插件未匯入該帳號',
+    'accountsRefresh.authExpired': '授權已過期，請重新登入',
 };

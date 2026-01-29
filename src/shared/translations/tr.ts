@@ -760,4 +760,5 @@ export const tr = {
     'accountsRefresh.loadFailed': 'Yükleme başarısız: {error}',
     'accountsRefresh.refreshCooldown': 'Yenilemeden önce lütfen {seconds} saniye bekleyin',
     'accountsRefresh.notImported': 'Hesap eklentiye aktarılmadı',
+    'accountsRefresh.authExpired': 'Yetkilendirme süresi doldu, lütfen tekrar giriş yapın',
 };

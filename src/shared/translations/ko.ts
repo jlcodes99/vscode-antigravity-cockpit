@@ -756,4 +756,5 @@ export const ko = {
     'accountsRefresh.loadFailed': '로드 실패: {error}',
     'accountsRefresh.refreshCooldown': '{seconds}초 후 다시 시도해 주세요',
     'accountsRefresh.notImported': '플러그인에 가져오지 않은 계정입니다',
+    'accountsRefresh.authExpired': '인증이 만료되었습니다. 다시 로그인해 주세요',
 };

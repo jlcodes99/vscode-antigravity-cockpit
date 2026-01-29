@@ -757,4 +757,5 @@ export const it = {
     'accountsRefresh.loadFailed': 'Caricamento fallito: {error}',
     'accountsRefresh.refreshCooldown': 'Attendi {seconds} secondi prima di aggiornare',
     'accountsRefresh.notImported': 'Account non importato nell\'estensione',
+    'accountsRefresh.authExpired': 'Autorizzazione scaduta, rieffettua l’accesso',
 };

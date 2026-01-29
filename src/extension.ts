@@ -184,8 +184,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // 监听数据变更事件
     cockpitToolsWs.on('dataChanged', async (payload: { source?: string }) => {
         const source = payload?.source ?? 'unknown';
-        logger.info('[WS] 收到数据变更通知，开始同步');
-        await accountsRefreshService.refresh({ forceSync: true, reason: `dataChanged:${source}` });
+        logger.info(`[WS] 收到数据变更通知: ${source}`);
+        // 只同步账号列表，不刷新配额（配额由定时刷新和手动刷新负责）
+        await accountsRefreshService.refresh({ forceSync: true, skipQuotaRefresh: true, reason: `dataChanged:${source}` });
         // 通知 Webview 刷新账号数据
         hud.sendMessage({ type: 'refreshAccounts' });
     });

@@ -794,4 +794,5 @@ export const vi = {
     'accountsRefresh.loadFailed': 'Tải thất bại: {error}',
     'accountsRefresh.refreshCooldown': 'Vui lòng chờ {seconds} giây trước khi làm mới',
     'accountsRefresh.notImported': 'Tài khoản chưa được nhập vào plugin',
+    'accountsRefresh.authExpired': 'Ủy quyền đã hết hạn, vui lòng đăng nhập lại',
 };

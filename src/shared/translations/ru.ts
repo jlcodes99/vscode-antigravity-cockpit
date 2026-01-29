@@ -757,4 +757,5 @@ export const ru = {
     'accountsRefresh.loadFailed': 'Ошибка загрузки: {error}',
     'accountsRefresh.refreshCooldown': 'Пожалуйста, подождите {seconds} сек. перед обновлением',
     'accountsRefresh.notImported': 'Аккаунт не импортирован в плагин',
+    'accountsRefresh.authExpired': 'Срок действия авторизации истек, войдите снова',
 };

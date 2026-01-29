@@ -23,6 +23,10 @@ export interface AccountState {
     hasDeviceBound: boolean;
     hasPluginCredential: boolean;
     tier?: string;
+    // 异常状态（从 credentialStorage 同步）
+    isInvalid?: boolean;        // Token 失效（需重新授权）
+    invalidReason?: string;     // 失效原因（用于UI显示）
+    expiresAt?: string;         // Token 过期时间
 }
 
 export class AccountsRefreshService {
@@ -88,6 +92,28 @@ export class AccountsRefreshService {
         return this.toolsAvailable;
     }
 
+    /**
+     * 供管理弹框使用，兼容原有格式
+     * 替代 credentialStorage.getAccountInfoList()
+     */
+    getAccountInfoList(): Array<{
+        email: string;
+        isActive: boolean;
+        expiresAt?: string;
+        isInvalid?: boolean;
+    }> {
+        const result = [];
+        for (const [email, state] of this.accounts) {
+            result.push({
+                email,
+                isActive: state.isCurrent,
+                expiresAt: state.expiresAt,
+                isInvalid: state.isInvalid,
+            });
+        }
+        return result;
+    }
+
     async manualRefresh(): Promise<boolean> {
         const now = Date.now();
         const elapsed = now - this.lastManualRefresh;
@@ -138,7 +164,7 @@ export class AccountsRefreshService {
         return this.startupRefreshPromise;
     }
 
-    async refresh(options?: { forceSync?: boolean; skipSync?: boolean; reason?: string }): Promise<void> {
+    async refresh(options?: { forceSync?: boolean; skipSync?: boolean; skipQuotaRefresh?: boolean; reason?: string }): Promise<void> {
         if (this.refreshInFlight) {
             return this.refreshInFlight;
         }
@@ -163,12 +189,17 @@ export class AccountsRefreshService {
                 logger.info(`[AccountsRefresh] Loaded ${this.accounts.size} accounts, tools available: ${this.toolsAvailable}`);
                 this.emitUpdate();
 
-                for (const [email, account] of this.accounts) {
-                    if (!account.hasPluginCredential) {
-                        this.setMissingCredentialCache(email);
-                        continue;
+                // 刷新配额（可选跳过）
+                if (!options?.skipQuotaRefresh) {
+                    for (const [email, account] of this.accounts) {
+                        if (!account.hasPluginCredential) {
+                            this.setMissingCredentialCache(email);
+                            continue;
+                        }
+                        await this.silentLoadAccountQuota(email);
                     }
-                    await this.silentLoadAccountQuota(email);
+                } else {
+                    logger.info('[AccountsRefresh] 跳过配额刷新 (skipQuotaRefresh=true)');
                 }
             } catch (err) {
                 const error = err instanceof Error ? err.message : String(err);
@@ -301,13 +332,20 @@ export class AccountsRefreshService {
                 currentEmail = acc.email;
             }
 
+            // 读取该账号的凭证状态
+            const credential = credentials[acc.email];
+
             this.accounts.set(acc.email, {
                 email: acc.email,
                 toolsId: acc.id ?? null,
                 isCurrent,
                 hasDeviceBound: acc.has_fingerprint,
                 hasPluginCredential: pluginEmails.has(acc.email),
-                tier: this.extractTierFromAccount(acc),
+                tier: this.extractTierFromAccount(acc as unknown as { [key: string]: unknown }),
+                // 合并凭证异常状态
+                isInvalid: credential?.isInvalid ?? false,
+                invalidReason: credential?.isInvalid ? t('accountsRefresh.authExpired') : undefined,
+                expiresAt: credential?.expiresAt,
             });
         }
 
@@ -351,12 +389,18 @@ export class AccountsRefreshService {
         this.accounts.clear();
         for (const email of pluginEmails) {
             const isCurrent = email === currentEmailFromFile;
+            const credential = credentials[email];
+            
             this.accounts.set(email, {
                 email,
                 toolsId: null,
                 isCurrent,
                 hasDeviceBound: false,
                 hasPluginCredential: true,
+                // 合并凭证异常状态
+                isInvalid: credential?.isInvalid ?? false,
+                invalidReason: credential?.isInvalid ? t('accountsRefresh.authExpired') : undefined,
+                expiresAt: credential?.expiresAt,
             });
         }
 
@@ -373,10 +417,53 @@ export class AccountsRefreshService {
         }
     }
 
-    private async silentLoadAccountQuota(email: string): Promise<void> {
+    /**
+     * 统一判断：账号是否可刷新配额
+     * 所有刷新逻辑调用这个方法，避免重复判断
+     */
+    private checkAccountRefreshable(email: string): {
+        canRefresh: boolean;
+        skipReason?: string;
+    } {
         const account = this.accounts.get(email);
-        if (account && !account.hasPluginCredential) {
-            this.setMissingCredentialCache(email);
+        
+        // 1. 没有插件凭证
+        if (!account?.hasPluginCredential) {
+            return { 
+                canRefresh: false, 
+                skipReason: t('accountsRefresh.notImported'), 
+            };
+        }
+        
+        // 2. 已标记为失效
+        if (account.isInvalid) {
+            return { 
+                canRefresh: false, 
+                skipReason: account.invalidReason || t('accountsRefresh.authExpired'), 
+            };
+        }
+        
+        return { canRefresh: true };
+    }
+
+    private setErrorCache(email: string, error: string): void {
+        const cache: AccountQuotaCache = {
+            snapshot: { timestamp: new Date(), models: [], isConnected: false },
+            fetchedAt: Date.now(),
+            loading: false,
+            error,
+        };
+        this.quotaCache.set(email, cache);
+        this.emitUpdate();
+    }
+
+    private async silentLoadAccountQuota(email: string): Promise<void> {
+        // 统一检查
+        const { canRefresh, skipReason } = this.checkAccountRefreshable(email);
+        
+        if (!canRefresh) {
+            // 直接设置错误缓存，跳过网络请求
+            this.setErrorCache(email, skipReason!);
             return;
         }
 
@@ -394,6 +481,25 @@ export class AccountsRefreshService {
             logger.info(`[AccountsRefresh] Refreshed quota for ${email}: ${snapshot.models.length} models, ${snapshot.groups?.length ?? 0} groups`);
         } catch (err) {
             const error = err instanceof Error ? err.message : String(err);
+            
+            // 判断是否为授权失败错误（多种情况）
+            const isAuthError = error.includes('Authorization expired') 
+                || error.includes('invalid_grant')
+                || error.includes('401')
+                || error.includes('UNAUTHENTICATED')
+                || error.includes('invalid authentication credentials')
+                || error.includes('Expected OAuth 2 access token');
+            
+            if (isAuthError) {
+                const account = this.accounts.get(email);
+                if (account) {
+                    account.isInvalid = true;
+                    account.invalidReason = t('accountsRefresh.authExpired');
+                    this.emitUpdate();
+                    logger.warn(`[AccountsRefresh] Account ${email} marked as invalid due to auth error: ${error.substring(0, 100)}`);
+                }
+            }
+            
             logger.debug(`[AccountsRefresh] Silent refresh failed for ${email}: ${error}`);
         }
     }

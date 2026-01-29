@@ -759,4 +759,5 @@ export const fr = {
     'accountsRefresh.loadFailed': 'Échec du chargement : {error}',
     'accountsRefresh.refreshCooldown': 'Veuillez patienter {seconds} secondes avant d\'actualiser',
     'accountsRefresh.notImported': 'Compte non importé dans l\'extension',
+    'accountsRefresh.authExpired': 'L\'autorisation a expiré, veuillez vous reconnecter',
 };

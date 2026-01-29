@@ -757,4 +757,5 @@ export const pl = {
     'accountsRefresh.loadFailed': 'Błąd ładowania: {error}',
     'accountsRefresh.refreshCooldown': 'Proszę odczekać {seconds} sekund przed odświeżeniem',
     'accountsRefresh.notImported': 'Konto niezaimportowane do wtyczki',
+    'accountsRefresh.authExpired': 'Autoryzacja wygasła, zaloguj się ponownie',
 };

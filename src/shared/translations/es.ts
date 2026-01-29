@@ -755,4 +755,5 @@ export const es = {
     'accountsRefresh.loadFailed': 'Error al cargar: {error}',
     'accountsRefresh.refreshCooldown': 'Por favor, espere {seconds} segundos antes de actualizar',
     'accountsRefresh.notImported': 'Cuenta no importada al plugin',
+    'accountsRefresh.authExpired': 'La autorización ha caducado, inicie sesión de nuevo',
 };

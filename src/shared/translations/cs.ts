@@ -757,4 +757,5 @@ export const cs = {
     'accountsRefresh.loadFailed': 'Load failed: {error}',
     'accountsRefresh.refreshCooldown': 'Please wait {seconds} seconds before refreshing',
     'accountsRefresh.notImported': 'Account not imported to plugin',
+    'accountsRefresh.authExpired': 'Platnost autorizace vypršela, přihlaste se prosím znovu',
 };
