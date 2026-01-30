@@ -498,7 +498,6 @@ export class ReactorCore {
                 }
                 const telemetry = await this.fetchAuthorizedTelemetry();
                 this.lastAuthorizedFetchedAt = Date.now();
-                const activeEmail = await credentialStorage.getActiveAccount();
                 this.publishTelemetry(telemetry, 'authorized');
                 return;
             } catch (error) {
@@ -543,11 +542,6 @@ export class ReactorCore {
         // Local 模式：优先尝试 state.vscdb 账户 + 远端 API，失败则兜底本地进程
         try {
             const telemetry = await this.fetchLocalTelemetryWithRemoteFallback();
-            const rawEmail = telemetry.localAccountEmail
-                || telemetry.userInfo?.email
-                || this.localAccountEmail
-                || null;
-            const cacheEmail = rawEmail && rawEmail.includes('@') ? rawEmail : null;
             this.publishTelemetry(telemetry, 'local');
         } catch (error) {
             throw this.wrapSyncError(error, 'local');
