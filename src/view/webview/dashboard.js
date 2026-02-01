@@ -3453,12 +3453,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
             .replace(/'/g, "&#039;");
     }
 
-    // 安全的 CSS class 名称
-    function sanitizeClassName(value) {
-        if (!value || typeof value !== 'string') return '';
-        return value.replace(/[^a-zA-Z0-9_-]/g, '');
-    }
-
     /**
      * 解析模型能力，返回能力列表
      */
