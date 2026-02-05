@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.12] - 2026-02-05
+
+### Added
+- **Remote-SSH Support**: Added `extensionKind: ["ui"]` configuration to ensure the extension runs on the local machine even when connected to a remote server via Remote-SSH. This allows users to view their local Antigravity quota information while working on remote projects.
+
+---
+
 ## [2.1.11] - 2026-02-05
 
 ### Changed

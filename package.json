@@ -3,7 +3,7 @@
   "displayName": "Antigravity Cockpit",
   "icon": "assets/icon.png",
   "description": "A premium, dashboard-style quota monitor for Antigravity AI.",
-  "version": "2.1.11",
+  "version": "2.1.12",
   "publisher": "jlcodes",
   "engines": {
     "vscode": "^1.90.0"
@@ -27,6 +27,7 @@
     "onStartupFinished"
   ],
   "main": "./out/extension.js",
+  "extensionKind": ["ui"],
   "contributes": {
     "commands": [
       {
