@@ -24,7 +24,8 @@
         updateState(authorization, antigravityToolsSyncEnabled, antigravityToolsAutoSwitchEnabled) {
             this.state.authorization = authorization;
             if (antigravityToolsSyncEnabled !== undefined) {
-                this.state.antigravityToolsSyncEnabled = antigravityToolsSyncEnabled;
+                // Auto sync is intentionally forced off in UI.
+                this.state.antigravityToolsSyncEnabled = false;
             }
             if (antigravityToolsAutoSwitchEnabled !== undefined) {
                 this.state.antigravityToolsAutoSwitchEnabled = antigravityToolsAutoSwitchEnabled;
@@ -40,7 +41,7 @@
         renderAuthRow(container, options = {}) {
             if (!container) return;
 
-            const { authorization, antigravityToolsSyncEnabled } = this.state;
+            const { authorization } = this.state;
             const accounts = authorization?.accounts || [];
             const hasAccounts = accounts.length > 0;
             const activeAccount = authorization?.activeAccount;
@@ -56,10 +57,6 @@
             if (options.showSyncToggleInline) {
                 // Inline Style (Like Auto Trigger Tab)
                 syncActionsHtml = `
-                    <label class="antigravityTools-sync-toggle">
-                        <input type="checkbox" class="at-sync-checkbox" ${antigravityToolsSyncEnabled ? 'checked' : ''}>
-                        <span>${t('autoTrigger.antigravityToolsSync')}</span>
-                    </label>
                     <button class="at-btn at-btn-secondary at-import-btn">${t('autoTrigger.importFromAntigravityTools')}</button>
                 `;
             } else {
@@ -139,13 +136,6 @@
             });
 
             // Inline Sync Toggle
-            container.querySelector('.at-sync-checkbox')?.addEventListener('change', (e) => {
-                const enabled = e.target.checked;
-                // Update local state immediately for UI consistency
-                this.state.antigravityToolsSyncEnabled = enabled;
-                postMessage({ command: 'antigravityToolsSync.toggle', enabled });
-            });
-
             // Inline Import
             container.querySelector('.at-import-btn')?.addEventListener('click', () => {
                 postMessage({ command: 'antigravityToolsSync.import' });
@@ -355,26 +345,12 @@
                                         </div>
                                         <div class="at-sync-info-block">
                                             <div class="at-sync-info-line">
-                                                <span class="at-sync-info-label">${t('atSyncConfig.autoSyncTitle') || '自动同步'}：</span>
-                                                <span class="at-sync-info-text">${t('atSyncConfig.autoSyncDesc') || '启用后检测到 Antigravity Tools 新账号时自动导入。'}</span>
-                                            </div>
-                                            <div class="at-sync-info-line">
                                                 <span class="at-sync-info-label">${t('atSyncConfig.manualImportTitle') || '手动导入'}：</span>
                                                 <span class="at-sync-info-text">${t('atSyncConfig.manualImportDesc') || '分别导入本地账户或 Antigravity Tools 账户，仅执行一次。'}</span>
                                             </div>
                                         </div>
                                     </div>
                                 </details>
-                        </div>
-                        <div class="at-sync-section">
-                            <div class="at-sync-toggle-grid">
-                                <div class="at-sync-toggle-card">
-                                    <label class="at-sync-toggle-label">
-                                        <input type="checkbox" id="at-sync-modal-checkbox">
-                                        <span>${t('atSyncConfig.enableAutoSync') || '自动同步Antigravity Tools账户'}</span>
-                                    </label>
-                                </div>
-                            </div>
                         </div>
                             <div class="at-sync-section">
                                 <div class="at-sync-section-title">📥 ${t('atSyncConfig.manualImportTitle') || '手动导入'}</div>
@@ -388,10 +364,6 @@
                 `);
                 document.getElementById('close-at-sync-config-modal')?.addEventListener('click', () => modal.classList.add('hidden'));
 
-                modal.querySelector('#at-sync-modal-checkbox')?.addEventListener('change', (e) => {
-                    this.state.antigravityToolsSyncEnabled = e.target.checked;
-                    this.vscode.postMessage({ command: 'antigravityToolsSync.toggle', enabled: e.target.checked });
-                });
                 modal.querySelector('#at-sync-modal-import-local-btn')?.addEventListener('click', () => {
                     if (typeof window.showLocalAuthImportLoading === 'function') {
                         window.showLocalAuthImportLoading();
@@ -405,8 +377,6 @@
                 });
             }
 
-            const checkbox = modal.querySelector('#at-sync-modal-checkbox');
-            if (checkbox) checkbox.checked = this.state.antigravityToolsSyncEnabled;
             modal.querySelectorAll('.at-sync-details').forEach((detail) => {
                 detail.removeAttribute('open');
             });

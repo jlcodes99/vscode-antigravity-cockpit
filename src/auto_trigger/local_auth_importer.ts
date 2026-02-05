@@ -8,7 +8,8 @@ import { OAuthCredential } from './types';
 import { logger } from '../shared/log_service';
 import { getAntigravityStateDbPath, getAntigravityUserDataDir } from '../shared/antigravity_paths';
 
-const STATE_KEY = 'jetskiStateSync.agentManagerInitState';
+const LEGACY_STATE_KEY = 'jetskiStateSync.agentManagerInitState';
+const UNIFIED_STATE_KEY = 'antigravityUnifiedStateSync.oauthToken';
 
 // sql.js 初始化缓存
 let sqlJsPromise: ReturnType<typeof initSqlJs> | null = null;
@@ -39,7 +40,7 @@ let pendingLocalCredential: PendingLocalCredential | null = null;
 
 // 注意：state.vscdb 路径统一由 shared/antigravity_paths 提供，避免多处维护。
 
-async function readStateValue(dbPath: string): Promise<string> {
+async function readStateValueByKey(dbPath: string, key: string): Promise<string> {
     // 检查数据库文件是否存在
     if (!fs.existsSync(dbPath)) {
         throw new Error(`Database file not found: ${dbPath}`);
@@ -52,7 +53,7 @@ async function readStateValue(dbPath: string): Promise<string> {
     try {
         db = new SQL.Database(fileBuffer);
         const stmt = db.prepare('SELECT value FROM ItemTable WHERE key = ?');
-        stmt.bind([STATE_KEY]);
+        stmt.bind([key]);
 
         if (stmt.step()) {
             const row = stmt.get();
@@ -178,14 +179,56 @@ function parseOAuthTokenInfo(data: Buffer): LocalTokenInfo {
     return info;
 }
 
+function parseUnifiedOAuthTokenInfo(stateValue: string): LocalTokenInfo {
+    const outerRaw = Buffer.from(stateValue.trim(), 'base64');
+    const inner = findField(outerRaw, 1);
+    if (!inner) {
+        throw new Error('Unified oauth outer field not found');
+    }
+
+    const sentinel = findField(inner, 1)?.toString();
+    if (sentinel !== 'oauthTokenInfoSentinelKey') {
+        throw new Error('Unified oauth sentinel mismatch');
+    }
+
+    const inner2 = findField(inner, 2);
+    if (!inner2) {
+        throw new Error('Unified oauth inner field not found');
+    }
+
+    const oauthInfoB64 = findField(inner2, 1)?.toString();
+    if (!oauthInfoB64) {
+        throw new Error('Unified oauth info not found');
+    }
+
+    const oauthInfoRaw = Buffer.from(oauthInfoB64.trim(), 'base64');
+    return parseOAuthTokenInfo(oauthInfoRaw);
+}
+
 async function readLocalTokenInfo(): Promise<LocalTokenInfo> {
     const dbPath = getAntigravityStateDbPath();
     logger.info(`[LocalAuth] state.vscdb path: ${dbPath}`);
-    const stateValue = await readStateValue(dbPath);
-    const raw = Buffer.from(stateValue.trim(), 'base64');
+
+    // 新格式优先：antigravityUnifiedStateSync.oauthToken
+    try {
+        const unifiedValue = await readStateValueByKey(dbPath, UNIFIED_STATE_KEY);
+        const unifiedInfo = parseUnifiedOAuthTokenInfo(unifiedValue);
+        if (unifiedInfo.refreshToken) {
+            logger.debug('[LocalAuth] Parsed oauth token from unified state key');
+            return unifiedInfo;
+        }
+        logger.debug('[LocalAuth] Unified state key parsed but refresh_token missing, fallback to legacy key');
+    } catch (error) {
+        const err = error instanceof Error ? error.message : String(error);
+        logger.debug(`[LocalAuth] Unified state parse failed, fallback to legacy key: ${err}`);
+    }
+
+    // 旧格式兜底：jetskiStateSync.agentManagerInitState -> field 6
+    const legacyValue = await readStateValueByKey(dbPath, LEGACY_STATE_KEY);
+    const raw = Buffer.from(legacyValue.trim(), 'base64');
     const oauthField = findField(raw, 6);
     if (!oauthField) {
-        throw new Error('OAuth field not found');
+        throw new Error('OAuth field not found in legacy state');
     }
     return parseOAuthTokenInfo(oauthField);
 }

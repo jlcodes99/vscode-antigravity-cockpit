@@ -11,6 +11,7 @@ import { credentialStorage } from './credential_storage';
 import { TriggerRecord, ModelInfo } from './types';
 import { logger } from '../shared/log_service';
 import { cloudCodeClient } from '../shared/cloudcode_client';
+import { t } from '../shared/i18n';
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const RESET_TRIGGER_COOLDOWN_MS = 10 * 60 * 1000;
@@ -649,7 +650,7 @@ class TriggerService {
             }
         }
 
-        const reply = replyParts.join('') || '(无回复)';
+        const reply = replyParts.join('') || t('autoTrigger.noReply');
         const normalizedCompletion = completionTokens ?? 0;
         return { reply, promptTokens, completionTokens: normalizedCompletion, totalTokens, traceId, responseId };
     }

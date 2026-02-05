@@ -8,6 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.11] - 2026-02-05
+
+### Changed
+- **Antigravity Tools Sync**: Auto-sync feature has been removed from the UI and is now permanently fixed to OFF. Manual import functionality remains available.
+
+### Added
+- **Accounts Overview Sorting**: Added new sorting options for the accounts list:
+  - Sort by update time (`last_updated`)
+  - Sort by group quota (e.g., "By Sonnet Quota")
+  - Sort by group reset time (e.g., "By Sonnet Reset Time")
+
+### i18n
+- Added translation keys for new sorting options: `sortByLastUpdated`, `sortByGroup`, `sortByGroupReset`, `sortAsc`, `sortDesc` across all 16+ supported languages.
+
+---
+
 ## [2.1.10] - 2026-02-03
 
 ### Core Enhancements

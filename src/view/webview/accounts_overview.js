@@ -20,7 +20,8 @@
     let sortBy = 'overall';
     let sortDirection = 'desc'; // 'asc' or 'desc'
     let viewMode = 'grid';
-    let sortGroups = [];
+    let sortGroups =  [];
+    const resetSortPrefix = 'reset:'; // 重置时间排序前缀
     let currentConfig = {};
     let isInitialLoading = true;
     let actionMessageTimer = null;
@@ -218,6 +219,26 @@
         return group.percentage;
     }
 
+    /**
+     * 获取分组的重置时间戳 (Unix timestamp in milliseconds)
+     * @param {object} account - 账号对象
+     * @param {string} groupId - 分组 ID
+     * @returns {number|null} - 重置时间戳,如果无法解析则返回 null
+     */
+    function getGroupResetTimestamp(account, groupId) {
+        if (!account.groups) return null;
+        const group = account.groups.find(g => g.groupId === groupId);
+        if (!group || !group.resetTime) return null;
+        
+        // resetTime 格式示例: "2024-02-05T12:00:00Z" 或其他 ISO 格式
+        try {
+            const timestamp = new Date(group.resetTime).getTime();
+            return isNaN(timestamp) ? null : timestamp;
+        } catch (e) {
+            return null;
+        }
+    }
+
     function getDisplayGroups(account) {
         if (!account.groups || account.groups.length === 0) return [];
         const groups = [...account.groups];
@@ -313,10 +334,21 @@
             .sort((a, b) => a.name.localeCompare(b.name));
 
         const currentValue = elements.sortSelect.value;
-        elements.sortSelect.innerHTML = `<option value="overall">${escapeHtml(getString('sortOverall', 'Overall'))}</option>`;
+        // 添加基础排序选项
+        elements.sortSelect.innerHTML = `
+            <option value="overall">${escapeHtml(getString('sortOverall', 'Overall Quota'))}</option>
+            <option value="last_updated">${escapeHtml(getString('sortByLastUpdated', 'By Update Time'))}</option>
+        `;
+        // 添加分组配额排序选项
         sortGroups.forEach(group => {
             const selected = currentValue === group.id ? 'selected' : '';
-            elements.sortSelect.innerHTML += `<option value="${escapeHtml(group.id)}" ${selected}>${escapeHtml(group.name)}</option>`;
+            elements.sortSelect.innerHTML += `<option value="${escapeHtml(group.id)}" ${selected}>${escapeHtml(getString('sortByGroup', 'By {group} Quota').replace('{group}', group.name))}</option>`;
+        });
+        // 添加分组重置时间排序选项
+        sortGroups.forEach(group => {
+            const resetValue = `${resetSortPrefix}${group.id}`;
+            const selected = currentValue === resetValue ? 'selected' : '';
+            elements.sortSelect.innerHTML += `<option value="${escapeHtml(resetValue)}" ${selected}>${escapeHtml(getString('sortByGroupReset', 'By {group} Reset Time').replace('{group}', group.name))}</option>`;
         });
 
         // Update sort direction button
@@ -371,14 +403,40 @@
 
         const modifier = sortDirection === 'asc' ? -1 : 1;
 
-        if (sortBy !== 'overall' && sortGroups.some(group => group.id === sortBy)) {
+        // 按更新时间排序 (使用 lastUpdated 作为创建时间的替代)
+        if (sortBy === 'last_updated') {
+            result.sort((a, b) => {
+                const aTime = a.lastUpdated || 0;
+                const bTime = b.lastUpdated || 0;
+                return (bTime - aTime) * modifier;
+            });
+        }
+        // 按分组重置时间排序
+        else if (sortBy.startsWith(resetSortPrefix) && sortGroups.length > 0) {
+            const targetGroupId = sortBy.slice(resetSortPrefix.length);
+            const targetGroup = sortGroups.find(group => group.id === targetGroupId);
+            if (targetGroup) {
+                result.sort((a, b) => {
+                    const aReset = getGroupResetTimestamp(a, targetGroupId);
+                    const bReset = getGroupResetTimestamp(b, targetGroupId);
+                    if (aReset === null && bReset === null) return 0;
+                    if (aReset === null) return 1; // 无数据排后面
+                    if (bReset === null) return -1;
+                    return (bReset - aReset) * modifier;
+                });
+            }
+        }
+        // 按分组配额排序
+        else if (sortBy !== 'overall' && sortGroups.some(group => group.id === sortBy)) {
             result.sort((a, b) => {
                 const aGroup = getGroupQuota(a, sortBy);
                 const bGroup = getGroupQuota(b, sortBy);
                 if (aGroup !== bGroup) return (bGroup - aGroup) * modifier;
                 return (getOverallQuota(b) - getOverallQuota(a)) * modifier;
             });
-        } else {
+        }
+        // 默认按综合配额排序
+        else {
             result.sort((a, b) => (getOverallQuota(b) - getOverallQuota(a)) * modifier);
         }
 

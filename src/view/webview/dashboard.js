@@ -734,7 +734,8 @@ import { createAnnouncementModule } from './dashboard_announcements';
                     isDataMasked = message.config.dataMasked;
                 }
                 if (message.config.antigravityToolsSyncEnabled !== undefined) {
-                    antigravityToolsSyncEnabled = message.config.antigravityToolsSyncEnabled;
+                    // Auto sync is intentionally forced off in UI.
+                    antigravityToolsSyncEnabled = false;
                 }
                 if (message.config.antigravityToolsAutoSwitchEnabled !== undefined) {
                     antigravityToolsAutoSwitchEnabled = message.config.antigravityToolsAutoSwitchEnabled;
@@ -814,11 +815,9 @@ import { createAnnouncementModule } from './dashboard_announcements';
         }
 
         if (message.type === 'antigravityToolsSyncStatus') {
-            if (message.data?.enabled !== undefined) {
-                antigravityToolsSyncEnabled = message.data.enabled;
-            }
-            if (message.data?.autoSyncEnabled !== undefined) {
-                antigravityToolsSyncEnabled = message.data.autoSyncEnabled;
+            if (message.data?.enabled !== undefined || message.data?.autoSyncEnabled !== undefined) {
+                // Auto sync is intentionally forced off in UI.
+                antigravityToolsSyncEnabled = false;
             }
             if (message.data?.autoSwitchEnabled !== undefined) {
                 antigravityToolsAutoSwitchEnabled = message.data.autoSwitchEnabled;
@@ -908,9 +907,9 @@ import { createAnnouncementModule } from './dashboard_announcements';
         const importBtn = document.getElementById('antigravityTools-import-btn');
 
         checkbox?.addEventListener('change', (e) => {
-            const enabled = e.target.checked;
-            antigravityToolsSyncEnabled = enabled;
-            vscode.postMessage({ command: 'antigravityToolsSync.toggle', enabled });
+            e.target.checked = false;
+            antigravityToolsSyncEnabled = false;
+            vscode.postMessage({ command: 'antigravityToolsSync.toggle', enabled: false });
         });
 
         importBtn?.addEventListener('click', () => {
@@ -968,10 +967,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
                                     </div>
                                     <div class="at-sync-info-block">
                                         <div class="at-sync-info-line">
-                                            <span class="at-sync-info-label">${i18n['atSyncConfig.autoSyncTitle'] || '自动同步'}：</span>
-                                            <span class="at-sync-info-text">${i18n['atSyncConfig.autoSyncDesc'] || '启用后检测到 Antigravity Tools 新账号时自动导入（是否切换由“自动切换”控制）。'}</span>
-                                        </div>
-                                        <div class="at-sync-info-line">
                                             <span class="at-sync-info-label">${i18n['atSyncConfig.manualImportTitle'] || '手动导入'}：</span>
                                             <span class="at-sync-info-text">${i18n['atSyncConfig.manualImportDesc'] || '分别导入本地账户或 Antigravity Tools 账户，仅执行一次。'}</span>
                                         </div>
@@ -979,19 +974,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
                                 </div>
                             </details>
                         </div>
-                        
-                        <!-- 自动同步 / 自动切换 -->
-                        <div class="at-sync-section">
-                            <div class="at-sync-toggle-grid">
-                                <div class="at-sync-toggle-card">
-                                    <label class="at-sync-toggle-label">
-                                        <input type="checkbox" id="at-sync-modal-checkbox" ${antigravityToolsSyncEnabled ? 'checked' : ''}>
-                                        <span>${i18n['atSyncConfig.enableAutoSync'] || '自动同步Antigravity Tools账户'}</span>
-                                    </label>
-                                </div>
-                            </div>
-                        </div>
-                        
+
                         <!-- 手动导入 -->
                         <div class="at-sync-section">
                             <div class="at-sync-section-title">📥 ${i18n['atSyncConfig.manualImportTitle'] || '手动导入'}</div>
@@ -1018,37 +1001,21 @@ import { createAnnouncementModule } from './dashboard_announcements';
             });
         }
 
-        // 更新 checkbox 状态
-        const syncCheckbox = modal.querySelector('#at-sync-modal-checkbox');
-        if (syncCheckbox) {
-            syncCheckbox.checked = antigravityToolsSyncEnabled;
-        }
-
-
         modal.querySelectorAll('.at-sync-details').forEach((detail) => {
             detail.removeAttribute('open');
         });
 
         // 绑定事件（每次打开都重新绑定以确保状态正确）
-        const newCheckbox = modal.querySelector('#at-sync-modal-checkbox');
         const importLocalBtn = modal.querySelector('#at-sync-modal-import-local-btn');
         const importToolsBtn = modal.querySelector('#at-sync-modal-import-tools-btn');
 
         // 移除旧的事件监听器
-        const newCheckboxClone = newCheckbox.cloneNode(true);
-        newCheckbox.parentNode.replaceChild(newCheckboxClone, newCheckbox);
         const importLocalBtnClone = importLocalBtn.cloneNode(true);
         importLocalBtn.parentNode.replaceChild(importLocalBtnClone, importLocalBtn);
         const importToolsBtnClone = importToolsBtn.cloneNode(true);
         importToolsBtn.parentNode.replaceChild(importToolsBtnClone, importToolsBtn);
 
         // 绑定新的事件监听器
-        modal.querySelector('#at-sync-modal-checkbox')?.addEventListener('change', (e) => {
-            const enabled = e.target.checked;
-            antigravityToolsSyncEnabled = enabled;
-            vscode.postMessage({ command: 'antigravityToolsSync.toggle', enabled });
-        });
-
         modal.querySelector('#at-sync-modal-import-local-btn')?.addEventListener('click', () => {
             showLocalAuthImportLoading();
             vscode.postMessage({ command: 'autoTrigger.importLocal' });

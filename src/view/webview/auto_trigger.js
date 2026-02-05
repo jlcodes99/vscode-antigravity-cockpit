@@ -74,17 +74,14 @@
         return Math.floor(parsed);
     }
 
-    function setAntigravityToolsSyncEnabled(enabled) {
-        if (typeof enabled !== 'boolean') {
-            return;
-        }
-        antigravityToolsSyncEnabled = enabled;
+    function setAntigravityToolsSyncEnabled(_enabled) {
+        antigravityToolsSyncEnabled = false;
         if (authUi) {
-            authUi.updateState(currentState?.authorization, enabled, antigravityToolsAutoSwitchEnabled);
+            authUi.updateState(currentState?.authorization, false, antigravityToolsAutoSwitchEnabled);
         } else {
             const checkbox = document.getElementById('at-antigravityTools-sync-checkbox');
             if (checkbox) {
-                checkbox.checked = enabled;
+                checkbox.checked = false;
             }
         }
     }
@@ -108,9 +105,9 @@
             if (!(target instanceof HTMLInputElement)) {
                 return;
             }
-            const enabled = target.checked;
-            antigravityToolsSyncEnabled = enabled;
-            vscode.postMessage({ command: 'antigravityToolsSync.toggle', enabled });
+            target.checked = false;
+            antigravityToolsSyncEnabled = false;
+            vscode.postMessage({ command: 'antigravityToolsSync.toggle', enabled: false });
         });
 
         importBtn?.addEventListener('click', () => {
@@ -1421,7 +1418,7 @@
             const syncInput = document.createElement('input');
             syncInput.type = 'checkbox';
             syncInput.id = 'at-antigravityTools-sync-checkbox';
-            syncInput.checked = Boolean(antigravityToolsSyncEnabled);
+            syncInput.checked = false;
             const syncText = document.createElement('span');
             syncText.textContent = t('autoTrigger.antigravityToolsSync');
             syncToggle.append(syncInput, syncText);

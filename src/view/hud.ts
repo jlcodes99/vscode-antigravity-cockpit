@@ -230,7 +230,7 @@ export class CockpitHUD {
             dataMasked: config.dataMasked,
             groupMappings: config.groupMappings,
             language: config.language,
-            antigravityToolsSyncEnabled: configService.getStateFlag('antigravityToolsSyncEnabled', false),
+            antigravityToolsSyncEnabled: false,
             antigravityToolsAutoSwitchEnabled: configService.getStateFlag('antigravityToolsAutoSwitchEnabled', true),
         });
     }
@@ -527,6 +527,11 @@ export class CockpitHUD {
             'all': t('accountsOverview.all') || 'All',
             'sortBy': t('accountsOverview.sortBy') || 'Sort by',
             'sortOverall': t('accountsOverview.sortOverall') || 'Overall Quota',
+            'sortByLastUpdated': t('accountsOverview.sortByLastUpdated') || 'By Update Time',
+            'sortByGroup': t('accountsOverview.sortByGroup') || 'By {group} Quota',
+            'sortByGroupReset': t('accountsOverview.sortByGroupReset') || 'By {group} Reset Time',
+            'sortAsc': t('accountsOverview.sortAsc') || 'Ascending',
+            'sortDesc': t('accountsOverview.sortDesc') || 'Descending',
             'sortLabel': t('accountsOverview.sortLabel') || 'Sort',
             'refreshAll': t('accountsOverview.refreshAll') || 'Refresh All',
             'addAccount': t('accountsOverview.addAccount') || 'Add Account',
