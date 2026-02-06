@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.14] - 2026-02-06
+
+### Improved
+- **Custom Time Save UX**: In schedule configuration, pending custom time input is now auto-applied on save. Users no longer need to click "Add" before clicking "Save Settings".
+
+---
+
 ## [2.1.13] - 2026-02-06
 
 ### Changed

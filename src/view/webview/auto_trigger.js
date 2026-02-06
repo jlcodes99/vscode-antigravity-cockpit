@@ -507,6 +507,17 @@
             return;
         }
 
+        // 保存时自动吸收当前输入框中的自定义时间，无需额外点击“添加”
+        if (configTriggerMode === 'scheduled') {
+            if (configMode === 'daily') {
+                applyPendingCustomTime('at-daily-custom-time', 'daily');
+            } else if (configMode === 'weekly') {
+                applyPendingCustomTime('at-weekly-custom-time', 'weekly');
+            }
+        } else if (wakeOnReset && configTimeWindowEnabled) {
+            applyPendingCustomTime('at-fallback-custom-time', 'fallback');
+        }
+
         const maxOutputTokens = parseNonNegativeInt(
             document.getElementById('at-max-output-tokens')?.value,
             0,
@@ -740,7 +751,10 @@
         const arr = mode === 'daily' ? configDailyTimes : configWeeklyTimes;
         const idx = arr.indexOf(time);
         if (idx >= 0) {
-            if (arr.length > 1) arr.splice(idx, 1);
+            // 允许在“已填写自定义时间但未点击添加”时移除最后一个固定时间
+            if (arr.length > 1 || hasPendingCustomTime(mode)) {
+                arr.splice(idx, 1);
+            }
         } else {
             arr.push(time);
         }
@@ -768,6 +782,10 @@
                 addTime();
             }
         });
+        if (mode === 'daily' || mode === 'weekly') {
+            input.addEventListener('input', updatePreview);
+            input.addEventListener('change', updatePreview);
+        }
     }
 
     function normalizeTimeInput(value) {
@@ -807,6 +825,49 @@
         }
     }
 
+    function applyPendingCustomTime(inputId, mode) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+
+        const normalized = normalizeTimeInput(input.value);
+        if (!normalized) return;
+
+        addCustomTime(normalized, mode);
+        input.value = '';
+    }
+
+    function hasPendingCustomTime(mode) {
+        return Boolean(getPendingCustomTime(mode));
+    }
+
+    function getPendingCustomTime(mode) {
+        let inputId = '';
+        if (mode === 'daily') {
+            inputId = 'at-daily-custom-time';
+        } else if (mode === 'weekly') {
+            inputId = 'at-weekly-custom-time';
+        } else if (mode === 'fallback') {
+            inputId = 'at-fallback-custom-time';
+        } else {
+            return null;
+        }
+
+        const input = document.getElementById(inputId);
+        if (!input) return null;
+        return normalizeTimeInput(input.value);
+    }
+
+    function getEffectiveTimesForPreview(mode) {
+        const base = mode === 'daily' ? [...configDailyTimes] : [...configWeeklyTimes];
+        if (configMode === mode) {
+            const pending = getPendingCustomTime(mode);
+            if (pending && !base.includes(pending)) {
+                base.push(pending);
+            }
+        }
+        return base.sort();
+    }
+
     // ============ 时段策略相关函数 ============
 
     function updateTimeWindowConfigVisibility() {
@@ -820,7 +881,7 @@
         const idx = configFallbackTimes.indexOf(time);
         if (idx >= 0) {
             // 至少保留一个时间点
-            if (configFallbackTimes.length > 1) {
+            if (configFallbackTimes.length > 1 || hasPendingCustomTime('fallback')) {
                 configFallbackTimes.splice(idx, 1);
             }
         } else {
@@ -1189,9 +1250,9 @@
         // 普通模式预览
         const config = {
             repeatMode: configMode,
-            dailyTimes: configDailyTimes,
+            dailyTimes: getEffectiveTimesForPreview('daily'),
             weeklyDays: configWeeklyDays,
-            weeklyTimes: configWeeklyTimes,
+            weeklyTimes: getEffectiveTimesForPreview('weekly'),
             intervalHours: configIntervalHours,
             intervalStartTime: configIntervalStart,
             intervalEndTime: configIntervalEnd,
