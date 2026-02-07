@@ -81,11 +81,15 @@ export class QuotaRefreshManager {
             // 2. 缓存无效或强制刷新，发起网络请求
             logger.info(`[QuotaRefresh] Fetching quota for ${email} from network (force: ${forceRefresh}, reason: ${reason})`);
             
-            const snapshot = await this.reactor.fetchQuotaForAccount(email, { forceRefresh });
+            const { snapshot, fromApiCacheFile } = await this.reactor.fetchQuotaForAccountWithSource(email, { forceRefresh });
             this.lastNetworkRefreshAt.set(email, Date.now());
             
             // 3. 记录历史
-            void recordQuotaHistory(email, snapshot);
+            if (!fromApiCacheFile) {
+                void recordQuotaHistory(email, snapshot);
+            } else {
+                logger.debug(`[QuotaRefresh] Skip history record for ${email} because data comes from api cache file`);
+            }
 
             logger.info(`[QuotaRefresh] Refreshed ${email}: ${snapshot.models.length} models`);
             

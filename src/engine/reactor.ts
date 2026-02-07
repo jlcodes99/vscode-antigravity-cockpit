@@ -74,6 +74,11 @@ interface AuthorizedQuotaResponse {
     models?: Record<string, AuthorizedModelInfo>;
 }
 
+export interface AccountQuotaFetchResult {
+    snapshot: QuotaSnapshot;
+    fromApiCacheFile: boolean;
+}
+
 
 /**
  * 反应堆核心类
@@ -184,6 +189,14 @@ export class ReactorCore {
         email: string,
         options?: { forceRefresh?: boolean },
     ): Promise<QuotaSnapshot> {
+        const result = await this.fetchQuotaForAccountWithSource(email, options);
+        return result.snapshot;
+    }
+
+    async fetchQuotaForAccountWithSource(
+        email: string,
+        options?: { forceRefresh?: boolean },
+    ): Promise<AccountQuotaFetchResult> {
         logger.info(`[ReactorCore] Fetching quota for account: ${email}`);
 
         try {
@@ -201,18 +214,22 @@ export class ReactorCore {
             const projectId = credential?.projectId;
 
             // 获取配额模型（复用现有方法）
-            const models = await this.fetchAuthorizedQuotaModels(
+            const modelsResult = await this.fetchAuthorizedQuotaModelsWithSource(
                 tokenStatus.token,
                 projectId,
                 email,
                 options?.forceRefresh ?? false,
             );
+            const models = modelsResult.models;
 
             // 构建快照（复用现有分组/过滤逻辑）
             const snapshot = this.buildSnapshot(models);
             
             logger.info(`[ReactorCore] Quota for ${email}: ${models.length} models, ${snapshot.groups?.length ?? 0} groups`);
-            return snapshot;
+            return {
+                snapshot,
+                fromApiCacheFile: modelsResult.fromApiCacheFile,
+            };
         } catch (err) {
             const error = err instanceof Error ? err : new Error(String(err));
             logger.error(`[ReactorCore] Failed to fetch quota for ${email}:`, error.message);
@@ -766,11 +783,24 @@ export class ReactorCore {
         email?: string,
         forceRefresh: boolean = false,
     ): Promise<ModelQuotaInfo[]> {
+        const result = await this.fetchAuthorizedQuotaModelsWithSource(accessToken, projectId, email, forceRefresh);
+        return result.models;
+    }
+
+    private async fetchAuthorizedQuotaModelsWithSource(
+        accessToken: string,
+        projectId?: string,
+        email?: string,
+        forceRefresh: boolean = false,
+    ): Promise<{ models: ModelQuotaInfo[]; fromApiCacheFile: boolean }> {
         if (email && !forceRefresh) {
             const cached = await readQuotaApiCache('authorized', email);
             if (isApiCacheValid(cached)) {
                 try {
-                    return this.buildModelsFromAuthorizedResponse(cached!.payload as AuthorizedQuotaResponse);
+                    return {
+                        models: this.buildModelsFromAuthorizedResponse(cached!.payload as AuthorizedQuotaResponse),
+                        fromApiCacheFile: true,
+                    };
                 } catch (error) {
                     logger.warn(`[QuotaApiCache] Cached response decode failed: ${error instanceof Error ? error.message : String(error)}`);
                 }
@@ -800,7 +830,10 @@ export class ReactorCore {
             }
         }
 
-        return this.buildModelsFromAuthorizedResponse(data);
+        return {
+            models: this.buildModelsFromAuthorizedResponse(data),
+            fromApiCacheFile: false,
+        };
     }
 
     private buildModelsFromAuthorizedResponse(data: AuthorizedQuotaResponse): ModelQuotaInfo[] {

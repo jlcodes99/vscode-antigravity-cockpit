@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.16] - 2026-02-07
+
+### Fixed
+- **Quota History Write Guard**: Quota history now records only when data is fetched from real-time network responses. Reads from API cache files now skip history recording to avoid cached points polluting trend calculations.
+
+---
+
 ## [2.1.15] - 2026-02-06
 
 ### Fixed
