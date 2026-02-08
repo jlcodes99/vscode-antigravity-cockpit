@@ -8,6 +8,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.17] - 2026-02-08
+
+### Changed
+- **Local quota source**: Local mode now uses the local process API only; removed auto-import and remote API fallback.
+- **Model visibility (authorized)**: Switched to blacklist filtering; default selection shows all non-blacklisted models. On upgrade, saved `visibleModels` is reset to show all.
+- **Plan Details UI**: The Plan button is shown in local mode and hidden in authorized mode. Default visibility is restored.
+
+### Added
+- **Diagnostics**: Log full model lists for local and authorized sources.
+
+---
+
 ## [2.1.16] - 2026-02-07
 
 ### Fixed

@@ -3,7 +3,7 @@
  * 处理 Webview 交互逻辑
  */
 
-import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../shared/recommended_models';
+import { AUTH_MODEL_BLACKLIST_IDS, AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../shared/recommended_models';
 import { createHistoryModule } from './dashboard_history';
 import { createAnnouncementModule } from './dashboard_announcements';
 
@@ -123,6 +123,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
     const AUTH_RECOMMENDED_ID_KEY_RANK = new Map(
         AUTH_RECOMMENDED_MODEL_IDS.map((id, index) => [normalizeRecommendedKey(id), index])
     );
+    const AUTH_MODEL_BLACKLIST_ID_SET = new Set(AUTH_MODEL_BLACKLIST_IDS);
 
     // 自定义分组弹框状态
     const customGroupingModal = document.getElementById('custom-grouping-modal');
@@ -149,6 +150,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
         if (state.quotaSource) {
             currentQuotaSource = state.quotaSource;
         }
+        updatePlanButtonVisibility();
 
         // isProfileHidden and isDataMasked are now loaded from config in handleMessage
 
@@ -648,6 +650,15 @@ import { createAnnouncementModule } from './dashboard_announcements';
         }
     }
 
+    function updatePlanButtonVisibility() {
+        const btn = document.getElementById('toggle-profile-btn');
+        if (!btn) {
+            return;
+        }
+        const shouldShow = currentQuotaSource !== 'authorized';
+        btn.classList.toggle('hidden', !shouldShow);
+    }
+
     function handleToggleGrouping() {
         // 发送切换分组的消息给扩展
         vscode.postMessage({ command: 'toggleGrouping' });
@@ -744,6 +755,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
 
 
             }
+            updatePlanButtonVisibility();
             if (isQuotaSourceSwitching) {
                 if (message.config?.quotaSource !== pendingQuotaSource) {
                     updateQuotaSourceUI(message.data?.isConnected);
@@ -2150,10 +2162,11 @@ import { createAnnouncementModule } from './dashboard_announcements';
 
     function getModelManagerModels() {
         const models = lastSnapshot?.allModels || lastSnapshot?.models || [];
-        // Only include recommended models
-        const recommendedModels = models.filter(model => getRecommendedRank(model) < Number.MAX_SAFE_INTEGER);
-        // Use recommended rank for sorting
-        return recommendedModels.sort((a, b) => {
+        const filteredModels = currentQuotaSource === 'authorized'
+            ? models.filter(model => !AUTH_MODEL_BLACKLIST_ID_SET.has(model.modelId))
+            : models;
+        // Use recommended rank for sorting (non-recommended fall back to label order)
+        return filteredModels.sort((a, b) => {
             const aRank = getRecommendedRank(a);
             const bRank = getRecommendedRank(b);
             if (aRank !== bRank) {
@@ -2167,11 +2180,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
         const allIds = models.map(model => model.modelId);
         if (Array.isArray(visibleModelIds) && visibleModelIds.length > 0) {
             return visibleModelIds.filter(id => allIds.includes(id));
-        }
-        // Use recommended IDs for default selection for both local and authorized
-        const recommendedIds = getRecommendedIds(models).filter(id => allIds.includes(id));
-        if (recommendedIds.length > 0) {
-            return recommendedIds;
         }
         return allIds;
     }

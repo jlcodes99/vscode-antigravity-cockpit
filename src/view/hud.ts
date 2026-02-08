@@ -699,8 +699,7 @@ export class CockpitHUD {
             <button id="toggle-grouping-btn" class="refresh-btn" title="${t('grouping.toggleHint')}">
                 ${t('grouping.title')}
             </button>
-            <!-- 计划按钮已隐藏 -->
-            <button id="toggle-profile-btn" class="refresh-btn hidden" title="${t('profile.togglePlan')}">
+            <button id="toggle-profile-btn" class="refresh-btn" title="${t('profile.togglePlan')}">
                 ${t('profile.planDetails')}
             </button>
             <button id="announcement-btn" class="refresh-btn icon-only" title="${t('announcement.title')}">

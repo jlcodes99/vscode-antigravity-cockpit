@@ -22,10 +22,10 @@ import { captureError } from '../shared/error_reporter';
 import { AntigravityError, isServerError } from '../shared/errors';
 import { cloudCodeClient, CloudCodeAuthError, CloudCodeRequestError } from '../shared/cloudcode_client';
 import { autoTriggerController } from '../auto_trigger/controller';
-import { oauthService, credentialStorage, ensureLocalCredentialImported } from '../auto_trigger';
+import { oauthService, credentialStorage } from '../auto_trigger';
 import { antigravityToolsSyncService } from '../antigravityTools_sync';
 import { readQuotaApiCache, writeQuotaApiCache, isApiCacheValid } from '../services/quota_api_cache';
-import { AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../shared/recommended_models';
+import { AUTH_MODEL_BLACKLIST_IDS, AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../shared/recommended_models';
 
 const AUTH_RECOMMENDED_LABEL_RANK = new Map(
     AUTH_RECOMMENDED_LABELS.map((label, index) => [label, index]),
@@ -45,6 +45,7 @@ const AUTH_RECOMMENDED_LABEL_KEY_RANK = new Map(
 const AUTH_RECOMMENDED_ID_KEY_RANK = new Map(
     AUTH_RECOMMENDED_MODEL_IDS.map((id, index) => [normalizeRecommendedKey(id), index]),
 );
+const AUTH_MODEL_BLACKLIST_ID_SET = new Set(AUTH_MODEL_BLACKLIST_IDS);
 
 
 interface AuthorizedQuotaInfo {
@@ -114,6 +115,10 @@ export class ReactorCore {
     private localAccountEmail?: string;
     /** 本地模式是否使用远端 API */
     private localUsingRemoteApi: boolean = false;
+    /** 上次记录的本地模型列表（避免重复日志） */
+    private lastLoggedLocalModelList?: string;
+    /** 上次记录的授权模型列表（避免重复日志） */
+    private lastLoggedAuthorizedModelList?: string;
     /** 当前用户在 Antigravity 中选中的模型 ID */
     private activeModelId?: string;
 
@@ -556,7 +561,7 @@ export class ReactorCore {
             }
         }
 
-        // Local 模式：优先尝试 state.vscdb 账户 + 远端 API，失败则兜底本地进程
+        // Local 模式：仅使用本地进程 API
         try {
             const telemetry = await this.fetchLocalTelemetryWithRemoteFallback();
             this.publishTelemetry(telemetry, 'local');
@@ -566,33 +571,9 @@ export class ReactorCore {
     }
 
     /**
-     * 获取本地配额数据，优先使用远端 API（自动导入 state.vscdb 账户）
-     * 如果远端 API 失败，兜底到本地进程 API
+     * 获取本地配额数据（仅本地进程 API）
      */
     private async fetchLocalTelemetryWithRemoteFallback(): Promise<QuotaSnapshot> {
-        // 第一优先级：确保本地账户已导入，然后使用远端 API
-        try {
-            const importResult = await ensureLocalCredentialImported();
-            if (importResult) {
-                logger.info(`[LocalQuota] Using remote API with account: ${importResult.email}`);
-                
-                // 复用授权模式的逻辑获取配额
-                const telemetry = await this.fetchAuthorizedTelemetry();
-                
-                this.localAccountEmail = importResult.email;
-                this.localUsingRemoteApi = true;
-                this.lastLocalFetchedAt = Date.now();
-                
-                // 添加本地账户信息到快照
-                telemetry.localAccountEmail = importResult.email;
-                return telemetry;
-            }
-        } catch (error) {
-            const err = error instanceof Error ? error : new Error(String(error));
-            logger.warn(`[LocalQuota] Remote API failed, falling back to local process: ${err.message}`);
-        }
-
-        // 第二优先级：兜底到本地进程 API
         logger.info('[LocalQuota] Using local process API');
         this.localUsingRemoteApi = false;
         this.localAccountEmail = undefined;
@@ -891,6 +872,7 @@ export class ReactorCore {
         }
 
         models.sort((a, b) => a.label.localeCompare(b.label));
+        this.logModelList('authorized', models);
         return models;
     }
     /**
@@ -1146,7 +1128,34 @@ export class ReactorCore {
             return a.label.localeCompare(b.label);
         });
 
+        this.logModelList('local', models);
         return this.buildSnapshot(models, promptCredits, userInfo);
+    }
+
+    private logModelList(source: 'local' | 'authorized', models: ModelQuotaInfo[]): void {
+        if (models.length === 0) {
+            return;
+        }
+
+        const items = models.map(model => ({
+            modelId: model.modelId,
+            label: model.label,
+            isRecommended: model.isRecommended,
+            tagTitle: model.tagTitle,
+        }));
+        const payload = JSON.stringify(items);
+        const lastPayload = source === 'local'
+            ? this.lastLoggedLocalModelList
+            : this.lastLoggedAuthorizedModelList;
+        if (payload === lastPayload) {
+            return;
+        }
+        if (source === 'local') {
+            this.lastLoggedLocalModelList = payload;
+        } else {
+            this.lastLoggedAuthorizedModelList = payload;
+        }
+        logger.info(`[ModelList:${source}] count=${items.length} items=${payload}`);
     }
 
     private buildSnapshot(
@@ -1157,8 +1166,10 @@ export class ReactorCore {
         const config = configService.getConfig();
         const allModels = [...models];
 
-        // 首先过滤只保留推荐模型
-        models = models.filter(model => this.getAuthorizedRecommendedRank(model) < Number.MAX_SAFE_INTEGER);
+        // 授权模式：应用黑名单过滤（本地模式不过滤）
+        if (config.quotaSource === 'authorized') {
+            models = models.filter(model => !AUTH_MODEL_BLACKLIST_ID_SET.has(model.modelId));
+        }
 
         const visibleModels = config.visibleModels ?? [];
         if (visibleModels.length > 0) {
@@ -1383,17 +1394,9 @@ export class ReactorCore {
         return snapshot;
     }
 
-    private getAuthorizedRecommendedIds(models: ModelQuotaInfo[]): string[] {
+    private getAuthorizedDefaultVisibleIds(models: ModelQuotaInfo[]): string[] {
         return models
-            .filter(model => this.getAuthorizedRecommendedRank(model) < Number.MAX_SAFE_INTEGER)
-            .sort((a, b) => {
-                const aRank = this.getAuthorizedRecommendedRank(a);
-                const bRank = this.getAuthorizedRecommendedRank(b);
-                if (aRank !== bRank) {
-                    return aRank - bRank;
-                }
-                return a.label.localeCompare(b.label);
-            })
+            .filter(model => !AUTH_MODEL_BLACKLIST_ID_SET.has(model.modelId))
             .map(model => model.modelId);
     }
 
@@ -1432,9 +1435,9 @@ export class ReactorCore {
             return;
         }
 
-        const recommendedIds = this.getAuthorizedRecommendedIds(models);
-        const defaultVisible = recommendedIds.length > 0
-            ? recommendedIds
+        const allowedIds = this.getAuthorizedDefaultVisibleIds(models);
+        const defaultVisible = allowedIds.length > 0
+            ? allowedIds
             : models.map(model => model.modelId);
         await configService.updateVisibleModels(defaultVisible);
         await configService.setStateFlag('visibleModelsInitializedAuthorized', true);

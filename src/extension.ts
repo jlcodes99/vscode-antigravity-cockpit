@@ -94,6 +94,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const packageJson = await import('../package.json');
     const version = packageJson.version || 'unknown';
 
+    // 版本升级时重置可见模型（visibleModels 置空，显示全部）
+    const lastVersion = context.globalState.get<string>('state.lastVersion');
+    if (lastVersion !== version) {
+        logger.info(`[Startup] Version changed (${lastVersion ?? 'none'} -> ${version}), reset visibleModels`);
+        await configService.updateVisibleModels([]);
+        await context.globalState.update('state.lastVersion', version);
+    }
+
     // 初始化错误上报服务（放在日志之后，其他模块之前）
     initErrorReporter(version);
 
