@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.18] - 2026-02-09
+
+### Changed
+- **Extension Host Mode**: Set `extensionKind` to `["workspace"]` to run the extension in workspace host by default, improving Linux/server-side process detection and local process API stability.
+
+### Improved
+- **Startup Diagnostics**: Enhanced startup logs for local account auto-detection and process scanner path to make server-mode troubleshooting clearer.
+
+---
+
 ## [2.1.17] - 2026-02-08
 
 ### Changed
