@@ -275,7 +275,7 @@ export const ptBR = {
     'quotaSource.authorizedInfoTitle': 'Busca a cota via APIs remotas autorizadas. Não depende do processo local, ideal para relay de API ou uso sem o cliente Antigravity.',
     'quotaSource.localLoadingTitle': 'Detectando Antigravity local...',
     'quotaSource.localLoadingDesc': 'Mantenha o cliente Antigravity em execução. Você pode alternar para o monitoramento autorizado a qualquer momento.',
-    'quotaSource.authorizedLoadingTitle': 'Carregando cota autorizada...',
+    'quotaSource.authorizedLoadingTitle': 'Carregando cota...',
     'quotaSource.authorizedLoadingDesc': 'Buscando dados de cota na API remota.',
     'quotaSource.localOfflineTitle': 'Monitoramento local indisponível',
     'quotaSource.authorizedOfflineTitle': 'Monitoramento autorizado indisponível',
@@ -588,6 +588,9 @@ export const ptBR = {
     // Added missing keys from en.ts
     'customGrouping.other': 'Outro',
     'customGrouping.smartGroupCount': 'Grupo automático: {count} grupos',
+    'customGrouping.ungroupedCount': '{count} model(s) unmatched',
+    'customGrouping.newModelsDetected': 'Detected {count} new model(s) not in any group: {names}. Go to Group Management to configure.',
+    'common.dismiss': 'Dismiss',
     'groupNode.group': 'Grupo',
     'groupNode.quota': 'Cota',
     'groupNode.reset': 'Redefinir',

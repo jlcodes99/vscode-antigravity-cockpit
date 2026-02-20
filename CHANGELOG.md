@@ -8,6 +8,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.21] - 2026-02-20
+
+### Improved
+- **Card Layout Compactness**: Reduced card title font size, tightened spacing, and shrunk drag handles and action buttons for a more compact and information-dense dashboard layout.
+- **Model Name Tooltip**: All model names now show a rich tooltip on hover, displaying the full model name (first row) followed by capability details. Removed the standalone ✨ sparkle icon; hovering the model name itself now triggers the tooltip.
+- **New Tag Animation**: Model "New" tags now use a transient burst animation that plays a short pulsing effect when the panel becomes visible, then hides automatically after a few seconds. Tags no longer animate indefinitely.
+- **Panel Visibility Awareness**: The HUD panel now notifies the webview when it becomes visible (via reveal, tab switch, or serializer restore), enabling visibility-dependent UI behaviors like the New tag burst.
+
+### Changed
+- **Default Group Definitions**: Updated default auto-group definitions — renamed "Claude 4.5" to "Claude 4" (now includes GPT-OSS 120B Medium, Claude Opus 4.6, Claude Sonnet 4.6), added Gemini 3.1 Pro models to the G3-Pro group, and renamed "G3-Image" display name to "Gemini 3 Pro Image".
+- **Authorized Model Coverage**: The authorized model list now includes all models with valid quota and display names (not just those in the Recommended sort). Fallback models are appended in recommended-rank order, preventing models from being silently hidden.
+- **GCP ToS Routing**: Authorized quota and project-ID resolution requests now pass the `isGcpTos` route flag, enabling correct endpoint routing for GCP Terms-of-Service accounts.
+- **Official Quota Flow Alignment**: Quota retrieval is now fully aligned with the official authorized flow. The deprecated local mode and its related switching entry points have been removed to reduce branching complexity and improve behavior consistency.
+
+### Fixed
+- **Missing ProjectId on Batch Refresh**: When an account's `projectId` is not cached, batch quota refresh now automatically resolves it via `resolveProjectId` before fetching models, instead of failing silently.
+- **Status Dot Removed**: Removed the redundant colored status dot from card title bars; the progress circle already conveys the same information.
+
+---
+
 ## [2.1.20] - 2026-02-11
 
 ### Added

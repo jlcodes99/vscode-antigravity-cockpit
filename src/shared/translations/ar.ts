@@ -282,7 +282,7 @@ export const ar = {
     'quotaSource.authorizedInfoTitle': 'يجلب الحصة عبر واجهات برمجة التطبيقات البعيدة المصرح بها. غير مرتبط بالعملية المحلية. الأفضل لترحيل واجهة برمجة التطبيقات أو الاستخدام بدون عميل Antigravity.',
     'quotaSource.localLoadingTitle': 'جارِ اكتشاف Antigravity المحلي...',
     'quotaSource.localLoadingDesc': 'أبقِ عميل Antigravity قيد التشغيل. يمكنك التبديل إلى المراقبة المصرح بها في أي وقت.',
-    'quotaSource.authorizedLoadingTitle': 'جارِ تحميل الحصة المصرح بها...',
+    'quotaSource.authorizedLoadingTitle': 'جارِ تحميل الحصة...',
     'quotaSource.authorizedLoadingDesc': 'جلب بيانات الحصة من واجهة برمجة التطبيقات البعيدة.',
     'quotaSource.localOfflineTitle': 'المراقبة المحلية غير متاحة',
     'quotaSource.authorizedOfflineTitle': 'المراقبة المصرح بها غير متاحة',
@@ -589,6 +589,9 @@ export const ar = {
     // Added missing keys from en.ts
     'customGrouping.other': 'Other',
     'customGrouping.smartGroupCount': 'Auto Group: {count} groups',
+    'customGrouping.ungroupedCount': '{count} model(s) unmatched',
+    'customGrouping.newModelsDetected': 'Detected {count} new model(s) not in any group: {names}. Go to Group Management to configure.',
+    'common.dismiss': 'Dismiss',
     'groupNode.group': 'Group',
     'groupNode.quota': 'Quota',
     'groupNode.reset': 'Reset',

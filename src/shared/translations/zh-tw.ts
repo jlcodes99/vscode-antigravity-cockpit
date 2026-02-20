@@ -168,6 +168,9 @@ export const zhTW = {
     'customGrouping.emptyGroupWarning': '存在空分組，是否繼續保存？',
     'customGrouping.other': '其他',
     'customGrouping.smartGroupCount': '自動分組：共 {count} 個分組',
+    'customGrouping.ungroupedCount': '{count} model(s) unmatched',
+    'customGrouping.newModelsDetected': 'Detected {count} new model(s) not in any group: {names}. Go to Group Management to configure.',
+    'common.dismiss': 'Dismiss',
 
     // 分組節點 Tooltip
     'groupNode.group': '分組',
@@ -293,7 +296,7 @@ export const zhTW = {
     'quotaSource.authorizedInfoTitle': '透過授權存取遠端介面取得配額，不依賴本地進程，適用於 API 中轉或無需啟動 Antigravity 客戶端的情境。',
     'quotaSource.localLoadingTitle': '正在偵測本地 Antigravity...',
     'quotaSource.localLoadingDesc': '請保持 Antigravity 用戶端運行，可隨時切換到授權監控。',
-    'quotaSource.authorizedLoadingTitle': '正在載入授權配額...',
+    'quotaSource.authorizedLoadingTitle': '正在載入配額...',
     'quotaSource.authorizedLoadingDesc': '正在從遠端 API 取得配額資料。',
     'quotaSource.localOfflineTitle': '本地監控不可用',
     'quotaSource.authorizedOfflineTitle': '授權監控不可用',

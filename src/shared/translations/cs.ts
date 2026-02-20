@@ -275,7 +275,7 @@ export const cs = {
     'quotaSource.authorizedInfoTitle': 'Získává kvótu přes autorizovaná vzdálená API. Nezávisí na místním procesu, vhodné pro API relay nebo použití bez klienta Antigravity.',
     'quotaSource.localLoadingTitle': 'Zjišťuji místní Antigravity...',
     'quotaSource.localLoadingDesc': 'Nechte klienta Antigravity spuštěného. Kdykoliv můžete přepnout na autorizované monitorování.',
-    'quotaSource.authorizedLoadingTitle': 'Načítám autorizovanou kvótu...',
+    'quotaSource.authorizedLoadingTitle': 'Načítám kvótu...',
     'quotaSource.authorizedLoadingDesc': 'Načítání kvóty z vzdáleného API.',
     'quotaSource.localOfflineTitle': 'Místní monitorování není dostupné',
     'quotaSource.authorizedOfflineTitle': 'Autorizované monitorování není dostupné',
@@ -552,6 +552,9 @@ export const cs = {
     // Added missing keys from en.ts
     'customGrouping.other': 'Other',
     'customGrouping.smartGroupCount': 'Auto Group: {count} groups',
+    'customGrouping.ungroupedCount': '{count} model(s) unmatched',
+    'customGrouping.newModelsDetected': 'Detected {count} new model(s) not in any group: {names}. Go to Group Management to configure.',
+    'common.dismiss': 'Dismiss',
     'groupNode.group': 'Group',
     'groupNode.quota': 'Quota',
     'groupNode.reset': 'Reset',

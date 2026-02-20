@@ -290,7 +290,7 @@ export const en = {
     'quotaSource.authorizedInfoTitle': 'Fetches quota via authorized remote APIs. Not tied to the local process. Best for API relay or use without the Antigravity client.',
     'quotaSource.localLoadingTitle': 'Detecting local Antigravity...',
     'quotaSource.localLoadingDesc': 'Keep the Antigravity client running. You can switch to authorized monitoring anytime.',
-    'quotaSource.authorizedLoadingTitle': 'Loading authorized quota...',
+    'quotaSource.authorizedLoadingTitle': 'Loading quota...',
     'quotaSource.authorizedLoadingDesc': 'Fetching quota data from the remote API.',
     'quotaSource.localOfflineTitle': 'Local monitoring unavailable',
     'quotaSource.authorizedOfflineTitle': 'Authorized monitoring unavailable',

@@ -53,7 +53,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
     let renameModelIds = [];  // 当前分组包含的模型 ID
     let renameModelId = null; // 当前正在重命名的模型 ID（非分组模式）
     let isRenamingModel = false; // 标记是否正在重命名模型（而非分组）
-    let currentQuotaSource = 'local';
+    let currentQuotaSource = 'authorized';
     let isQuotaSourceSwitching = false;
     let pendingQuotaSource = null;
     let authorizedAvailable = false;
@@ -150,9 +150,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 startCooldown(state.refreshCooldown - diff);
             }
         }
-        if (state.quotaSource) {
-            currentQuotaSource = state.quotaSource;
-        }
+        currentQuotaSource = 'authorized';
         updatePlanButtonVisibility();
 
         // isProfileHidden and isDataMasked are now loaded from config in handleMessage
@@ -188,15 +186,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
         if (settingsBtn) {
             settingsBtn.addEventListener('click', openSettingsModal);
         }
-
-        // 配额来源切换
-        const quotaSourceButtons = document.querySelectorAll('.quota-source-btn');
-        quotaSourceButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const source = btn.dataset.source;
-                requestQuotaSourceChange(source);
-            });
-        });
 
         // 关闭设置模态框
         const closeSettingsBtn = document.getElementById('close-settings-btn');
@@ -743,7 +732,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 }
                 if (message.config.quotaSource) {
                     if (!isQuotaSourceSwitching || message.config.quotaSource === pendingQuotaSource) {
-                        currentQuotaSource = message.config.quotaSource;
+                        currentQuotaSource = 'authorized';
                         vscode.setState({ ...vscode.getState(), quotaSource: currentQuotaSource });
                     }
                 }
@@ -909,9 +898,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
     }
 
     function requestQuotaSourceChange(source, options = {}) {
-        if (!source) {
-            return;
-        }
+        source = 'authorized';
         const force = options.force === true;
         if (!force) {
             if (!isQuotaSourceSwitching && source === currentQuotaSource) {
@@ -1801,8 +1788,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
             
             row.innerHTML = `
                 <div class="quota-auth-info quota-auth-info-clickable" title="${escapeHtml(i18n['autoTrigger.manageAccounts'])}">
-                    <span class="quota-auth-icon">✅</span>
-                    <span class="quota-auth-text">${escapeHtml(i18n['autoTrigger.authorized'])}</span>
                     <span class="quota-auth-email">${escapeHtml(activeEmail)}</span>
                     ${accountCountBadge}
                     ${manageBtn}
@@ -2103,17 +2088,8 @@ import { createAnnouncementModule } from './dashboard_announcements';
             <div class="icon offline-spinner"><span class="spinner"></span></div>
             <h2>${i18n['quotaSource.localLoadingTitle'] || 'Detecting local Antigravity...'}</h2>
             <p>${i18n['quotaSource.localLoadingDesc'] || 'Keep the Antigravity client running. You can switch to authorized monitoring anytime.'}</p>
-            <div class="offline-actions">
-                <button class="btn-secondary" data-action="switch-authorized">
-                    ${i18n['quotaSource.switchToAuthorized'] || 'Switch to Authorized'}
-                </button>
-            </div>
         `;
         dashboard.appendChild(card);
-        const switchBtn = card.querySelector('[data-action="switch-authorized"]');
-        switchBtn?.addEventListener('click', () => {
-            requestQuotaSourceChange('authorized', { force: true });
-        });
     }
 
     function renderAuthorizedLoadingCard() {
@@ -2121,19 +2097,10 @@ import { createAnnouncementModule } from './dashboard_announcements';
         card.className = 'offline-card authorized-card';
         card.innerHTML = `
             <div class="icon offline-spinner"><span class="spinner"></span></div>
-            <h2>${i18n['quotaSource.authorizedLoadingTitle'] || 'Loading authorized quota...'}</h2>
+            <h2>${i18n['quotaSource.authorizedLoadingTitle'] || 'Loading quota...'}</h2>
             <p>${i18n['quotaSource.authorizedLoadingDesc'] || 'Fetching quota data from the remote API.'}</p>
-            <div class="offline-actions">
-                <button class="btn-secondary" data-action="switch-local">
-                    ${i18n['quotaSource.switchToLocal'] || 'Switch to Local'}
-                </button>
-            </div>
         `;
         dashboard.appendChild(card);
-        const switchBtn = card.querySelector('[data-action="switch-local"]');
-        switchBtn?.addEventListener('click', () => {
-            requestQuotaSourceChange('local', { force: true });
-        });
     }
 
     function getRecommendedRank(model) {
@@ -2177,18 +2144,12 @@ import { createAnnouncementModule } from './dashboard_announcements';
 
     function getModelManagerModels() {
         const models = lastSnapshot?.allModels || lastSnapshot?.models || [];
-        const filteredModels = currentQuotaSource === 'authorized'
-            ? models.filter(model => !AUTH_MODEL_BLACKLIST_ID_SET.has(model.modelId))
-            : models;
-        // Use recommended rank for sorting (non-recommended fall back to label order)
-        return filteredModels.sort((a, b) => {
-            const aRank = getRecommendedRank(a);
-            const bRank = getRecommendedRank(b);
-            if (aRank !== bRank) {
-                return aRank - bRank;
-            }
-            return (a.label || '').localeCompare(b.label || '');
-        });
+        // 与官方一致：直接使用后端返回顺序（agentModelSorts -> groups -> modelIds）
+        // 这里只做过滤，不再前端二次排序。
+        if (currentQuotaSource === 'authorized') {
+            return models.filter(model => !AUTH_MODEL_BLACKLIST_ID_SET.has(model.modelId));
+        }
+        return [...models];
     }
 
     function getDefaultVisibleModelIds(models) {
@@ -2596,18 +2557,11 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 <button class="btn-secondary" data-action="retry-local">
                     ${i18n['quotaSource.retryLocal'] || (i18n['help.retry'] || 'Retry')}
                 </button>
-                <button class="btn-primary" data-action="switch-authorized">
-                    ${i18n['quotaSource.switchToAuthorized'] || 'Switch to Authorized'}
-                </button>
             </div>
         `;
         dashboard.appendChild(card);
         const retryBtn = card.querySelector('[data-action="retry-local"]');
-        const switchBtn = card.querySelector('[data-action="switch-authorized"]');
         retryBtn?.addEventListener('click', retryConnection);
-        switchBtn?.addEventListener('click', () => {
-            requestQuotaSourceChange('authorized', { force: true });
-        });
     }
 
     function renderAuthorizedOfflineCard(errorMessage) {
@@ -2627,20 +2581,13 @@ import { createAnnouncementModule } from './dashboard_announcements';
             <p>${description}</p>
             ${detail}
             <div class="offline-actions">
-                <button class="btn-secondary" data-action="switch-local">
-                    ${i18n['quotaSource.switchToLocal'] || 'Switch to Local'}
-                </button>
                 <button class="btn-primary" data-action="authorized-primary">
                     ${isAuthorized ? (i18n['dashboard.refresh'] || 'Refresh') : (i18n['autoTrigger.authorizeBtn'] || 'Authorize')}
                 </button>
             </div>
         `;
         dashboard.appendChild(card);
-        const switchBtn = card.querySelector('[data-action="switch-local"]');
         const primaryBtn = card.querySelector('[data-action="authorized-primary"]');
-        switchBtn?.addEventListener('click', () => {
-            requestQuotaSourceChange('local', { force: true });
-        });
         if (isAuthorized) {
             primaryBtn?.addEventListener('click', handleRefresh);
         } else {
@@ -2803,7 +2750,13 @@ import { createAnnouncementModule } from './dashboard_announcements';
 
     function renderCustomGroupingContent() {
         const groupsList = document.getElementById('custom-groups-list');
-        if (!groupsList) return;
+        const ungroupedList = document.getElementById('ungrouped-models-list');
+
+        if (!groupsList || !ungroupedList) return;
+
+        // 获取已分组的模型 ID
+        const groupedModelIds = new Set();
+        customGroupingState.groups.forEach(g => g.modelIds.forEach(id => groupedModelIds.add(id)));
 
         // 渲染分组列表
         if (customGroupingState.groups.length === 0) {
@@ -2855,6 +2808,24 @@ import { createAnnouncementModule } from './dashboard_announcements';
             groupsList.querySelectorAll('.custom-group-name input').forEach(input => {
                 input.addEventListener('change', handleGroupNameChange);
             });
+        }
+
+        // 渲染未分组模型
+        const ungroupedModels = customGroupingState.allModels.filter(m => !groupedModelIds.has(m.modelId));
+
+        if (ungroupedModels.length === 0) {
+            ungroupedList.innerHTML = `<div style="color: var(--text-secondary); font-size: 12px;">${i18n['customGrouping.noModels'] || 'All models are grouped'}</div>`;
+        } else {
+            ungroupedList.innerHTML = ungroupedModels.map(model => {
+                const name = currentConfig.modelCustomNames?.[model.modelId] || model.label;
+                const quotaPct = (model.remainingPercentage || 0).toFixed(0);
+                return `
+                    <div class="ungrouped-model-item" data-model-id="${escapeHtml(model.modelId)}" title="${escapeHtml(model.modelId)}">
+                        ${escapeHtml(name)}
+                        <span class="quota-badge">${quotaPct}%</span>
+                    </div>
+                `;
+            }).join('');
         }
 
     }

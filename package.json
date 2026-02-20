@@ -3,7 +3,7 @@
   "displayName": "Antigravity Cockpit",
   "icon": "assets/icon.png",
   "description": "A premium, dashboard-style quota monitor for Antigravity AI.",
-  "version": "2.1.20",
+  "version": "2.1.21",
   "publisher": "jlcodes",
   "engines": {
     "vscode": "^1.90.0"
@@ -226,14 +226,14 @@
         },
         "agCockpit.quotaSource": {
           "type": "string",
-          "default": "local",
+          "default": "authorized",
           "enum": [
             "local",
             "authorized"
           ],
           "enumDescriptions": [
-            "Local process (default)",
-            "Authorized account"
+            "Local process",
+            "Authorized account (default)"
           ],
           "description": "Quota source. Use authorized account to fetch quota without local process."
         },

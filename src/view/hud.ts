@@ -754,14 +754,6 @@ export class CockpitHUD {
         <button class="tab-btn" data-tab="history">📈 ${t('history.tabTitle')}</button>
         <div id="quota-source-info" class="quota-source-info hidden"></div>
         <div class="tab-spacer"></div>
-        <div class="quota-source-toggle">
-            <span class="quota-source-label">${t('quotaSource.title')}</span>
-            <div class="quota-source-buttons">
-                <button type="button" class="quota-source-btn" data-source="local">${t('quotaSource.local')}</button>
-                <button type="button" class="quota-source-btn" data-source="authorized">${t('quotaSource.authorized')}</button>
-            </div>
-            <span class="quota-source-status" data-state="ok" title="${t('quotaSource.title')}"></span>
-        </div>
     </nav>
 
     <!-- Quota Tab Content -->
@@ -1516,6 +1508,13 @@ export class CockpitHUD {
                         <h4>📦 ${i18n.t('customGrouping.groupList')}</h4>
                         <div id="custom-groups-list" class="custom-groups-list">
                             <!-- Groups will be rendered here -->
+                        </div>
+                    </div>
+                    <div class="ungrouped-section">
+                        <h4>🎲 ${i18n.t('customGrouping.ungrouped')}</h4>
+                        <p class="ungrouped-hint">${i18n.t('customGrouping.ungroupedHint')}</p>
+                        <div id="ungrouped-models-list" class="ungrouped-models-list">
+                            <!-- Ungrouped models will be rendered here -->
                         </div>
                     </div>
                 </div>

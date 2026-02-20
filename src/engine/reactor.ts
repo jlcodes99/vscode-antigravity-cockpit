@@ -25,27 +25,6 @@ import { autoTriggerController } from '../auto_trigger/controller';
 import { oauthService, credentialStorage } from '../auto_trigger';
 import { antigravityToolsSyncService } from '../antigravityTools_sync';
 import { readQuotaApiCache, writeQuotaApiCache, isApiCacheValid } from '../services/quota_api_cache';
-import { AUTH_MODEL_BLACKLIST_IDS, AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../shared/recommended_models';
-
-const AUTH_RECOMMENDED_LABEL_RANK = new Map(
-    AUTH_RECOMMENDED_LABELS.map((label, index) => [label, index]),
-);
-
-const AUTH_RECOMMENDED_ID_RANK = new Map(
-    AUTH_RECOMMENDED_MODEL_IDS.map((id, index) => [id, index]),
-);
-
-const normalizeRecommendedKey = (value: string): string =>
-    value.toLowerCase().replace(/[^a-z0-9]/g, '');
-
-const AUTH_RECOMMENDED_LABEL_KEY_RANK = new Map(
-    AUTH_RECOMMENDED_LABELS.map((label, index) => [normalizeRecommendedKey(label), index]),
-);
-
-const AUTH_RECOMMENDED_ID_KEY_RANK = new Map(
-    AUTH_RECOMMENDED_MODEL_IDS.map((id, index) => [normalizeRecommendedKey(id), index]),
-);
-const AUTH_MODEL_BLACKLIST_ID_SET = new Set(AUTH_MODEL_BLACKLIST_IDS);
 
 
 interface AuthorizedQuotaInfo {
@@ -56,6 +35,7 @@ interface AuthorizedQuotaInfo {
 interface AuthorizedModelInfo {
     displayName?: string;
     model?: string;
+    disabled?: boolean;
     quotaInfo?: AuthorizedQuotaInfo;
     // 模型能力字段
     supportsImages?: boolean;
@@ -90,9 +70,8 @@ export interface AccountQuotaFetchResult {
     fromApiCacheFile: boolean;
 }
 
-const AUTHORIZED_PRIMARY_SORT_NAME = 'recommended';
-const AUTHORIZED_FIXED_MODEL_KEY = 'gemini-3-pro-image';
-const AUTHORIZED_FIXED_MODEL_ID = 'MODEL_PLACEHOLDER_M9';
+const AUTHORIZED_EXTRA_IMAGE_MODEL_KEY = 'gemini-3-pro-image';
+const AUTHORIZED_EXTRA_IMAGE_MODEL_ID = 'MODEL_PLACEHOLDER_M9';
 
 
 /**
@@ -788,7 +767,6 @@ export class ReactorCore {
             return this.fetchAuthorizedTelemetry(retryCount + 1);
         }
         this.lastAuthorizedModels = models;
-        await this.ensureAuthorizedVisibleModels(models);
         return this.buildSnapshot(models);
     }
 
@@ -884,49 +862,44 @@ export class ReactorCore {
             if (!info) {
                 continue;
             }
+            if (info.disabled) {
+                continue;
+            }
+
             const quotaInfo = info.quotaInfo;
-            if (!quotaInfo) {
-                continue;
-            }
+            const rawRemainingFraction = quotaInfo?.remainingFraction;
+            const remainingFraction = typeof rawRemainingFraction === 'number'
+                && rawRemainingFraction >= 0
+                && rawRemainingFraction <= 1
+                ? rawRemainingFraction
+                : undefined;
 
-            const displayName = info.displayName?.trim();
-            if (!displayName) {
-                logger.debug(`[AuthorizedQuota] Skip model without displayName: ${modelKey}`);
-                continue;
-            }
-
-            const remainingFraction = Math.min(1, Math.max(0, quotaInfo.remainingFraction ?? 0));
-            
-            let resetTime: Date;
-            let resetTimeValid = true;
-            if (quotaInfo.resetTime) {
+            let resetTime = new Date(0);
+            let resetTimeValid = false;
+            if (quotaInfo?.resetTime) {
                 const parsed = new Date(quotaInfo.resetTime);
                 if (!Number.isNaN(parsed.getTime())) {
                     resetTime = parsed;
+                    resetTimeValid = parsed.getTime() > now;
                 } else {
-                    resetTime = new Date(now + 24 * 60 * 60 * 1000);
-                    resetTimeValid = false;
                     logger.warn(`[AuthorizedQuota] Invalid resetTime for model ${modelKey}: ${quotaInfo.resetTime}`);
                 }
-            } else {
-                resetTime = new Date(now + 24 * 60 * 60 * 1000);
-                resetTimeValid = false;
             }
-            
-            const timeUntilReset = Math.max(0, resetTime.getTime() - now);
+
+            const timeUntilReset = resetTimeValid ? Math.max(0, resetTime.getTime() - now) : 0;
             const modelId = info.model || modelKey;
-            const label = displayName;
+            const label = info.displayName?.trim() || modelKey;
 
             models.push({
                 label,
                 modelId,
                 remainingFraction,
-                remainingPercentage: remainingFraction * 100,
-                isExhausted: remainingFraction <= 0,
+                remainingPercentage: remainingFraction !== undefined ? remainingFraction * 100 : undefined,
+                isExhausted: remainingFraction === 0,
                 resetTime,
                 resetTimeDisplay: resetTimeValid ? this.formatIso(resetTime) : (t('common.unknown') || 'Unknown'),
                 timeUntilReset,
-                timeUntilResetFormatted: resetTimeValid ? this.formatDelta(timeUntilReset) : (t('common.unknown') || 'Unknown'),
+                timeUntilResetFormatted: resetTimeValid ? this.formatDelta(timeUntilReset) : (t('dashboard.online') || 'Quota available'),
                 resetTimeValid,
                 supportsImages: info.supportsImages,
                 isRecommended: info.recommended,
@@ -946,55 +919,36 @@ export class ReactorCore {
 
         const orderedKeys: string[] = [];
         const added = new Set<string>();
-        const pushIdentifier = (identifier?: string): void => {
-            if (!identifier) {
-                return;
-            }
-            const key = this.resolveAuthorizedModelKeyByIdentifier(data.models!, identifier);
-            if (!key || added.has(key)) {
-                return;
-            }
-            added.add(key);
-            orderedKeys.push(key);
-        };
 
-        const recommendedSort = (data.agentModelSorts ?? []).find(sort =>
-            (sort.displayName ?? '').trim().toLowerCase() === AUTHORIZED_PRIMARY_SORT_NAME,
-        );
-
-        for (const group of recommendedSort?.groups ?? []) {
-            for (const modelIdentifier of group.modelIds ?? []) {
-                pushIdentifier(modelIdentifier);
-            }
-        }
-
-        // 始终追加图像模型（若存在）
-        pushIdentifier(AUTHORIZED_FIXED_MODEL_KEY);
-        pushIdentifier(AUTHORIZED_FIXED_MODEL_ID);
-
-        // 官方接口的 Recommended 分组可能不会覆盖全部可展示模型。
-        // 这里补全：把其余“有配额 + 有名称”的模型按推荐优先级追加，避免漏显示。
-        const fallbackKeys = Object.entries(data.models)
-            .filter(([, info]) => !!info?.quotaInfo && !!info?.displayName?.trim())
-            .sort(([aKey, aInfo], [bKey, bInfo]) => {
-                const rankA = this.getAuthorizedRecommendedRankFromRaw(aKey, aInfo);
-                const rankB = this.getAuthorizedRecommendedRankFromRaw(bKey, bInfo);
-                if (rankA !== rankB) {
-                    return rankA - rankB;
+        for (const sort of data.agentModelSorts ?? []) {
+            for (const group of sort.groups ?? []) {
+                for (const modelIdentifier of group.modelIds ?? []) {
+                    if (!Object.prototype.hasOwnProperty.call(data.models, modelIdentifier)) {
+                        logger.debug(`[AuthorizedQuota] Model ${modelIdentifier} not found in available models`);
+                        continue;
+                    }
+                    if (added.has(modelIdentifier)) {
+                        continue;
+                    }
+                    added.add(modelIdentifier);
+                    orderedKeys.push(modelIdentifier);
                 }
-                const labelA = (aInfo.displayName ?? '').trim();
-                const labelB = (bInfo.displayName ?? '').trim();
-                return labelA.localeCompare(labelB);
-            })
-            .map(([key]) => key);
-
-        for (const key of fallbackKeys) {
-            if (added.has(key)) {
-                continue;
             }
-            added.add(key);
-            orderedKeys.push(key);
         }
+
+        // 在官方列表基础上补入 Gemini 3 Pro Image（若接口返回且未包含）
+        this.pushAuthorizedModelKeyIfExists(
+            data.models,
+            AUTHORIZED_EXTRA_IMAGE_MODEL_KEY,
+            added,
+            orderedKeys,
+        );
+        this.pushAuthorizedModelKeyByModelIdIfExists(
+            data.models,
+            AUTHORIZED_EXTRA_IMAGE_MODEL_ID,
+            added,
+            orderedKeys,
+        );
 
         if (orderedKeys.length === 0) {
             logger.warn('[AuthorizedQuota] No model found from available models response');
@@ -1003,28 +957,36 @@ export class ReactorCore {
         return orderedKeys;
     }
 
-    private resolveAuthorizedModelKeyByIdentifier(
+    private pushAuthorizedModelKeyIfExists(
         modelMap: Record<string, AuthorizedModelInfo>,
-        identifier: string,
-    ): string | null {
-        const normalized = identifier.trim().toLowerCase();
-        if (!normalized) {
-            return null;
+        modelKey: string,
+        added: Set<string>,
+        orderedKeys: string[],
+    ): void {
+        if (!Object.prototype.hasOwnProperty.call(modelMap, modelKey) || added.has(modelKey)) {
+            return;
         }
+        added.add(modelKey);
+        orderedKeys.push(modelKey);
+    }
 
-        for (const modelKey of Object.keys(modelMap)) {
-            if (modelKey.trim().toLowerCase() === normalized) {
-                return modelKey;
-            }
-        }
-
+    private pushAuthorizedModelKeyByModelIdIfExists(
+        modelMap: Record<string, AuthorizedModelInfo>,
+        modelId: string,
+        added: Set<string>,
+        orderedKeys: string[],
+    ): void {
         for (const [modelKey, info] of Object.entries(modelMap)) {
-            if ((info.model ?? '').trim().toLowerCase() === normalized) {
-                return modelKey;
+            if (added.has(modelKey)) {
+                continue;
             }
+            if ((info.model ?? '').trim() !== modelId) {
+                continue;
+            }
+            added.add(modelKey);
+            orderedKeys.push(modelKey);
+            return;
         }
-
-        return null;
     }
     /**
      * 检查配额重置并触发自动唤醒
@@ -1316,11 +1278,6 @@ export class ReactorCore {
     ): QuotaSnapshot {
         const config = configService.getConfig();
         const allModels = [...models];
-
-        // 授权模式：应用黑名单过滤（本地模式不过滤）
-        if (config.quotaSource === 'authorized') {
-            models = models.filter(model => !AUTH_MODEL_BLACKLIST_ID_SET.has(model.modelId));
-        }
 
         const visibleModels = config.visibleModels ?? [];
         if (visibleModels.length > 0) {

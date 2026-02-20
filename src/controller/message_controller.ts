@@ -40,12 +40,15 @@ export class MessageController {
     private async applyQuotaSourceChange(
         source: 'local' | 'authorized',
     ): Promise<void> {
+        const requestedSource = source;
+        source = 'authorized';
         const previousSource = configService.getConfig().quotaSource;
 
-        if (source === 'authorized') {
-            this.reactor.cancelInitRetry();
-        }
+        this.reactor.cancelInitRetry();
 
+        if (requestedSource !== 'authorized') {
+            logger.info(`Quota source switch request ignored (${requestedSource}), forcing authorized mode`);
+        }
         logger.info(`User changed quota source: ${previousSource} -> ${source}`);
         await configService.updateConfig('quotaSource', source);
         // 验证保存是否成功
@@ -64,11 +67,7 @@ export class MessageController {
 
         // 如果配额来源发生变化，触发完整初始化流程
         if (previousSource !== source) {
-            if (source === 'local') {
-                await this.onRetry();
-            } else {
-                this.reactor.syncTelemetry();
-            }
+            this.reactor.syncTelemetry();
             return;
         }
 

@@ -275,7 +275,7 @@ export const pl = {
     'quotaSource.authorizedInfoTitle': 'Pobiera limit przez autoryzowane zdalne API. Niezależne od procesu lokalnego, idealne do użycia bez klienta Antigravity lub jako przekaźnik API.',
     'quotaSource.localLoadingTitle': 'Wykrywanie lokalnego Antigravity...',
     'quotaSource.localLoadingDesc': 'Utrzymuj klienta Antigravity uruchomionego. W każdej chwili możesz przełączyć na monitorowanie autoryzowane.',
-    'quotaSource.authorizedLoadingTitle': 'Ładowanie autoryzowanej kwoty...',
+    'quotaSource.authorizedLoadingTitle': 'Ładowanie kwoty...',
     'quotaSource.authorizedLoadingDesc': 'Pobieranie danych kwoty z zdalnego API.',
     'quotaSource.localOfflineTitle': 'Monitorowanie lokalne niedostępne',
     'quotaSource.authorizedOfflineTitle': 'Monitorowanie autoryzowane niedostępne',
@@ -588,6 +588,9 @@ export const pl = {
     // Added missing keys from en.ts
     'customGrouping.other': 'Inne',
     'customGrouping.smartGroupCount': 'Auto-grupa: {count} grup',
+    'customGrouping.ungroupedCount': '{count} model(s) unmatched',
+    'customGrouping.newModelsDetected': 'Detected {count} new model(s) not in any group: {names}. Go to Group Management to configure.',
+    'common.dismiss': 'Dismiss',
     'groupNode.group': 'Grupa',
     'groupNode.quota': 'Limit',
     'groupNode.reset': 'Resetuj',

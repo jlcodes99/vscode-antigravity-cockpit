@@ -293,7 +293,7 @@ export const vi = {
     'quotaSource.localLoadingTitle': 'Đang phát hiện Antigravity cục bộ...',
     'quotaSource.localLoadingDesc':
         'Giữ Antigravity chạy. Bạn có thể chuyển sang giám sát ủy quyền bất cứ lúc nào.',
-    'quotaSource.authorizedLoadingTitle': 'Đang tải hạn mức ủy quyền...',
+    'quotaSource.authorizedLoadingTitle': 'Đang tải hạn mức...',
     'quotaSource.authorizedLoadingDesc': 'Đang lấy dữ liệu hạn mức từ API từ xa.',
     'quotaSource.localOfflineTitle': 'Giám sát cục bộ không khả dụng',
     'quotaSource.authorizedOfflineTitle': 'Giám sát ủy quyền không khả dụng',
@@ -626,6 +626,9 @@ export const vi = {
     // Added missing keys from en.ts
     'customGrouping.other': 'Khác',
     'customGrouping.smartGroupCount': 'Nhóm tự động: {count} nhóm',
+    'customGrouping.ungroupedCount': '{count} model(s) unmatched',
+    'customGrouping.newModelsDetected': 'Detected {count} new model(s) not in any group: {names}. Go to Group Management to configure.',
+    'common.dismiss': 'Dismiss',
     'groupNode.group': 'Nhóm',
     'groupNode.quota': 'Hạn mức',
     'groupNode.reset': 'Đặt lại',

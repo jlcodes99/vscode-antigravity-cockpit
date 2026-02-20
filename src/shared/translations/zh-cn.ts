@@ -290,7 +290,7 @@ export const zhCN = {
     'quotaSource.authorizedInfoTitle': '通过授权访问远端接口获取配额，不依赖本地进程，适用于 API 中转或无需启动Antigravity客户端的场景。',
     'quotaSource.localLoadingTitle': '正在检测本地 Antigravity...',
     'quotaSource.localLoadingDesc': '请保持 Antigravity 客户端运行，可随时切换到授权监控。',
-    'quotaSource.authorizedLoadingTitle': '正在加载授权配额...',
+    'quotaSource.authorizedLoadingTitle': '正在加载配额...',
     'quotaSource.authorizedLoadingDesc': '正在从远端接口获取配额数据。',
     'quotaSource.localOfflineTitle': '本地监控不可用',
     'quotaSource.authorizedOfflineTitle': '授权监控不可用',

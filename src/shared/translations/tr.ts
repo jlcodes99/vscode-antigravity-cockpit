@@ -276,7 +276,7 @@ export const tr = {
     'quotaSource.authorizedInfoTitle': 'Yetkili uzak API\'ler üzerinden kota alır. Yerel sürece bağlı değildir, API rölesi veya Antigravity istemcisi olmadan kullanım için uygundur.',
     'quotaSource.localLoadingTitle': 'Yerel Antigravity algılanıyor...',
     'quotaSource.localLoadingDesc': 'Antigravity istemcisini çalışır durumda tutun. İstediğiniz zaman yetkili izlemeye geçebilirsiniz.',
-    'quotaSource.authorizedLoadingTitle': 'Yetkili kota yükleniyor...',
+    'quotaSource.authorizedLoadingTitle': 'Kota yükleniyor...',
     'quotaSource.authorizedLoadingDesc': 'Uzaktaki API\'den kota verileri alınıyor.',
     'quotaSource.localOfflineTitle': 'Yerel izleme kullanılamıyor',
     'quotaSource.authorizedOfflineTitle': 'Yetkili izleme kullanılamıyor',
@@ -580,6 +580,9 @@ export const tr = {
     // Added missing keys from en.ts
     'customGrouping.other': 'Diğer',
     'customGrouping.smartGroupCount': 'Otomatik Grup: {count} grup',
+    'customGrouping.ungroupedCount': '{count} model(s) unmatched',
+    'customGrouping.newModelsDetected': 'Detected {count} new model(s) not in any group: {names}. Go to Group Management to configure.',
+    'common.dismiss': 'Dismiss',
     'groupNode.group': 'Grup',
     'groupNode.quota': 'Kota',
     'groupNode.reset': 'Sıfırla',

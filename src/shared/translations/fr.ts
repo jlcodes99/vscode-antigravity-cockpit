@@ -277,7 +277,7 @@ export const fr = {
     'quotaSource.authorizedInfoTitle': 'Récupère le quota via des API distantes autorisées. Indépendant du processus local, adapté aux relais API ou aux usages sans le client Antigravity.',
     'quotaSource.localLoadingTitle': 'Détection d\'Antigravity local...',
     'quotaSource.localLoadingDesc': 'Gardez le client Antigravity en cours d\'exécution. Vous pouvez passer au monitoring autorisé à tout moment.',
-    'quotaSource.authorizedLoadingTitle': 'Chargement du quota autorisé...',
+    'quotaSource.authorizedLoadingTitle': 'Chargement du quota...',
     'quotaSource.authorizedLoadingDesc': 'Récupération des données de quota depuis l\'API distante.',
     'quotaSource.localOfflineTitle': 'Monitoring local indisponible',
     'quotaSource.authorizedOfflineTitle': 'Monitoring autorisé indisponible',
@@ -590,6 +590,9 @@ export const fr = {
     // Added missing keys from en.ts
     'customGrouping.other': 'Autre',
     'customGrouping.smartGroupCount': 'Groupe auto : {count} groupes',
+    'customGrouping.ungroupedCount': '{count} model(s) unmatched',
+    'customGrouping.newModelsDetected': 'Detected {count} new model(s) not in any group: {names}. Go to Group Management to configure.',
+    'common.dismiss': 'Dismiss',
     'groupNode.group': 'Groupe',
     'groupNode.quota': 'Quota',
     'groupNode.reset': 'Réinitialiser',

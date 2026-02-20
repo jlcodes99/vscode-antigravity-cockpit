@@ -79,8 +79,6 @@
 
                 container.innerHTML = `
                     <div class="quota-auth-info quota-auth-info-clickable" title="${t('autoTrigger.manageAccounts')}">
-                        <span class="quota-auth-icon">✅</span>
-                        <span class="quota-auth-text">${t('autoTrigger.authorized')}</span>
                         <span class="quota-auth-email">${activeEmail}</span>
                         ${accountCountBadge}
                         ${overviewBtn}
