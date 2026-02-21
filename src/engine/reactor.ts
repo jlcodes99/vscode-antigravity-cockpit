@@ -24,7 +24,12 @@ import { cloudCodeClient, CloudCodeAuthError, CloudCodeRequestError } from '../s
 import { autoTriggerController } from '../auto_trigger/controller';
 import { oauthService, credentialStorage } from '../auto_trigger';
 import { antigravityToolsSyncService } from '../antigravityTools_sync';
-import { readQuotaApiCache, writeQuotaApiCache, isApiCacheValid } from '../services/quota_api_cache';
+import {
+    readQuotaApiCache,
+    writeQuotaApiCache,
+    isApiCacheValid,
+    type QuotaApiCacheRecord,
+} from '../services/quota_api_cache';
 
 
 interface AuthorizedQuotaInfo {
@@ -72,6 +77,47 @@ export interface AccountQuotaFetchResult {
 
 const AUTHORIZED_EXTRA_IMAGE_MODEL_KEY = 'gemini-3-pro-image';
 const AUTHORIZED_EXTRA_IMAGE_MODEL_ID = 'MODEL_PLACEHOLDER_M9';
+type AutoGroupFamily = 'claude' | 'gemini_pro' | 'gemini_flash' | 'gemini_image';
+
+const AUTO_GROUP_GEMINI_PRO_ID_PATTERN = /^gemini-\d+(?:\.\d+)?-pro-(high|low)(?:-|$)/;
+const AUTO_GROUP_GEMINI_FLASH_ID_PATTERN = /^gemini-\d+(?:\.\d+)?-flash(?:-|$)/;
+const AUTO_GROUP_GEMINI_IMAGE_ID_PATTERN = /^gemini-\d+(?:\.\d+)?-pro-image(?:-|$)/;
+
+const AUTO_GROUP_GEMINI_PRO_LABEL_PATTERN = /^gemini \d+(?:\.\d+)? pro(?: \((high|low)\)| (high|low))\b/;
+const AUTO_GROUP_GEMINI_FLASH_LABEL_PATTERN = /^gemini \d+(?:\.\d+)? flash\b/;
+const AUTO_GROUP_GEMINI_IMAGE_LABEL_PATTERN = /^gemini \d+(?:\.\d+)? pro image\b/;
+
+const AUTO_GROUP_CLAUDE_ID_SET = new Set(
+    [
+        'MODEL_CLAUDE_4_5_SONNET',
+        'MODEL_CLAUDE_4_5_SONNET_THINKING',
+        'MODEL_PLACEHOLDER_M12',
+        'MODEL_PLACEHOLDER_M26',
+        'MODEL_PLACEHOLDER_M35',
+        'MODEL_OPENAI_GPT_OSS_120B_MEDIUM',
+    ].map(id => id.toLowerCase()),
+);
+
+const AUTO_GROUP_GEMINI_PRO_ID_SET = new Set(
+    [
+        'MODEL_PLACEHOLDER_M7',
+        'MODEL_PLACEHOLDER_M8',
+        'MODEL_PLACEHOLDER_M36',
+        'MODEL_PLACEHOLDER_M37',
+    ].map(id => id.toLowerCase()),
+);
+
+const AUTO_GROUP_GEMINI_FLASH_ID_SET = new Set(
+    [
+        'MODEL_PLACEHOLDER_M18',
+    ].map(id => id.toLowerCase()),
+);
+
+const AUTO_GROUP_GEMINI_IMAGE_ID_SET = new Set(
+    [
+        'MODEL_PLACEHOLDER_M9',
+    ].map(id => id.toLowerCase()),
+);
 
 
 /**
@@ -778,6 +824,182 @@ export class ReactorCore {
         return normalized ? normalized : null;
     }
 
+    private normalizeAutoGroupMatchText(value: string | undefined): string {
+        return (value || '')
+            .toLowerCase()
+            .replace(/[_-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    private resolveAutoGroupFamily(modelId: string, label?: string): AutoGroupFamily | null {
+        const normalizedId = modelId.trim().toLowerCase();
+        if (!normalizedId) {
+            return null;
+        }
+        const normalizedLabel = this.normalizeAutoGroupMatchText(label || modelId);
+
+        if (
+            AUTO_GROUP_GEMINI_IMAGE_ID_SET.has(normalizedId)
+            || AUTO_GROUP_GEMINI_IMAGE_ID_PATTERN.test(normalizedId)
+            || AUTO_GROUP_GEMINI_IMAGE_LABEL_PATTERN.test(normalizedLabel)
+        ) {
+            return 'gemini_image';
+        }
+
+        if (
+            AUTO_GROUP_GEMINI_PRO_ID_SET.has(normalizedId)
+            || AUTO_GROUP_GEMINI_PRO_ID_PATTERN.test(normalizedId)
+            || AUTO_GROUP_GEMINI_PRO_LABEL_PATTERN.test(normalizedLabel)
+        ) {
+            return 'gemini_pro';
+        }
+
+        if (
+            AUTO_GROUP_GEMINI_FLASH_ID_SET.has(normalizedId)
+            || AUTO_GROUP_GEMINI_FLASH_ID_PATTERN.test(normalizedId)
+            || AUTO_GROUP_GEMINI_FLASH_LABEL_PATTERN.test(normalizedLabel)
+        ) {
+            return 'gemini_flash';
+        }
+
+        if (
+            AUTO_GROUP_CLAUDE_ID_SET.has(normalizedId)
+            || normalizedId.startsWith('claude-')
+            || normalizedId.startsWith('model_claude')
+            || normalizedLabel.startsWith('claude ')
+        ) {
+            return 'claude';
+        }
+
+        return null;
+    }
+
+    private buildAutoFamilyGroupMap(groupMappings: Record<string, string>): Partial<Record<AutoGroupFamily, string>> {
+        const familyStats = new Map<AutoGroupFamily, Map<string, number>>();
+
+        for (const [modelId, groupId] of Object.entries(groupMappings)) {
+            if (!groupId) {
+                continue;
+            }
+            const family = this.resolveAutoGroupFamily(modelId);
+            if (!family) {
+                continue;
+            }
+            let groupCounter = familyStats.get(family);
+            if (!groupCounter) {
+                groupCounter = new Map<string, number>();
+                familyStats.set(family, groupCounter);
+            }
+            groupCounter.set(groupId, (groupCounter.get(groupId) || 0) + 1);
+        }
+
+        const familyGroupMap: Partial<Record<AutoGroupFamily, string>> = {};
+        for (const family of ['claude', 'gemini_pro', 'gemini_flash', 'gemini_image'] as AutoGroupFamily[]) {
+            const groupCounter = familyStats.get(family);
+            if (!groupCounter || groupCounter.size === 0) {
+                continue;
+            }
+            let selectedGroupId: string | null = null;
+            let maxCount = -1;
+            for (const [groupId, count] of groupCounter.entries()) {
+                if (count > maxCount) {
+                    selectedGroupId = groupId;
+                    maxCount = count;
+                }
+            }
+            if (selectedGroupId) {
+                familyGroupMap[family] = selectedGroupId;
+            }
+        }
+
+        return familyGroupMap;
+    }
+
+    private getNewModelsComparedToCache(
+        previousCache: QuotaApiCacheRecord | null,
+        latestModels: ModelQuotaInfo[],
+    ): ModelQuotaInfo[] {
+        if (!previousCache?.payload) {
+            return [];
+        }
+        try {
+            const previousModels = this.buildModelsFromAuthorizedResponse(
+                previousCache.payload as AuthorizedQuotaResponse,
+            );
+            const previousIds = new Set(
+                previousModels.map(model => model.modelId.trim().toLowerCase()),
+            );
+            const seen = new Set<string>();
+            return latestModels.filter(model => {
+                const normalizedId = model.modelId.trim().toLowerCase();
+                if (!normalizedId || seen.has(normalizedId)) {
+                    return false;
+                }
+                seen.add(normalizedId);
+                return !previousIds.has(normalizedId);
+            });
+        } catch (error) {
+            logger.warn(
+                `[AutoGroup] Failed to compare api cache payload: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return [];
+        }
+    }
+
+    private async autoAssignNewModelsToExistingGroups(
+        previousCache: QuotaApiCacheRecord | null,
+        latestModels: ModelQuotaInfo[],
+    ): Promise<void> {
+        const newModels = this.getNewModelsComparedToCache(previousCache, latestModels);
+        if (newModels.length === 0) {
+            return;
+        }
+
+        const config = configService.getConfig();
+        const existingMappings = config.groupMappings || {};
+        if (Object.keys(existingMappings).length === 0) {
+            logger.info('[AutoGroup] Skip auto-assign: no existing group mappings');
+            return;
+        }
+
+        const familyGroupMap = this.buildAutoFamilyGroupMap(existingMappings);
+        if (Object.keys(familyGroupMap).length === 0) {
+            logger.info('[AutoGroup] Skip auto-assign: no existing family groups found');
+            return;
+        }
+
+        let changedCount = 0;
+        const nextMappings = { ...existingMappings };
+        for (const model of newModels) {
+            if (!model.modelId || nextMappings[model.modelId]) {
+                continue;
+            }
+            const family = this.resolveAutoGroupFamily(model.modelId, model.label);
+            if (!family) {
+                continue;
+            }
+            const targetGroupId = familyGroupMap[family];
+            if (!targetGroupId) {
+                continue;
+            }
+            nextMappings[model.modelId] = targetGroupId;
+            changedCount++;
+            logger.info(
+                `[AutoGroup] Assigned new model "${model.label}" (${model.modelId}) to existing group "${targetGroupId}" (family=${family})`,
+            );
+        }
+
+        if (changedCount === 0) {
+            return;
+        }
+
+        await configService.updateGroupMappings(nextMappings);
+        logger.info(`[AutoGroup] Auto-assigned ${changedCount} new model(s) based on api-cache diff`);
+    }
+
     private async fetchAuthorizedQuotaModels(
         accessToken: string,
         projectId?: string,
@@ -802,17 +1024,19 @@ export class ReactorCore {
         forceRefresh: boolean = false,
         isGcpTos?: boolean,
     ): Promise<{ models: ModelQuotaInfo[]; fromApiCacheFile: boolean }> {
-        if (email && !forceRefresh) {
-            const cached = await readQuotaApiCache('authorized', email);
-            if (isApiCacheValid(cached)) {
-                try {
-                    return {
-                        models: this.buildModelsFromAuthorizedResponse(cached!.payload as AuthorizedQuotaResponse),
-                        fromApiCacheFile: true,
-                    };
-                } catch (error) {
-                    logger.warn(`[QuotaApiCache] Cached response decode failed: ${error instanceof Error ? error.message : String(error)}`);
-                }
+        let previousCache: QuotaApiCacheRecord | null = null;
+        if (email) {
+            previousCache = await readQuotaApiCache('authorized', email);
+        }
+
+        if (email && !forceRefresh && isApiCacheValid(previousCache)) {
+            try {
+                return {
+                    models: this.buildModelsFromAuthorizedResponse(previousCache!.payload as AuthorizedQuotaResponse),
+                    fromApiCacheFile: true,
+                };
+            } catch (error) {
+                logger.warn(`[QuotaApiCache] Cached response decode failed: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
 
@@ -826,7 +1050,14 @@ export class ReactorCore {
             },
         ) as AuthorizedQuotaResponse;
 
+        const models = this.buildModelsFromAuthorizedResponse(data);
+
         if (email) {
+            try {
+                await this.autoAssignNewModelsToExistingGroups(previousCache, models);
+            } catch (error) {
+                logger.warn(`[AutoGroup] Failed to auto-assign new models: ${error instanceof Error ? error.message : String(error)}`);
+            }
             try {
                 await writeQuotaApiCache({
                     version: 1,
@@ -843,7 +1074,7 @@ export class ReactorCore {
         }
 
         return {
-            models: this.buildModelsFromAuthorizedResponse(data),
+            models,
             fromApiCacheFile: false,
         };
     }
@@ -1664,28 +1895,75 @@ export class ReactorCore {
     private static groupBasedOnSeries(models: ModelQuotaInfo[]): Record<string, string> {
         const seriesMap = new Map<string, string[]>();
 
-        // 定义硬编码的分组规则
+        const normalizeModelMatchText = (value: string | undefined): string =>
+            (value || '')
+                .toLowerCase()
+                .replace(/[_-]+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+        const isGeminiProTier = (modelIdLower: string, labelText: string): boolean =>
+            /^gemini-\d+(?:\.\d+)?-pro-(high|low)(?:-|$)/.test(modelIdLower) ||
+            /^gemini \d+(?:\.\d+)? pro(?: \((high|low)\)| (high|low))\b/.test(labelText);
+
+        const isGeminiFlash = (modelIdLower: string, labelText: string): boolean =>
+            /^gemini-\d+(?:\.\d+)?-flash(?:-|$)/.test(modelIdLower) ||
+            /^gemini \d+(?:\.\d+)? flash\b/.test(labelText);
+
+        const isGeminiImage = (modelIdLower: string, labelText: string): boolean =>
+            /^gemini-\d+(?:\.\d+)?-pro-image(?:-|$)/.test(modelIdLower) ||
+            /^gemini \d+(?:\.\d+)? pro image\b/.test(labelText);
+
+        const isClaudeFamily = (modelIdLower: string, labelText: string): boolean =>
+            modelIdLower.startsWith('claude-') ||
+            modelIdLower.startsWith('model_claude') ||
+            labelText.startsWith('claude ');
+
+        // 兜底分组规则：精确 ID + 前缀/模式匹配（忽略版本号）
         const GROUPS = {
-            GEMINI: ['MODEL_PLACEHOLDER_M8', 'MODEL_PLACEHOLDER_M7'],
-            GEMINI_FLASH: ['MODEL_PLACEHOLDER_M18'],
-            CLAUDE_GPT: [
-                'MODEL_CLAUDE_4_5_SONNET',
-                'MODEL_CLAUDE_4_5_SONNET_THINKING',
-                'MODEL_PLACEHOLDER_M12', // Claude Opus 4.5 Thinking
-                'MODEL_OPENAI_GPT_OSS_120B_MEDIUM',
-            ],
+            CLAUDE: {
+                name: 'Claude',
+                ids: [
+                    'MODEL_CLAUDE_4_5_SONNET',
+                    'MODEL_CLAUDE_4_5_SONNET_THINKING',
+                    'MODEL_PLACEHOLDER_M12',
+                    'MODEL_PLACEHOLDER_M26',
+                    'MODEL_PLACEHOLDER_M35',
+                    'MODEL_OPENAI_GPT_OSS_120B_MEDIUM',
+                ],
+                matcher: isClaudeFamily,
+            },
+            GEMINI_PRO: {
+                name: 'Gemini Pro',
+                ids: ['MODEL_PLACEHOLDER_M8', 'MODEL_PLACEHOLDER_M7', 'MODEL_PLACEHOLDER_M36', 'MODEL_PLACEHOLDER_M37'],
+                matcher: isGeminiProTier,
+            },
+            GEMINI_FLASH: {
+                name: 'Gemini Flash',
+                ids: ['MODEL_PLACEHOLDER_M18'],
+                matcher: isGeminiFlash,
+            },
+            GEMINI_IMAGE: {
+                name: 'Gemini Image',
+                ids: ['MODEL_PLACEHOLDER_M9'],
+                matcher: isGeminiImage,
+            },
         };
 
         for (const model of models) {
             const id = model.modelId;
+            const idLower = id.toLowerCase();
+            const labelText = normalizeModelMatchText(model.label || id);
             let groupName = 'Other';
 
-            if (GROUPS.GEMINI.includes(id)) {
-                groupName = 'Gemini';
-            } else if (GROUPS.GEMINI_FLASH.includes(id)) {
-                groupName = 'Gemini Flash';
-            } else if (GROUPS.CLAUDE_GPT.includes(id)) {
-                groupName = 'Claude';
+            if (GROUPS.CLAUDE.ids.includes(id) || GROUPS.CLAUDE.matcher(idLower, labelText)) {
+                groupName = GROUPS.CLAUDE.name;
+            } else if (GROUPS.GEMINI_PRO.ids.includes(id) || GROUPS.GEMINI_PRO.matcher(idLower, labelText)) {
+                groupName = GROUPS.GEMINI_PRO.name;
+            } else if (GROUPS.GEMINI_FLASH.ids.includes(id) || GROUPS.GEMINI_FLASH.matcher(idLower, labelText)) {
+                groupName = GROUPS.GEMINI_FLASH.name;
+            } else if (GROUPS.GEMINI_IMAGE.ids.includes(id) || GROUPS.GEMINI_IMAGE.matcher(idLower, labelText)) {
+                groupName = GROUPS.GEMINI_IMAGE.name;
             }
 
             if (!seriesMap.has(groupName)) {

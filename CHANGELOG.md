@@ -8,6 +8,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.22] - 2026-02-21
+
+### Changed
+- **Cache-diff based auto-group assignment**: On fresh authorized API responses, the extension now compares the latest model list with the previous per-account API cache and auto-assigns newly appeared models into existing family groups (Claude / Gemini Pro / Gemini Flash / Gemini Image) without requiring a manual "Auto Group" action.
+- **Version-agnostic model grouping**: Smart grouping now supports prefix/pattern matching (in addition to exact IDs), so model family grouping no longer depends on a fixed version list.
+- **Unified group naming**: Default group names are now normalized to `Claude`, `Gemini Pro`, `Gemini Flash`, and `Gemini Image`.
+- **Webview smart-group coverage**: New Claude/Gemini variants (including future `x` versions) are auto-routed into their target groups instead of being left ungrouped.
+
+### Improved
+- **Quota history group consistency**: History aggregation now uses the same version-agnostic matching rules, keeping group lines stable across Gemini/Claude version updates.
+- **Fallback grouping consistency**: Reactor fallback grouping (degenerate all-same-quota case) now follows the same family-based grouping strategy as the dashboard.
+
+### Fixed
+- **Legacy default-name migration in smart grouping**: Existing default names such as `G3-Pro`, `G3-Flash`, `G3-Image`, `Gemini 3 Pro Image`, and `Claude 4` are auto-normalized to the new naming when auto-grouping is applied.
+
+---
+
 ## [2.1.21] - 2026-02-20
 
 ### Improved

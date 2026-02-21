@@ -136,6 +136,105 @@ import { createAnnouncementModule } from './dashboard_announcements';
         groupMappings: {} // 原始分组映射（用于保存）
     };
 
+    const CUSTOM_GROUP_FAMILY_ORDER = {
+        claude: 0,
+        gemini_pro: 1,
+        gemini_flash: 2,
+        gemini_image: 3,
+    };
+
+    function normalizeGroupMatchText(value) {
+        return (value || '')
+            .toLowerCase()
+            .replace(/[_-]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function resolveGroupFamily(modelId, label) {
+        const modelIdLower = (modelId || '').toLowerCase();
+        const labelText = normalizeGroupMatchText(label || modelId || '');
+
+        if (
+            /^gemini-\d+(?:\.\d+)?-pro-image(?:-|$)/.test(modelIdLower)
+            || /^gemini \d+(?:\.\d+)? pro image\b/.test(labelText)
+            || modelIdLower === 'model_placeholder_m9'
+        ) {
+            return 'gemini_image';
+        }
+
+        if (
+            /^gemini-\d+(?:\.\d+)?-pro-(high|low)(?:-|$)/.test(modelIdLower)
+            || /^gemini \d+(?:\.\d+)? pro(?: \((high|low)\)| (high|low))\b/.test(labelText)
+            || modelIdLower === 'model_placeholder_m7'
+            || modelIdLower === 'model_placeholder_m8'
+            || modelIdLower === 'model_placeholder_m36'
+            || modelIdLower === 'model_placeholder_m37'
+        ) {
+            return 'gemini_pro';
+        }
+
+        if (
+            /^gemini-\d+(?:\.\d+)?-flash(?:-|$)/.test(modelIdLower)
+            || /^gemini \d+(?:\.\d+)? flash\b/.test(labelText)
+            || modelIdLower === 'model_placeholder_m18'
+        ) {
+            return 'gemini_flash';
+        }
+
+        if (
+            modelIdLower.startsWith('claude-')
+            || modelIdLower.startsWith('model_claude')
+            || labelText.startsWith('claude ')
+            || modelIdLower === 'model_placeholder_m12'
+            || modelIdLower === 'model_placeholder_m26'
+            || modelIdLower === 'model_placeholder_m35'
+            || modelIdLower === 'model_openai_gpt_oss_120b_medium'
+        ) {
+            return 'claude';
+        }
+
+        return null;
+    }
+
+    function resolveGroupFamilyByModels(group, allModels) {
+        const modelMap = new Map((allModels || []).map(model => [model.modelId, model]));
+        const familyCounter = new Map();
+
+        for (const modelId of group.modelIds || []) {
+            const model = modelMap.get(modelId);
+            const family = resolveGroupFamily(modelId, model?.label || modelId);
+            if (!family) continue;
+            familyCounter.set(family, (familyCounter.get(family) || 0) + 1);
+        }
+
+        if (familyCounter.size === 0) return null;
+
+        let selectedFamily = null;
+        let maxCount = -1;
+        for (const [family, count] of familyCounter.entries()) {
+            if (count > maxCount) {
+                selectedFamily = family;
+                maxCount = count;
+            }
+        }
+        return selectedFamily;
+    }
+
+    function sortGroupsForDisplay(groups, allModels) {
+        return (groups || [])
+            .map((group, index) => {
+                const family = resolveGroupFamilyByModels(group, allModels);
+                const rank = family ? CUSTOM_GROUP_FAMILY_ORDER[family] : 999;
+                return { group, index, rank };
+            })
+            .sort((a, b) => {
+                if (a.rank !== b.rank) return a.rank - b.rank;
+                return a.index - b.index;
+            })
+            .map(item => item.group);
+    }
+
 
 
     // ============ 初始化 ============
@@ -2734,7 +2833,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
             }
         }
 
-        customGroupingState.groups = Array.from(groupMap.values());
+        customGroupingState.groups = sortGroupsForDisplay(Array.from(groupMap.values()), models);
 
         // 渲染弹框内容
         renderCustomGroupingContent();
@@ -3094,11 +3193,25 @@ import { createAnnouncementModule } from './dashboard_announcements';
             return;
         }
 
-        // 固定分组配置（仅使用精确模型 ID）
+        // 固定分组配置（优先精确 ID，补充前缀/模式匹配，忽略版本号）
         const defaultGroups = [
             {
+                id: 'claude',
+                name: 'Claude',
+                family: 'claude',
+                modelIds: [
+                    'MODEL_OPENAI_GPT_OSS_120B_MEDIUM', // GPT-OSS 120B (Medium)
+                    'MODEL_PLACEHOLDER_M12',            // Claude Opus 4.5 (Thinking)
+                    'MODEL_PLACEHOLDER_M26',            // Claude Opus 4.6 (Thinking)
+                    'MODEL_CLAUDE_4_5_SONNET',
+                    'MODEL_CLAUDE_4_5_SONNET_THINKING',
+                    'MODEL_PLACEHOLDER_M35',            // Claude Sonnet 4.6 (Thinking)
+                ],
+            },
+            {
                 id: 'g3_pro',
-                name: 'G3-Pro',
+                name: 'Gemini Pro',
+                family: 'gemini_pro',
                 modelIds: [
                     'MODEL_PLACEHOLDER_M36', // Gemini 3.1 Pro (Low)
                     'MODEL_PLACEHOLDER_M37', // Gemini 3.1 Pro (High)
@@ -3108,23 +3221,16 @@ import { createAnnouncementModule } from './dashboard_announcements';
             },
             {
                 id: 'g3_flash',
-                name: 'G3-Flash',
+                name: 'Gemini Flash',
+                family: 'gemini_flash',
                 modelIds: [
                     'MODEL_PLACEHOLDER_M18', // Gemini 3 Flash
                 ],
             },
             {
-                id: 'claude_4',
-                name: 'Claude 4',
-                modelIds: [
-                    'MODEL_OPENAI_GPT_OSS_120B_MEDIUM', // GPT-OSS 120B (Medium)
-                    'MODEL_PLACEHOLDER_M26',            // Claude Opus 4.6 (Thinking)
-                    'MODEL_PLACEHOLDER_M35',            // Claude Sonnet 4.6 (Thinking)
-                ],
-            },
-            {
                 id: 'g3_image',
-                name: 'Gemini 3 Pro Image',
+                name: 'Gemini Image',
+                family: 'gemini_image',
                 modelIds: [
                     'MODEL_PLACEHOLDER_M9', // Gemini 3 Pro Image
                 ],
@@ -3145,8 +3251,10 @@ import { createAnnouncementModule } from './dashboard_announcements';
             const groupModels = [];
             
             for (const model of models) {
-                // 固定常量匹配：只按 modelId
-                if (defaultGroup.modelIds.includes(model.modelId)) {
+                const exactMatch = defaultGroup.modelIds.includes(model.modelId);
+                const familyMatch = resolveGroupFamily(model.modelId, model.label) === defaultGroup.family;
+                const prefixMatch = familyMatch;
+                if (exactMatch || prefixMatch) {
                     groupModels.push(model.modelId);
                 }
             }
@@ -3160,17 +3268,25 @@ import { createAnnouncementModule } from './dashboard_announcements';
                         break;
                     }
                 }
+
+                const shouldUseDefaultName =
+                    !inheritedName ||
+                    inheritedName === 'G3-Pro' ||
+                    inheritedName === 'G3-Flash' ||
+                    inheritedName === 'G3-Image' ||
+                    inheritedName === 'Gemini 3 Pro Image' ||
+                    inheritedName === 'Claude 4';
                 
                 groupMap.set(defaultGroup.id, {
                     id: defaultGroup.id,
-                    name: inheritedName || defaultGroup.name,
+                    name: shouldUseDefaultName ? defaultGroup.name : inheritedName,
                     modelIds: groupModels
                 });
             }
         }
 
         // 转换为数组
-        customGroupingState.groups = Array.from(groupMap.values());
+        customGroupingState.groups = sortGroupsForDisplay(Array.from(groupMap.values()), models);
 
         renderCustomGroupingContent();
         const smartGroupMsg = (i18n['customGrouping.smartGroupCount'] || 'Auto Group: {count} groups').replace('{count}', customGroupingState.groups.length);

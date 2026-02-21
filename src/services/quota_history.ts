@@ -46,37 +46,83 @@ const HISTORY_MAX_POINTS_PER_MODEL = 5000;
 const HISTORY_ROOT = path.join(os.homedir(), '.antigravity_cockpit', 'cache', 'quota_history');
 const RECOMMENDED_MODEL_ID_SET = new Set(AUTH_RECOMMENDED_MODEL_IDS);
 
-const HISTORY_GROUPS = [
+type HistoryGroupMatchInput = {
+    modelIdLower: string;
+    labelText: string;
+};
+
+type HistoryGroupDefinition = {
+    groupId: string;
+    label: string;
+    modelIds: string[];
+    matcher: (input: HistoryGroupMatchInput) => boolean;
+};
+
+function normalizeModelMatchText(value: string | undefined): string {
+    return (value || '')
+        .toLowerCase()
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+const isGeminiProTier = ({ modelIdLower, labelText }: HistoryGroupMatchInput): boolean =>
+    /^gemini-\d+(?:\.\d+)?-pro-(high|low)(?:-|$)/.test(modelIdLower) ||
+    /^gemini \d+(?:\.\d+)? pro(?: \((high|low)\)| (high|low))\b/.test(labelText);
+
+const isGeminiFlash = ({ modelIdLower, labelText }: HistoryGroupMatchInput): boolean =>
+    /^gemini-\d+(?:\.\d+)?-flash(?:-|$)/.test(modelIdLower) ||
+    /^gemini \d+(?:\.\d+)? flash\b/.test(labelText);
+
+const isGeminiImage = ({ modelIdLower, labelText }: HistoryGroupMatchInput): boolean =>
+    /^gemini-\d+(?:\.\d+)?-pro-image(?:-|$)/.test(modelIdLower) ||
+    /^gemini \d+(?:\.\d+)? pro image\b/.test(labelText);
+
+const isClaudeFamily = ({ modelIdLower, labelText }: HistoryGroupMatchInput): boolean =>
+    modelIdLower.startsWith('claude-') ||
+    modelIdLower.startsWith('model_claude') ||
+    labelText.startsWith('claude ');
+
+const HISTORY_GROUPS: HistoryGroupDefinition[] = [
     {
         groupId: 'claude-4-5',
-        label: 'Claude 4.5',
+        label: 'Claude',
         modelIds: [
             'MODEL_PLACEHOLDER_M12',
             'MODEL_CLAUDE_4_5_SONNET',
             'MODEL_CLAUDE_4_5_SONNET_THINKING',
+            'MODEL_PLACEHOLDER_M26',
+            'MODEL_PLACEHOLDER_M35',
+            'MODEL_OPENAI_GPT_OSS_120B_MEDIUM',
         ],
+        matcher: isClaudeFamily,
     },
     {
         groupId: 'g3-pro',
-        label: 'G3-Pro',
+        label: 'Gemini Pro',
         modelIds: [
             'MODEL_PLACEHOLDER_M7',
             'MODEL_PLACEHOLDER_M8',
+            'MODEL_PLACEHOLDER_M36',
+            'MODEL_PLACEHOLDER_M37',
         ],
+        matcher: isGeminiProTier,
     },
     {
         groupId: 'g3-flash',
-        label: 'G3-Flash',
+        label: 'Gemini Flash',
         modelIds: [
             'MODEL_PLACEHOLDER_M18',
         ],
+        matcher: isGeminiFlash,
     },
     {
         groupId: 'g3-image',
-        label: 'G3-Image',
+        label: 'Gemini Image',
         modelIds: [
             'MODEL_PLACEHOLDER_M9',
         ],
+        matcher: isGeminiImage,
     },
 ];
 
@@ -144,7 +190,6 @@ function extractRecommendedGroups(
         ? snapshot.allModels
         : snapshot.models;
 
-    const modelsById = new Map(sourceModels.map(model => [model.modelId, model]));
     const groups: Array<{
         groupId: string;
         label: string;
@@ -154,10 +199,22 @@ function extractRecommendedGroups(
     }> = [];
 
     for (const group of HISTORY_GROUPS) {
-        const candidates = group.modelIds
-            .map(modelId => modelsById.get(modelId))
-            .filter((model): model is NonNullable<typeof model> => Boolean(model))
-            .filter(model => RECOMMENDED_MODEL_ID_SET.has(model.modelId));
+        const candidates = sourceModels.filter(model => {
+            if (!model?.modelId) {
+                return false;
+            }
+            const input: HistoryGroupMatchInput = {
+                modelIdLower: model.modelId.toLowerCase(),
+                labelText: normalizeModelMatchText(model.label || model.modelId),
+            };
+            const exactMatch = group.modelIds.includes(model.modelId);
+            const prefixMatch = group.matcher(input);
+            if (!exactMatch && !prefixMatch) {
+                return false;
+            }
+            // 优先沿用推荐模型白名单，同时放行命中前缀/模式的新版本模型
+            return RECOMMENDED_MODEL_ID_SET.has(model.modelId) || prefixMatch;
+        });
 
         if (candidates.length === 0) {
             continue;
