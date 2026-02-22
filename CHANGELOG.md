@@ -8,6 +8,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.23] - 2026-02-22
+
+### Changed
+- **Cloud Code quota backend alignment**: Aligned the authorized quota backend fetch flow with `Antigravity.app`, including endpoint routing, request sequence, and onboarding polling behavior.
+- **GCP ToS routing application**: The `isGcpTos` route flag is now actually applied when selecting the Cloud Code endpoint, matching desktop behavior.
+- **`onboardUser` flow parity**: Switched to the desktop-style flow (`POST` to start + `GET` polling on the returned operation) with a 500ms polling interval.
+- **`loadCodeAssist` fallback alignment**: Project resolution now follows the desktop-style `loadCodeAssist` fallback behavior when tier/project data is incomplete.
+- **Cloud Code request identity**: Aligned Cloud Code request `metadata` and `User-Agent` construction with the official Antigravity desktop client format.
+
+### Notes
+- No UI/UX changes. This release focuses on backend compatibility and quota-fetch reliability improvements.
+
+---
+
 ## [2.1.22] - 2026-02-21
 
 ### Changed
