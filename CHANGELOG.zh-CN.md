@@ -8,6 +8,20 @@
 
 ---
 
+## [2.1.23] - 2026-02-22
+
+### 调整
+- **Cloud Code 配额后端链路对齐**：授权配额的后端获取流程已与 `Antigravity.app` 对齐，包括端点路由选择、请求顺序与 onboard 轮询方式。
+- **GCP ToS 路由标识生效**：`isGcpTos` 路由标识现在会真正参与 Cloud Code 端点选择，与桌面端行为一致。
+- **`onboardUser` 流程一致化**：改为桌面端同款流程（先 `POST` 发起，再对返回 operation 执行 `GET` 轮询），轮询间隔为 500ms。
+- **`loadCodeAssist` fallback 对齐**：当 tier/project 信息不完整时，ProjectId 解析会按桌面端风格执行 `loadCodeAssist` 的兜底重试逻辑。
+- **Cloud Code 请求身份信息对齐**：Cloud Code 请求的 `metadata` 与 `User-Agent` 构造方式已对齐官方 Antigravity 桌面客户端格式。
+
+### 说明
+- 无 UI/交互改动；本次版本主要聚焦于后端兼容性与配额拉取稳定性优化。
+
+---
+
 ## [2.1.22] - 2026-02-21
 
 ### 调整

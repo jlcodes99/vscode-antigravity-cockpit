@@ -1,8 +1,10 @@
 /**
- * Cloud Code client with primary + fallback endpoints
+ * Cloud Code client (routing aligned with Antigravity desktop app)
  */
 
-import { CLOUDCODE_BASE_URLS, buildCloudCodeUrl } from './cloudcode_base';
+import * as fs from 'fs';
+import * as path from 'path';
+import { CloudCodeRouteOptions, resolveCloudCodeBaseUrl, buildCloudCodeUrl } from './cloudcode_base';
 import { TIMING } from './constants';
 import { logger } from './log_service';
 
@@ -33,6 +35,12 @@ export interface CloudCodeRequestOptions {
     logLabel?: string;
     timeoutMs?: number;
     maxAttempts?: number;
+    route?: CloudCodeRequestRouteOptions;
+}
+
+export interface CloudCodeRequestRouteOptions extends CloudCodeRouteOptions {
+    cloudaicompanionProject?: string;
+    enterpriseProjectId?: string;
 }
 
 export class CloudCodeAuthError extends Error {
@@ -63,35 +71,75 @@ interface LoadCodeAssistResponse {
 }
 
 interface OnboardUserResponse {
+    name?: string;
     done?: boolean;
     response?: { cloudaicompanionProject?: unknown };
 }
 
-const CLOUDCODE_METADATA = {
-    ideType: 'ANTIGRAVITY',
-    platform: 'PLATFORM_UNSPECIFIED',
-    pluginType: 'GEMINI',
-};
-
-const USER_AGENT = 'antigravity';
 const DEFAULT_ATTEMPTS = 2;
 const BACKOFF_BASE_MS = 500;
 const BACKOFF_MAX_MS = 4000;
-const ONBOARD_ATTEMPTS = 5;
-const ONBOARD_DELAY_MS = 2000;
+const ONBOARD_POLL_DELAY_MS = 500;
+
+let cachedIdeVersion: string | null = null;
+
+function getIdeVersion(): string {
+    if (cachedIdeVersion) {
+        return cachedIdeVersion;
+    }
+
+    try {
+        const packageJsonPath = path.resolve(__dirname, '../../package.json');
+        const content = fs.readFileSync(packageJsonPath, 'utf8');
+        const parsed = JSON.parse(content) as { version?: unknown };
+        if (typeof parsed.version === 'string' && parsed.version.trim()) {
+            cachedIdeVersion = parsed.version.trim();
+            return cachedIdeVersion;
+        }
+    } catch {
+        // ignore, fallback below
+    }
+
+    cachedIdeVersion = 'unknown';
+    return cachedIdeVersion;
+}
+
+function normalizeUserAgentPlatform(value: NodeJS.Platform): string {
+    return value === 'win32' ? 'windows' : value;
+}
+
+function normalizeUserAgentArch(value: string): string {
+    switch (value) {
+        case 'x64':
+            return 'amd64';
+        case 'ia32':
+            return '386';
+        default:
+            return value;
+    }
+}
+
+function getCloudCodeMetadata(): Record<string, string> {
+    return {
+        ideName: 'antigravity',
+        ideType: 'ANTIGRAVITY',
+        ideVersion: getIdeVersion(),
+    };
+}
+
+function getCloudCodeUserAgent(): string {
+    const ideVersion = getIdeVersion();
+    const platform = normalizeUserAgentPlatform(process.platform);
+    const arch = normalizeUserAgentArch(process.arch);
+    return `antigravity/${ideVersion} ${platform}/${arch}`;
+}
 
 export class CloudCodeClient {
     async loadProjectInfo(
         accessToken: string,
         options?: CloudCodeRequestOptions,
     ): Promise<CloudCodeProjectInfo> {
-        const payload = { metadata: CLOUDCODE_METADATA };
-        const { data } = await this.requestJson<LoadCodeAssistResponse>(
-            '/v1internal:loadCodeAssist',
-            payload,
-            accessToken,
-            options,
-        );
+        const data = await this.loadCodeAssistResponse(accessToken, options);
 
         return {
             projectId: this.extractProjectId(data?.cloudaicompanionProject),
@@ -103,13 +151,7 @@ export class CloudCodeClient {
         accessToken: string,
         options?: CloudCodeRequestOptions,
     ): Promise<CloudCodeProjectInfo> {
-        const payload = { metadata: CLOUDCODE_METADATA };
-        const { data } = await this.requestJson<LoadCodeAssistResponse>(
-            '/v1internal:loadCodeAssist',
-            payload,
-            accessToken,
-            options,
-        );
+        const data = await this.loadCodeAssistResponse(accessToken, options);
 
         const projectId = this.extractProjectId(data?.cloudaicompanionProject);
         const tierId = data?.paidTier?.id || data?.currentTier?.id;
@@ -149,7 +191,7 @@ export class CloudCodeClient {
         options?: CloudCodeRequestOptions,
     ): Promise<CloudCodeResponse<T>> {
         return this.requestStreamWithRetry<T>(
-            CLOUDCODE_BASE_URLS,
+            this.getRequestBaseUrls(options),
             path,
             body,
             accessToken,
@@ -164,12 +206,69 @@ export class CloudCodeClient {
         options?: CloudCodeRequestOptions,
     ): Promise<CloudCodeResponse<T>> {
         return this.requestWithRetry<T>(
-            CLOUDCODE_BASE_URLS,
+            this.getRequestBaseUrls(options),
             path,
             body,
             accessToken,
             options,
         );
+    }
+
+    async requestGetJson<T>(
+        path: string,
+        accessToken: string,
+        options?: CloudCodeRequestOptions,
+    ): Promise<CloudCodeResponse<T>> {
+        return this.requestGetWithRetry<T>(
+            this.getRequestBaseUrls(options),
+            path,
+            accessToken,
+            options,
+        );
+    }
+
+    private getRequestBaseUrls(options?: CloudCodeRequestOptions): readonly string[] {
+        return [resolveCloudCodeBaseUrl(options?.route)];
+    }
+
+    private async loadCodeAssistResponse(
+        accessToken: string,
+        options?: CloudCodeRequestOptions,
+    ): Promise<LoadCodeAssistResponse> {
+        const preferredProjectId = options?.route?.cloudaicompanionProject ?? options?.route?.enterpriseProjectId;
+        let data = await this.postLoadCodeAssist(accessToken, preferredProjectId, options);
+
+        const enterpriseProjectId = options?.route?.enterpriseProjectId;
+        const hasReturnedProject =
+            typeof data?.cloudaicompanionProject === 'string' && data.cloudaicompanionProject !== '';
+
+        // Align with desktop app behavior: retry loadCodeAssist with enterprise project when paidTier is absent.
+        if (!data?.paidTier && hasReturnedProject) {
+            data = await this.postLoadCodeAssist(accessToken, enterpriseProjectId, options);
+        }
+
+        return data;
+    }
+
+    private async postLoadCodeAssist(
+        accessToken: string,
+        cloudaicompanionProject: string | undefined,
+        options?: CloudCodeRequestOptions,
+    ): Promise<LoadCodeAssistResponse> {
+        const payload: Record<string, unknown> = {
+            metadata: getCloudCodeMetadata(),
+        };
+        if (cloudaicompanionProject) {
+            payload.cloudaicompanionProject = cloudaicompanionProject;
+        }
+
+        const { data } = await this.requestJson<LoadCodeAssistResponse>(
+            '/v1internal:loadCodeAssist',
+            payload,
+            accessToken,
+            options,
+        );
+        return data;
     }
 
     private async requestStreamWithRetry<T>(
@@ -210,6 +309,45 @@ export class CloudCodeClient {
         }
 
         throw lastError || new CloudCodeRequestError('Cloud Code stream request failed');
+    }
+
+    private async requestGetWithRetry<T>(
+        baseUrls: readonly string[],
+        path: string,
+        accessToken: string,
+        options?: CloudCodeRequestOptions,
+    ): Promise<CloudCodeResponse<T>> {
+        const maxAttempts = options?.maxAttempts ?? DEFAULT_ATTEMPTS;
+        let lastError: Error | undefined;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            if (attempt > 1) {
+                const delay = this.getBackoffDelay(attempt);
+                logger.info(`${this.formatLabel(options)} GET retry round ${attempt}/${maxAttempts} in ${delay}ms`);
+                await this.sleep(delay);
+            }
+
+            for (const baseUrl of baseUrls) {
+                try {
+                    return await this.requestGetOnce<T>(baseUrl, path, accessToken, options);
+                } catch (error) {
+                    if (error instanceof CloudCodeAuthError) {
+                        throw error;
+                    }
+                    lastError = error instanceof Error ? error : new Error(String(error));
+                    const retryable = error instanceof CloudCodeRequestError ? error.retryable : true;
+                    if (!retryable) {
+                        throw lastError;
+                    }
+                    if (baseUrl !== baseUrls[baseUrls.length - 1]) {
+                        logger.warn(
+                            `${this.formatLabel(options)} GET request failed (${baseUrl}${path}), trying fallback: ${lastError.message}`,
+                        );
+                    }
+                }
+            }
+        }
+
+        throw lastError || new CloudCodeRequestError('Cloud Code GET request failed');
     }
 
     private async requestWithRetry<T>(
@@ -269,7 +407,7 @@ export class CloudCodeClient {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
-                    'User-Agent': USER_AGENT,
+                    'User-Agent': getCloudCodeUserAgent(),
                     'Content-Type': 'application/json',
                     'Accept-Encoding': 'gzip',
                 },
@@ -383,7 +521,7 @@ export class CloudCodeClient {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
-                    'User-Agent': USER_AGENT,
+                    'User-Agent': getCloudCodeUserAgent(),
                     'Content-Type': 'application/json',
                     'Accept-Encoding': 'gzip',
                 },
@@ -433,36 +571,110 @@ export class CloudCodeClient {
         }
     }
 
+    private async requestGetOnce<T>(
+        baseUrl: string,
+        path: string,
+        accessToken: string,
+        options?: CloudCodeRequestOptions,
+    ): Promise<CloudCodeResponse<T>> {
+        const url = buildCloudCodeUrl(baseUrl, path);
+        logger.info(`${this.formatLabel(options)} Requesting ${url} (GET)`);
+        const controller = new AbortController();
+        const timeoutMs = options?.timeoutMs ?? TIMING.HTTP_TIMEOUT_MS;
+        const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'User-Agent': getCloudCodeUserAgent(),
+                    'Content-Type': 'application/json',
+                    'Accept-Encoding': 'gzip',
+                },
+                signal: controller.signal,
+            });
+
+            const text = await response.text();
+            if (response.status === 401 || this.isInvalidGrant(text)) {
+                throw new CloudCodeAuthError('Authorization expired', response.status);
+            }
+            if (response.status === 403) {
+                throw new CloudCodeRequestError('Cloud Code access forbidden', response.status, false);
+            }
+
+            if (!response.ok) {
+                const retryable = response.status === 429 || response.status >= 500;
+                throw new CloudCodeRequestError(
+                    `Cloud Code GET request failed (${response.status})`,
+                    response.status,
+                    retryable,
+                );
+            }
+
+            if (!text) {
+                return { data: {} as T, text: '', baseUrl, status: response.status };
+            }
+
+            try {
+                const parsed = JSON.parse(text) as T;
+                return { data: parsed, text, baseUrl, status: response.status };
+            } catch {
+                throw new CloudCodeRequestError('Cloud Code response parse failed', response.status, true);
+            }
+        } catch (error) {
+            if (error instanceof CloudCodeAuthError || error instanceof CloudCodeRequestError) {
+                throw error;
+            }
+
+            const err = error instanceof Error ? error : new Error(String(error));
+            if (err.name === 'AbortError') {
+                throw new CloudCodeRequestError('Cloud Code request timeout', 0, true);
+            }
+            throw new CloudCodeRequestError(`Cloud Code network error: ${err.message}`, 0, true);
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+
     private async tryOnboardUser(
         accessToken: string,
         tierId: string,
         options?: CloudCodeRequestOptions,
     ): Promise<string | null> {
-        const payload = {
+        const payload: Record<string, unknown> = {
             tierId,
-            metadata: CLOUDCODE_METADATA,
+            metadata: getCloudCodeMetadata(),
         };
+        const cloudaicompanionProject = options?.route?.cloudaicompanionProject ?? options?.route?.enterpriseProjectId;
+        if (cloudaicompanionProject) {
+            payload.cloudaicompanionProject = cloudaicompanionProject;
+        }
 
-        for (let attempt = 1; attempt <= ONBOARD_ATTEMPTS; attempt++) {
-            const { data } = await this.requestJson<OnboardUserResponse>(
-                '/v1internal:onboardUser',
-                payload,
+        let { data } = await this.requestJson<OnboardUserResponse>(
+            '/v1internal:onboardUser',
+            payload,
+            accessToken,
+            options,
+        );
+
+        while (!data?.done) {
+            const operationName = typeof data?.name === 'string' ? data.name : '';
+            if (!operationName) {
+                throw new CloudCodeRequestError('Cloud Code onboard operation missing name', 0, true);
+            }
+
+            await this.sleep(ONBOARD_POLL_DELAY_MS);
+            const result = await this.requestGetJson<OnboardUserResponse>(
+                `/v1internal/${operationName}`,
                 accessToken,
                 options,
             );
-
-            if (data?.done) {
-                const projectId = this.extractProjectId(data?.response?.cloudaicompanionProject);
-                if (projectId) {
-                    return projectId;
-                }
-                return null;
-            }
-
-            await this.sleep(ONBOARD_DELAY_MS);
+            data = result.data;
         }
 
-        return null;
+        const projectId = this.extractProjectId(data?.response?.cloudaicompanionProject);
+        return projectId ?? null;
     }
 
     private extractProjectId(project: unknown): string | undefined {
