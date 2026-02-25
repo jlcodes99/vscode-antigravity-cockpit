@@ -17,6 +17,7 @@ import {
 } from './types';
 import { logger } from '../shared/log_service';
 import { t } from '../shared/i18n';
+import { DEPRECATED_MODEL_KEY_REPLACEMENTS } from '../shared/model_preference_migration';
 
 /**
  * 带有配额信息的模型（用于配额重置检测）
@@ -31,6 +32,11 @@ interface QuotaModelInfo {
 
 // 存储键
 const SCHEDULE_CONFIG_KEY = 'scheduleConfig';
+const DEFAULT_AUTO_TRIGGER_MODEL = 'gemini-3-flash';
+const TIME_24H_REGEX = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const LEGACY_AUTO_TRIGGER_MODEL_REPLACEMENTS = new Map<string, string>(
+    Object.entries(DEPRECATED_MODEL_KEY_REPLACEMENTS).map(([from, to]) => [from.toLowerCase(), to]),
+);
 
 /**
  * 自动触发控制器
@@ -67,6 +73,270 @@ class AutoTriggerController {
         }
     }
 
+    private createDefaultScheduleConfig(): ScheduleConfig {
+        return {
+            enabled: false,
+            repeatMode: 'daily',
+            dailyTimes: ['08:00'],
+            weeklyDays: [1, 2, 3, 4, 5],
+            weeklyTimes: ['08:00'],
+            intervalHours: 4,
+            intervalStartTime: '07:00',
+            intervalEndTime: '22:00',
+            selectedModels: [DEFAULT_AUTO_TRIGGER_MODEL],
+            wakeOnReset: false,
+            timeWindowEnabled: false,
+            timeWindowStart: '09:00',
+            timeWindowEnd: '18:00',
+            fallbackTimes: ['07:00'],
+            maxOutputTokens: 0,
+        };
+    }
+
+    private normalizeStringArray(values: unknown): string[] {
+        if (!Array.isArray(values)) {
+            return [];
+        }
+        const result: string[] = [];
+        const seen = new Set<string>();
+        for (const value of values) {
+            if (typeof value !== 'string') {
+                continue;
+            }
+            const trimmed = value.trim();
+            if (!trimmed) {
+                continue;
+            }
+            const key = trimmed.toLowerCase();
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            result.push(trimmed);
+        }
+        return result;
+    }
+
+    private normalizeTimeValue(value: unknown): string | undefined {
+        if (typeof value !== 'string') {
+            return undefined;
+        }
+        const trimmed = value.trim();
+        return TIME_24H_REGEX.test(trimmed) ? trimmed : undefined;
+    }
+
+    private normalizeTimeArray(values: unknown): string[] {
+        const normalized: string[] = [];
+        const seen = new Set<string>();
+        for (const value of this.normalizeStringArray(values)) {
+            const time = this.normalizeTimeValue(value);
+            if (!time || seen.has(time)) {
+                continue;
+            }
+            seen.add(time);
+            normalized.push(time);
+        }
+        return normalized;
+    }
+
+    private normalizeWeekDays(values: unknown): number[] {
+        if (!Array.isArray(values)) {
+            return [];
+        }
+        const normalized: number[] = [];
+        const seen = new Set<number>();
+        for (const value of values) {
+            const parsed = typeof value === 'number'
+                ? value
+                : (typeof value === 'string' ? Number.parseInt(value, 10) : Number.NaN);
+            if (!Number.isInteger(parsed) || parsed < 0 || parsed > 6 || seen.has(parsed)) {
+                continue;
+            }
+            seen.add(parsed);
+            normalized.push(parsed);
+        }
+        return normalized.sort((a, b) => a - b);
+    }
+
+    private normalizeSelectedModels(
+        values: unknown,
+        availableModelIds?: Set<string>,
+    ): string[] {
+        const normalized: string[] = [];
+        const seen = new Set<string>();
+
+        for (const rawModelId of this.normalizeStringArray(values)) {
+            const replacement = LEGACY_AUTO_TRIGGER_MODEL_REPLACEMENTS.get(rawModelId.toLowerCase()) || rawModelId;
+            const key = replacement.toLowerCase();
+            if (seen.has(key)) {
+                continue;
+            }
+            if (availableModelIds && availableModelIds.size > 0 && !availableModelIds.has(replacement)) {
+                continue;
+            }
+            seen.add(key);
+            normalized.push(replacement);
+        }
+
+        return normalized;
+    }
+
+    private normalizeSelectedAccounts(
+        values: unknown,
+        availableAccountEmails?: Set<string>,
+    ): string[] {
+        const normalized: string[] = [];
+        const seen = new Set<string>();
+        const availableByLower = new Map<string, string>();
+
+        if (availableAccountEmails) {
+            for (const email of availableAccountEmails) {
+                availableByLower.set(email.toLowerCase(), email);
+            }
+        }
+
+        for (const rawEmail of this.normalizeStringArray(values)) {
+            const key = rawEmail.toLowerCase();
+            if (seen.has(key)) {
+                continue;
+            }
+            if (availableByLower.size > 0) {
+                const resolved = availableByLower.get(key);
+                if (!resolved) {
+                    continue;
+                }
+                seen.add(resolved.toLowerCase());
+                normalized.push(resolved);
+                continue;
+            }
+            seen.add(key);
+            normalized.push(rawEmail);
+        }
+
+        return normalized;
+    }
+
+    private normalizeScheduleConfig(
+        rawConfig: ScheduleConfig | null | undefined,
+        availableModelIds?: Set<string>,
+        availableAccountEmails?: Set<string>,
+    ): ScheduleConfig {
+        const defaults = this.createDefaultScheduleConfig();
+        const source: Partial<ScheduleConfig> = rawConfig && typeof rawConfig === 'object'
+            ? rawConfig
+            : {};
+
+        const normalized: ScheduleConfig = {
+            ...defaults,
+            dailyTimes: [...(defaults.dailyTimes || [])],
+            weeklyDays: [...(defaults.weeklyDays || [])],
+            weeklyTimes: [...(defaults.weeklyTimes || [])],
+            selectedModels: [...defaults.selectedModels],
+            fallbackTimes: [...(defaults.fallbackTimes || [])],
+        };
+
+        normalized.enabled = Boolean(source.enabled);
+
+        if (source.repeatMode === 'daily' || source.repeatMode === 'weekly' || source.repeatMode === 'interval') {
+            normalized.repeatMode = source.repeatMode;
+        }
+
+        const dailyTimes = this.normalizeTimeArray(source.dailyTimes);
+        if (dailyTimes.length > 0) {
+            normalized.dailyTimes = dailyTimes;
+        }
+
+        const weeklyDays = this.normalizeWeekDays(source.weeklyDays);
+        if (weeklyDays.length > 0) {
+            normalized.weeklyDays = weeklyDays;
+        }
+
+        const weeklyTimes = this.normalizeTimeArray(source.weeklyTimes);
+        if (weeklyTimes.length > 0) {
+            normalized.weeklyTimes = weeklyTimes;
+        }
+
+        if (typeof source.intervalHours === 'number' && Number.isFinite(source.intervalHours) && source.intervalHours > 0) {
+            normalized.intervalHours = Math.floor(source.intervalHours);
+        }
+
+        const intervalStart = this.normalizeTimeValue(source.intervalStartTime);
+        if (intervalStart) {
+            normalized.intervalStartTime = intervalStart;
+        }
+
+        const intervalEnd = this.normalizeTimeValue(source.intervalEndTime);
+        if (intervalEnd) {
+            normalized.intervalEndTime = intervalEnd;
+        }
+
+        if (Array.isArray(source.selectedModels)) {
+            normalized.selectedModels = this.normalizeSelectedModels(source.selectedModels, availableModelIds);
+        }
+
+        if (Array.isArray(source.selectedAccounts)) {
+            normalized.selectedAccounts = this.normalizeSelectedAccounts(source.selectedAccounts, availableAccountEmails);
+        } else {
+            normalized.selectedAccounts = undefined;
+        }
+
+        const crontab = typeof source.crontab === 'string' ? source.crontab.trim() : '';
+        normalized.crontab = crontab || undefined;
+
+        normalized.wakeOnReset = Boolean(source.wakeOnReset);
+        normalized.timeWindowEnabled = normalized.wakeOnReset && Boolean(source.timeWindowEnabled);
+
+        const timeWindowStart = this.normalizeTimeValue(source.timeWindowStart);
+        const timeWindowEnd = this.normalizeTimeValue(source.timeWindowEnd);
+        const fallbackTimes = this.normalizeTimeArray(source.fallbackTimes);
+        if (normalized.timeWindowEnabled) {
+            normalized.timeWindowStart = timeWindowStart || defaults.timeWindowStart;
+            normalized.timeWindowEnd = timeWindowEnd || defaults.timeWindowEnd;
+            normalized.fallbackTimes = fallbackTimes.length > 0 ? fallbackTimes : [...(defaults.fallbackTimes || [])];
+        } else {
+            normalized.timeWindowStart = undefined;
+            normalized.timeWindowEnd = undefined;
+            normalized.fallbackTimes = undefined;
+        }
+
+        const customPrompt = typeof source.customPrompt === 'string' ? source.customPrompt.trim() : '';
+        normalized.customPrompt = customPrompt || undefined;
+
+        if (typeof source.maxOutputTokens === 'number' && Number.isFinite(source.maxOutputTokens) && source.maxOutputTokens >= 0) {
+            normalized.maxOutputTokens = Math.floor(source.maxOutputTokens);
+        } else {
+            normalized.maxOutputTokens = 0;
+        }
+
+        if (!normalized.enabled || normalized.selectedModels.length === 0) {
+            normalized.enabled = false;
+            normalized.wakeOnReset = false;
+            normalized.timeWindowEnabled = false;
+            normalized.timeWindowStart = undefined;
+            normalized.timeWindowEnd = undefined;
+            normalized.fallbackTimes = undefined;
+        }
+
+        return normalized;
+    }
+
+    private async buildCanonicalScheduleConfig(rawConfig: ScheduleConfig | null | undefined): Promise<ScheduleConfig> {
+        let availableModelIds: Set<string> | undefined;
+        try {
+            const availableModels = await triggerService.fetchAvailableModels(this.quotaModelConstants);
+            if (availableModels.length > 0) {
+                availableModelIds = new Set(availableModels.map(model => model.id));
+            }
+        } catch (error) {
+            logger.warn(`[AutoTriggerController] Failed to load available models when normalizing schedule: ${error}`);
+        }
+
+        const allCredentials = await credentialStorage.getAllCredentials();
+        const availableAccountEmails = new Set(Object.keys(allCredentials));
+
+        return this.normalizeScheduleConfig(rawConfig, availableModelIds, availableAccountEmails);
+    }
+
 
     /**
      * 设置配额模型常量列表（从 Dashboard 的配额数据中获取）
@@ -93,16 +363,18 @@ class AutoTriggerController {
         // 恢复调度配置
         const savedConfig = credentialStorage.getState<ScheduleConfig | null>(SCHEDULE_CONFIG_KEY, null);
         if (savedConfig) {
+            const normalizedSavedConfig = await this.buildCanonicalScheduleConfig(savedConfig);
+            await credentialStorage.saveState(SCHEDULE_CONFIG_KEY, normalizedSavedConfig);
             // 互斥逻辑：wakeOnReset 优先，不启动定时调度器
-            if (savedConfig.wakeOnReset && savedConfig.enabled) {
+            if (normalizedSavedConfig.wakeOnReset && normalizedSavedConfig.enabled) {
                 logger.info('[AutoTriggerController] Wake on reset mode enabled, scheduler not started');
                 // 如果启用了时段策略且有 fallback 时间，启动 fallback 定时器
-                if (savedConfig.timeWindowEnabled && savedConfig.fallbackTimes?.length) {
-                    this.startFallbackScheduler(savedConfig);
+                if (normalizedSavedConfig.timeWindowEnabled && normalizedSavedConfig.fallbackTimes?.length) {
+                    this.startFallbackScheduler(normalizedSavedConfig);
                 }
-            } else if (savedConfig.enabled) {
+            } else if (normalizedSavedConfig.enabled) {
                 logger.info('[AutoTriggerController] Restoring schedule from saved config');
-                schedulerService.setSchedule(savedConfig, () => this.executeTrigger());
+                schedulerService.setSchedule(normalizedSavedConfig, () => this.executeTrigger());
             }
         }
 
@@ -122,13 +394,7 @@ class AutoTriggerController {
      */
     async getState(): Promise<AutoTriggerState> {
         const authorization = await credentialStorage.getAuthorizationStatus();
-        const schedule = credentialStorage.getState<ScheduleConfig>(SCHEDULE_CONFIG_KEY, {
-            enabled: false,
-            repeatMode: 'daily',
-            dailyTimes: ['08:00'],
-            selectedModels: ['gemini-3-flash'],
-            maxOutputTokens: 0,
-        });
+        const schedule = credentialStorage.getState<ScheduleConfig>(SCHEDULE_CONFIG_KEY, this.createDefaultScheduleConfig());
 
         const nextRunTime = schedulerService.getNextRunTime();
         // 传入配额模型常量进行过滤
@@ -287,39 +553,41 @@ class AutoTriggerController {
      * 保存调度配置
      */
     async saveSchedule(config: ScheduleConfig): Promise<void> {
+        const normalizedConfig = await this.buildCanonicalScheduleConfig(config);
+
         // 验证配置
-        if (config.crontab) {
-            const result = schedulerService.validateCrontab(config.crontab);
+        if (normalizedConfig.crontab) {
+            const result = schedulerService.validateCrontab(normalizedConfig.crontab);
             if (!result.valid) {
                 throw new Error(`无效的 crontab 表达式: ${result.error}`);
             }
         }
 
         // 保存配置
-        await credentialStorage.saveState(SCHEDULE_CONFIG_KEY, config);
+        await credentialStorage.saveState(SCHEDULE_CONFIG_KEY, normalizedConfig);
 
         // 互斥逻辑：三选一
         // 1. wakeOnReset = true → 配额重置触发（不需要定时器）
         // 2. wakeOnReset = false + enabled = true → 定时/Crontab 触发
         // 3. 都为 false → 不触发
-        if (config.wakeOnReset) {
+        if (normalizedConfig.wakeOnReset && normalizedConfig.enabled) {
             // 配额重置模式：停止定时调度器
             schedulerService.stop();
             this.stopFallbackScheduler();
             logger.info('[AutoTriggerController] Schedule saved, wakeOnReset mode enabled');
             // 如果启用了时段策略且有 fallback 时间，启动 fallback 定时器
-            if (config.timeWindowEnabled && config.fallbackTimes?.length) {
-                this.startFallbackScheduler(config);
+            if (normalizedConfig.timeWindowEnabled && normalizedConfig.fallbackTimes?.length) {
+                this.startFallbackScheduler(normalizedConfig);
             }
-        } else if (config.enabled) {
+        } else if (normalizedConfig.enabled) {
             // 定时/Crontab 模式
             this.stopFallbackScheduler();
-            const accounts = await this.resolveAccountsFromList(config.selectedAccounts);
+            const accounts = await this.resolveAccountsFromList(normalizedConfig.selectedAccounts);
             if (accounts.length === 0) {
                 throw new Error('请先完成授权');
             }
-            schedulerService.setSchedule(config, () => this.executeTrigger());
-            logger.info(`[AutoTriggerController] Schedule saved, enabled=${config.enabled}`);
+            schedulerService.setSchedule(normalizedConfig, () => this.executeTrigger());
+            logger.info(`[AutoTriggerController] Schedule saved, enabled=${normalizedConfig.enabled}`);
         } else {
             // 都不启用
             schedulerService.stop();

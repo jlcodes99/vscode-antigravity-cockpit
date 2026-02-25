@@ -8,6 +8,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.25] - 2026-02-25
+
+### Changed
+- **Auto Wake-up schedule save strategy**: Saving wake-up settings now rebuilds a canonical config from defaults and request payload, then writes it back as a full replacement (no legacy merge behavior).
+- **Submission-first persistence**: `selectedModels` / `selectedAccounts` now persist strictly from the submitted selection set (after normalization), preventing old residual values from surviving future saves.
+
+### Fixed
+- **Stale model residue in wake-up config**: Deprecated/invalid model IDs in wake-up selections are now normalized, deduplicated, mapped to current replacements, and filtered against the current available model list.
+- **Startup schedule self-heal**: Existing saved wake-up configs are sanitized on startup and rewritten to storage, cleaning historical invalid entries.
+- **Disabled-state trigger guard**: Quota-reset wake-up branch now requires `enabled=true`, preventing accidental trigger branch activation when wake-up is disabled.
+
+---
+
 ## [2.1.24] - 2026-02-24
 
 ### Added
