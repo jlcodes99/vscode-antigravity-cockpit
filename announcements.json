@@ -1,0 +1,283 @@
+{
+  "version": "1.0",
+  "announcements": [
+    {
+      "id": "ann-2026-01-cockpit-tools-promo",
+      "type": "info",
+      "priority": 320,
+      "title": "🛠️ Cockpit Tools v0.8.4",
+      "summary": "A multi-platform AI IDE desktop tool. Currently supports Antigravity, Codex, GitHub Copilot, Windsurf, and Kiro. Need another platform? Contact the author.",
+      "content": "🛠️ Cockpit Tools v0.8.4\n\nA multi-platform AI IDE desktop tool.\n\n✅ Currently supported platforms\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 Unified dashboard\n· Multi-platform account status overview\n· Quota status / reset time / visual progress\n· Quick refresh and wakeup entry\n\n🧩 Multi-instance workflow\n· Run multiple instances in parallel\n· Bind different accounts per instance\n· Custom instance directory & launch args\n\n💡 Need another platform?\nOpen an issue to contact the author:\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 Project: https://github.com/jlcodes99/cockpit-tools\n📥 Download: https://github.com/jlcodes99/cockpit-tools/releases/latest",
+      "action": {
+        "type": "url",
+        "target": "https://github.com/jlcodes99/cockpit-tools/releases/latest",
+        "label": "Download latest"
+      },
+      "locales": {
+        "zh-cn": {
+          "title": "🛠️ Cockpit Tools v0.8.4：多平台支持",
+          "summary": "通用多平台 AI IDE 桌面工具，目前已支持 Antigravity、Codex、GitHub Copilot、Windsurf、Kiro；如需新增平台支持，欢迎联系作者。",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\n一款通用的多平台 AI IDE 桌面工具。\n\n✅ 当前已支持平台\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 统一仪表盘\n· 多平台账号状态总览\n· 配额状态 / 重置时间 / 进度可视化\n· 一键刷新与唤醒入口\n\n🧩 多开实例能力\n· 多实例并行运行\n· 实例级账号绑定，互不影响\n· 支持自定义实例目录与启动参数\n\n💡 想支持更多平台？\n欢迎通过 Issue 联系作者：\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 项目地址：https://github.com/jlcodes99/cockpit-tools\n📥 下载地址：https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "下载最新版"
+        },
+        "zh-tw": {
+          "title": "🛠️ Cockpit Tools v0.8.4：多平台支援",
+          "summary": "通用多平台 AI IDE 桌面工具，目前已支援 Antigravity、Codex、GitHub Copilot、Windsurf、Kiro；如需新增平台支援，歡迎聯絡作者。",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\n一款通用的多平台 AI IDE 桌面工具。\n\n✅ 目前已支援平台\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 統一儀表板\n· 多平台帳號狀態總覽\n· 配額狀態 / 重置時間 / 進度視覺化\n· 一鍵重新整理與喚醒入口\n\n🧩 多開實例能力\n· 多實例並行運行\n· 實例級帳號綁定，互不影響\n· 支援自訂實例目錄與啟動參數\n\n💡 想支援更多平台？\n歡迎透過 Issue 聯絡作者：\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 專案地址：https://github.com/jlcodes99/cockpit-tools\n📥 下載地址：https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "下載最新版"
+        },
+        "ja": {
+          "title": "🛠️ Cockpit Tools v0.8.4：マルチプラットフォーム対応",
+          "summary": "マルチプラットフォーム対応の AI IDE デスクトップツール。現在は Antigravity、Codex、GitHub Copilot、Windsurf、Kiro をサポート。追加対応が必要なら作者へ連絡してください。",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\nマルチプラットフォーム対応の AI IDE デスクトップツールです。\n\n✅ 現在対応しているプラットフォーム\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 統合ダッシュボード\n· 複数プラットフォームのアカウント状況を一覧表示\n· クォータ状況 / リセット時刻 / 進捗の可視化\n· クイック更新とウェイクアップ入口\n\n🧩 マルチインスタンス運用\n· 複数インスタンスを並列実行\n· インスタンスごとに別アカウントを紐付け\n· インスタンスディレクトリと起動引数をカスタマイズ\n\n💡 対応プラットフォームを追加したいですか？\nIssue で作者に連絡してください：\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 プロジェクト：https://github.com/jlcodes99/cockpit-tools\n📥 ダウンロード：https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "最新版をダウンロード"
+        },
+        "ko": {
+          "title": "🛠️ Cockpit Tools v0.8.4: 멀티 플랫폼 지원",
+          "summary": "멀티 플랫폼 AI IDE 데스크톱 도구. 현재 Antigravity, Codex, GitHub Copilot, Windsurf, Kiro를 지원합니다. 추가 플랫폼이 필요하면 작성자에게 문의하세요.",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\n멀티 플랫폼 AI IDE 데스크톱 도구입니다.\n\n✅ 현재 지원 플랫폼\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 통합 대시보드\n· 멀티 플랫폼 계정 상태 한눈에 보기\n· 할당량 상태 / 리셋 시간 / 진행률 시각화\n· 빠른 새로고침 및 웨이크업 진입\n\n🧩 멀티 인스턴스 워크플로\n· 여러 인스턴스를 병렬 실행\n· 인스턴스별 서로 다른 계정 바인딩\n· 인스턴스 디렉터리와 실행 인자 커스텀\n\n💡 더 많은 플랫폼 지원이 필요하신가요?\nIssue로 작성자에게 문의하세요:\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 프로젝트: https://github.com/jlcodes99/cockpit-tools\n📥 다운로드: https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "최신 버전 다운로드"
+        },
+        "fr": {
+          "title": "🛠️ Cockpit Tools v0.8.4 — Support multi-plateforme",
+          "summary": "Outil desktop AI IDE multi-plateforme. Prend actuellement en charge Antigravity, Codex, GitHub Copilot, Windsurf et Kiro. Besoin d'une autre plateforme ? Contactez l'auteur.",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\nUn outil desktop AI IDE multi-plateforme.\n\n✅ Plateformes actuellement prises en charge\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 Tableau de bord unifié\n· Vue d'ensemble des comptes multi-plateformes\n· Statut des quotas / heure de reset / progression visuelle\n· Accès rapide au refresh et au wakeup\n\n🧩 Workflow multi-instances\n· Exécutez plusieurs instances en parallèle\n· Associez des comptes différents par instance\n· Dossier d'instance et arguments de lancement personnalisables\n\n💡 Besoin d'une autre plateforme ?\nOuvrez une issue pour contacter l'auteur :\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 Projet : https://github.com/jlcodes99/cockpit-tools\n📥 Télécharger : https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "Télécharger la dernière version"
+        },
+        "de": {
+          "title": "🛠️ Cockpit Tools v0.8.4: Multi-Plattform-Support",
+          "summary": "Ein plattformübergreifendes AI-IDE-Desktop-Tool. Aktuell unterstützt: Antigravity, Codex, GitHub Copilot, Windsurf und Kiro. Weitere Plattform gewünscht? Autor kontaktieren.",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\nEin Multi-Plattform-Desktop-Tool für AI IDEs.\n\n✅ Aktuell unterstützte Plattformen\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 Einheitliches Dashboard\n· Kontoübersicht über mehrere Plattformen\n· Quotenstatus / Reset-Zeit / visuelle Fortschritte\n· Schnellzugriff auf Aktualisieren und Wakeup\n\n🧩 Multi-Instanz-Workflow\n· Mehrere Instanzen parallel ausführen\n· Pro Instanz unterschiedliche Konten binden\n· Instanzverzeichnis und Startargumente anpassbar\n\n💡 Weitere Plattform benötigt?\nÖffne ein Issue und kontaktiere den Autor:\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 Projekt: https://github.com/jlcodes99/cockpit-tools\n📥 Download: https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "Neueste Version herunterladen"
+        },
+        "es": {
+          "title": "🛠️ Cockpit Tools v0.8.4: soporte multiplataforma",
+          "summary": "Herramienta de escritorio AI IDE multiplataforma. Actualmente soporta Antigravity, Codex, GitHub Copilot, Windsurf y Kiro. ¿Necesitas otra plataforma? Contacta al autor.",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\nUna herramienta de escritorio AI IDE multiplataforma.\n\n✅ Plataformas compatibles actualmente\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 Panel unificado\n· Vista general de cuentas en múltiples plataformas\n· Estado de cuotas / hora de reinicio / progreso visual\n· Entrada rápida para refrescar y despertar\n\n🧩 Flujo multi-instancia\n· Ejecuta múltiples instancias en paralelo\n· Vincula cuentas distintas por instancia\n· Directorio y argumentos de arranque personalizables\n\n💡 ¿Necesitas soporte para otra plataforma?\nAbre un issue para contactar al autor:\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 Proyecto: https://github.com/jlcodes99/cockpit-tools\n📥 Descarga: https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "Descargar última versión"
+        },
+        "it": {
+          "title": "🛠️ Cockpit Tools v0.8.4: supporto multi-piattaforma",
+          "summary": "Strumento desktop AI IDE multi-piattaforma. Attualmente supporta Antigravity, Codex, GitHub Copilot, Windsurf e Kiro. Serve un'altra piattaforma? Contatta l'autore.",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\nUno strumento desktop AI IDE multi-piattaforma.\n\n✅ Piattaforme attualmente supportate\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 Dashboard unificata\n· Panoramica account multi-piattaforma\n· Stato quota / ora reset / avanzamento visivo\n· Accesso rapido a refresh e wakeup\n\n🧩 Workflow multi-istanza\n· Esegui più istanze in parallelo\n· Associa account diversi per istanza\n· Directory istanza e argomenti di avvio personalizzabili\n\n💡 Ti serve un'altra piattaforma?\nApri una issue per contattare l'autore:\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 Progetto: https://github.com/jlcodes99/cockpit-tools\n📥 Download: https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "Scarica l'ultima versione"
+        },
+        "ru": {
+          "title": "🛠️ Cockpit Tools v0.8.4: мультиплатформенная поддержка",
+          "summary": "Мультиплатформенный AI IDE desktop-инструмент. Сейчас поддерживаются Antigravity, Codex, GitHub Copilot, Windsurf и Kiro. Нужна другая платформа? Свяжитесь с автором.",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\nМультиплатформенный desktop-инструмент для AI IDE.\n\n✅ Платформы, поддерживаемые сейчас\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 Единая панель\n· Обзор аккаунтов по нескольким платформам\n· Статус квот / время сброса / визуальный прогресс\n· Быстрый доступ к обновлению и пробуждению\n\n🧩 Работа с несколькими инстансами\n· Параллельный запуск нескольких инстансов\n· Привязка разных аккаунтов к каждому инстансу\n· Настраиваемые каталог инстанса и аргументы запуска\n\n💡 Нужна поддержка другой платформы?\nОткройте issue, чтобы связаться с автором:\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 Проект: https://github.com/jlcodes99/cockpit-tools\n📥 Скачать: https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "Скачать последнюю версию"
+        },
+        "pt-br": {
+          "title": "🛠️ Cockpit Tools v0.8.4: suporte multiplataforma",
+          "summary": "Ferramenta desktop AI IDE multiplataforma. Atualmente suporta Antigravity, Codex, GitHub Copilot, Windsurf e Kiro. Precisa de outra plataforma? Fale com o autor.",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\nUma ferramenta desktop AI IDE multiplataforma.\n\n✅ Plataformas atualmente suportadas\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 Painel unificado\n· Visão geral de contas em múltiplas plataformas\n· Status de cota / horário de reset / progresso visual\n· Acesso rápido para atualizar e despertar\n\n🧩 Fluxo multi-instâncias\n· Execute várias instâncias em paralelo\n· Vincule contas diferentes por instância\n· Diretório de instância e argumentos de inicialização personalizados\n\n💡 Precisa de suporte para outra plataforma?\nAbra uma issue para falar com o autor:\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 Projeto: https://github.com/jlcodes99/cockpit-tools\n📥 Download: https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "Baixar versão mais recente"
+        },
+        "tr": {
+          "title": "🛠️ Cockpit Tools v0.8.4: çoklu platform desteği",
+          "summary": "Çoklu platform AI IDE masaüstü aracı. Şu anda Antigravity, Codex, GitHub Copilot, Windsurf ve Kiro destekleniyor. Başka platform mu lazım? Geliştiriciyle iletişime geçin.",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\nÇoklu platform AI IDE masaüstü aracı.\n\n✅ Şu anda desteklenen platformlar\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 Birleşik gösterge paneli\n· Çoklu platform hesap durum özeti\n· Kota durumu / sıfırlama zamanı / görsel ilerleme\n· Hızlı yenileme ve uyandırma girişi\n\n🧩 Çoklu örnek iş akışı\n· Birden çok örneği paralel çalıştırın\n· Her örnek için farklı hesap bağlayın\n· Örnek dizini ve başlatma argümanlarını özelleştirin\n\n💡 Başka bir platform desteğine mi ihtiyacınız var?\nGeliştiriciyle iletişim için issue açın:\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 Proje: https://github.com/jlcodes99/cockpit-tools\n📥 İndir: https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "En son sürümü indir"
+        },
+        "pl": {
+          "title": "🛠️ Cockpit Tools v0.8.4: wsparcie wielu platform",
+          "summary": "Wieloplatformowe narzędzie desktopowe AI IDE. Obecnie wspiera Antigravity, Codex, GitHub Copilot, Windsurf i Kiro. Potrzebujesz kolejnej platformy? Skontaktuj się z autorem.",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\nWieloplatformowe narzędzie desktopowe AI IDE.\n\n✅ Aktualnie obsługiwane platformy\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 Ujednolicony panel\n· Przegląd stanu kont na wielu platformach\n· Stan limitów / czas resetu / postęp wizualny\n· Szybkie odświeżanie i wejście do wybudzania\n\n🧩 Praca na wielu instancjach\n· Uruchamianie wielu instancji równolegle\n· Przypinanie różnych kont do instancji\n· Konfigurowalny katalog instancji i argumenty startowe\n\n💡 Potrzebujesz wsparcia dla kolejnej platformy?\nOtwórz issue, aby skontaktować się z autorem:\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 Projekt: https://github.com/jlcodes99/cockpit-tools\n📥 Pobierz: https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "Pobierz najnowszą wersję"
+        },
+        "cs": {
+          "title": "🛠️ Cockpit Tools v0.8.4: podpora více platforem",
+          "summary": "Multiplatformní desktopový nástroj AI IDE. Aktuálně podporuje Antigravity, Codex, GitHub Copilot, Windsurf a Kiro. Potřebujete další platformu? Kontaktujte autora.",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\nMultiplatformní desktopový nástroj pro AI IDE.\n\n✅ Aktuálně podporované platformy\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 Sjednocený dashboard\n· Přehled stavu účtů napříč platformami\n· Stav kvót / čas resetu / vizuální průběh\n· Rychlý refresh a vstup do wakeup\n\n🧩 Multi-instance workflow\n· Spouštějte více instancí paralelně\n· Pro každou instanci použijte jiný účet\n· Vlastní adresář instance a spouštěcí argumenty\n\n💡 Potřebujete podporu další platformy?\nOtevřete issue a kontaktujte autora:\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 Projekt: https://github.com/jlcodes99/cockpit-tools\n📥 Stáhnout: https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "Stáhnout nejnovější verzi"
+        },
+        "vi": {
+          "title": "🛠️ Cockpit Tools v0.8.4: hỗ trợ đa nền tảng",
+          "summary": "Công cụ desktop AI IDE đa nền tảng. Hiện hỗ trợ Antigravity, Codex, GitHub Copilot, Windsurf và Kiro. Cần thêm nền tảng khác? Liên hệ tác giả.",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\nCông cụ desktop AI IDE đa nền tảng.\n\n✅ Nền tảng hiện đang hỗ trợ\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 Bảng điều khiển hợp nhất\n· Tổng quan trạng thái tài khoản đa nền tảng\n· Trạng thái hạn mức / thời gian reset / tiến độ trực quan\n· Truy cập nhanh làm mới và wakeup\n\n🧩 Quy trình multi-instance\n· Chạy nhiều phiên bản song song\n· Gán tài khoản khác nhau cho từng phiên bản\n· Tùy chỉnh thư mục phiên bản và tham số khởi chạy\n\n💡 Cần hỗ trợ nền tảng khác?\nHãy mở issue để liên hệ tác giả:\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 Dự án: https://github.com/jlcodes99/cockpit-tools\n📥 Tải xuống: https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "Tải bản mới nhất"
+        },
+        "ar": {
+          "title": "🛠️ Cockpit Tools v0.8.4: دعم متعدد المنصات",
+          "summary": "أداة سطح مكتب AI IDE متعددة المنصات. تدعم حالياً Antigravity وCodex وGitHub Copilot وWindsurf وKiro. هل تحتاج منصة أخرى؟ تواصل مع المؤلف.",
+          "content": "🛠️ Cockpit Tools v0.8.4\n\nأداة سطح مكتب AI IDE متعددة المنصات.\n\n✅ المنصات المدعومة حالياً\n· Antigravity\n· Codex\n· GitHub Copilot\n· Windsurf\n· Kiro\n\n📊 لوحة تحكم موحدة\n· نظرة عامة على حالة الحسابات عبر المنصات\n· حالة الحصص / وقت إعادة الضبط / تقدم مرئي\n· وصول سريع للتحديث وميزة الإيقاظ\n\n🧩 سير عمل متعدد النسخ\n· تشغيل عدة نسخ بشكل متوازٍ\n· ربط حسابات مختلفة لكل نسخة\n· تخصيص مجلد النسخة ومعاملات التشغيل\n\n💡 هل تحتاج دعماً لمنصة أخرى؟\nافتح Issue للتواصل مع المؤلف:\nhttps://github.com/jlcodes99/cockpit-tools/issues\n\n🔗 المشروع: https://github.com/jlcodes99/cockpit-tools\n📥 التحميل: https://github.com/jlcodes99/cockpit-tools/releases/latest",
+          "actionLabel": "تنزيل أحدث إصدار"
+        }
+      },
+      "targetVersions": "*",
+      "showOnce": true,
+      "popup": true,
+      "createdAt": "2026-02-19T00:00:00Z",
+      "expiresAt": null
+    },
+    {
+      "id": "ann-2026-01-23-v2-0-0",
+      "type": "feature",
+      "priority": 200,
+      "title": "🚀 2.0.0 重磅更新：账号管理全面升级",
+      "summary": "新增侧边栏账号树、独立账号总览页面，与 Cockpit Tools 深度联动支持快捷切号与批量导入。",
+      "content": "✨ 2.0.0 版本更新亮点\n\n⚓ 账号总览与树视图\n新增独立总览页面与侧边栏三层架构树视图，支持搜索、筛选、批量管理与导出账号。\n\n⚡ Cockpit Tools 双向联动\n实现与 Cockpit Tools 深度集成，支持在插件中联动客户端快速切号，并提供实时强化的批量导入流程。\n\n💾 配额本地缓存\n新增配额文件缓存，显著提升加载速度，支持在离线环境下查看最近的配额状态。\n\n🔄 离线配置同步\n通过共享存储与 Cockpit Tools 自动同步语言、主题等设置，实现配置的无感迁移与统一。",
+      "action": {
+        "type": "command",
+        "target": "workbench.extensions.search",
+        "arguments": [
+          "@id:jlcodes.antigravity-cockpit"
+        ],
+        "label": "Upgrade"
+      },
+      "actionOverrides": [
+        {
+          "targetVersions": ">=2.0.0",
+          "action": null
+        }
+      ],
+      "locales": {
+        "zh-cn": {
+          "title": "🚀 2.0.0 重磅更新：账号管理全面升级",
+          "summary": "新增侧边栏账号树、独立账号总览页面，与 Cockpit Tools 深度联动支持快捷切号与批量导入。",
+          "content": "✨ 2.0.0 版本更新亮点\n\n⚓ 账号总览与树视图\n新增独立总览页面与侧边栏三级架构树视图，支持搜索、筛选、批量管理与导出账号。\n\n⚡ Cockpit Tools 双向联动\n实现与 Cockpit Tools 深度集成，支持在插件中联动客户端快速切号，并提供实时强化的批量导入流程。\n\n💾 配额本地缓存\n新增配额文件缓存，显著提升加载速度，支持在离线环境下查看最近的配额状态。\n\n🔄 离线配置同步\n通过共享存储与 Cockpit Tools 自动同步语言、主题等设置，实现配置的无感迁移与统一。",
+          "actionLabel": "去升级"
+        },
+        "en": {
+          "title": "🚀 2.0.0 Major Update: Account Management Evolved",
+          "summary": "New Account Overview page, Sidebar Tree View, and seamless integration with Cockpit Tools.",
+          "content": "✨ 2.0.0 Update Highlights\n\n⚓ Account Overview & Tree View\nIndependent overview page and 3-level sidebar tree for searching, filtering, batch management, and exporting accounts.\n\n⚡ Cockpit Tools Integration\nDeep integration with Cockpit Tools for one-click account switching and enhanced batch import with real-time progress.\n\n💾 Local Quota Cache\nFile-based caching for lightning-fast loading and offline availability of quota status.\n\n🔄 Offline Config Sync\nAutomatic synchronization of language and theme settings with Cockpit Tools via shared storage.",
+          "actionLabel": "Upgrade"
+        }
+      },
+      "targetVersions": "*",
+      "showOnce": true,
+      "popup": true,
+      "createdAt": "2026-01-23T00:00:00Z",
+      "expiresAt": null
+    },
+    {
+      "id": "ann-2026-01-community-groups-v1",
+      "type": "info",
+      "priority": 130,
+      "title": "💬 加入交流群",
+      "summary": "微信群5个群都扫码上限了，欢迎加入QQ交流群",
+      "content": "📢 近期优化\n建议更新到最新版本：修复账户时序问题 · 账户切换完全跟随本地客户端\n\n💬 技术交流群\n微信群已满员，目前请通过 QQ 群加入交流。\n\n扫码加入 👇",
+      "images": [
+        {
+          "url": "https://raw.githubusercontent.com/jlcodes99/vscode-antigravity-cockpit/main/docs/qq_group.png",
+          "label": "QQ群"
+        }
+      ],
+      "locales": {
+        "zh-cn": {
+          "title": "💬 加入交流群",
+          "summary": "微信群5个群都扫码上限了，欢迎加入QQ交流群",
+          "content": "📢 近期优化\n建议更新到最新版本：修复账户时序问题 · 账户切换完全跟随本地客户端\n\n💬 技术交流群\n微信群已满员，目前请通过 QQ 群加入交流。\n\n扫码加入 👇"
+        }
+      },
+      "targetVersions": "*",
+      "targetLanguages": [
+        "zh-cn"
+      ],
+      "showOnce": true,
+      "popup": true,
+      "createdAt": "2026-01-07T00:00:00Z",
+      "expiresAt": null
+    },
+    {
+      "id": "ann-2025-12-welcome",
+      "type": "info",
+      "priority": 50,
+      "title": "👋 Welcome to Antigravity Cockpit",
+      "summary": "Thank you for using this extension!",
+      "content": "Thank you for choosing Antigravity Cockpit!\n\nThis extension helps you:\n• Monitor AI model quota usage in real-time\n• Automatically group multiple models\n• Customize model names and ordering\n• Set quota warning notifications\n\nFeedback is always welcome!",
+      "action": {
+        "type": "url",
+        "target": "https://github.com/jlcodes99/vscode-antigravity-cockpit/issues",
+        "label": "Feedback"
+      },
+      "locales": {
+        "zh-cn": {
+          "title": "👋 欢迎使用 Antigravity Cockpit",
+          "summary": "感谢您使用本插件，祝您使用愉快！",
+          "content": "感谢您选择 Antigravity Cockpit！\n\n本插件可以帮助您：\n• 实时监控 AI 模型配额使用情况\n• 自动分组管理多个模型\n• 自定义模型名称和排序\n• 设置配额预警通知\n\n如有任何问题或建议，欢迎反馈！",
+          "actionLabel": "反馈建议"
+        },
+        "zh-tw": {
+          "title": "👋 歡迎使用 Antigravity Cockpit",
+          "summary": "感謝您使用本插件，祝您使用愉快！",
+          "content": "感謝您選擇 Antigravity Cockpit！\n\n本插件可以幫助您：\n• 實時監控 AI 模型配额使用情况\n• 自動分組管理多個模型\n• 自定義模型名稱和排序\n• 設置配額預警通知\n\n如有任何問題或建議，歡迎反饋！",
+          "actionLabel": "反饋建議"
+        },
+        "ja": {
+          "title": "👋 Antigravity Cockpitへようこそ",
+          "summary": "この拡張機能をご利用いただきありがとうございます！",
+          "content": "Antigravity Cockpitをお選びいただきありがとうございます！\n\nこの拡張機能は以下のことに役立ちます：\n• AIモデルのクォータ使用状況をリアルタイムで監視\n• 複数のモデルを自动的にグループ化\n• モデル名と順序のカスタマイズ\n• クォータ警告通知の設定\n\nフィードバックはいつでも大歓迎です！",
+          "actionLabel": "フィードバック"
+        },
+        "ko": {
+          "title": "👋 Antigravity Cockpit에 오신 것을 환영합니다",
+          "summary": "이 확장 프로그램을 사용해 주셔서 감사합니다!",
+          "content": "Antigravity Cockpit을 선택해 주셔서 감사합니다!\n\n이 확장 프로그램은 다음을 도와줍니다:\n• AI 모델 할당량 사용량을 실시간으로 모니터링\n• 여러 모델을 자동으로 그룹화\n• 모델 이름 및 순서 사용자 정의\n• 할당량 경고 알림 설정\n\n피드백은 언제나 환영합니다!",
+          "actionLabel": "피드백"
+        },
+        "fr": {
+          "title": "👋 Bienvenue sur Antigravity Cockpit",
+          "summary": "Merci d'utiliser cette extension !",
+          "content": "Merci d'avoir choisi Antigravity Cockpit !\n\nCette extension vous aide à :\n• Surveiller l'utilisation du quota des modèles IA en temps réel\n• Grouper automatiquement plusieurs modèles\n• Personnaliser les noms et l'ordre des modèles\n• Définir des notifications d'avertissement de quota\n\nLes retours sont toujours les bienvenus !",
+          "actionLabel": "Commentaires"
+        },
+        "de": {
+          "title": "👋 Willkommen bei Antigravity Cockpit",
+          "summary": "Vielen Dank für die Nutzung dieser Erweiterung!",
+          "content": "Vielen Dank, dass Sie sich für Antigravity Cockpit entschieden haben!\n\nDiese Erweiterung hilft Ihnen bei:\n• Echtzeit-Überwachung der Quoten-Nutzung von KI-Modellen\n• Automatischer Gruppierung mehrerer Modelle\n• Anpassung von Modellnamen und Sortierung\n• Einstellung von Quoten-Warnbenachrichtigungen\n\nFeedback ist immer willkommen!",
+          "actionLabel": "Feedback"
+        },
+        "es": {
+          "title": "👋 Bienvenido a Antigravity Cockpit",
+          "summary": "¡Gracias por usar esta extensión!",
+          "content": "¡Gracias por elegir Antigravity Cockpit!\n\nEsta extensión le ayuda a:\n• Monitorear el uso de cuota de modelos de IA en tiempo real\n• Agrupar automáticamente múltiples modelos\n• Personalizar nombres y orden de modelos\n• Configurar notificaciones de advertencia de cuota\n\n¡Sus comentarios son siempre bienvenidos!",
+          "actionLabel": "Comentarios"
+        },
+        "it": {
+          "title": "👋 Benvenuto in Antigravity Cockpit",
+          "summary": "Grazie per aver usato questa estensione!",
+          "content": "Grazie per aver scelto Antigravity Cockpit!\n\nQuesta estensione ti aiuta a:\n• Monitorare l'uso della quota dei modelli IA in tempo reale\n• Raggruppare automaticamente più modelli\n• Personalizzare i nomi e l'ordine dei modelli\n• Impostare notifiche di avviso per la quota\n\nI feedback sono sempre benvenuti!",
+          "actionLabel": "Feedback"
+        },
+        "ru": {
+          "title": "👋 Добро пожаловать в Antigravity Cockpit",
+          "summary": "Спасибо за использование этого расширения!",
+          "content": "Спасибо, что выбрали Antigravity Cockpit!\n\nЭто расширение поможет вам:\n• Отслеживать использование квот ИИ-моделей в реальном времени\n• Автоматически группировать несколько моделей\n• Настраивать названия и порядок моделей\n• Устанавливать уведомления о достижении лимитов квот\n\nМы всегда рады вашим отзывам!",
+          "actionLabel": "Обратная связь"
+        },
+        "pt-br": {
+          "title": "👋 Bem-vindo ao Antigravity Cockpit",
+          "summary": "Obrigado por usar esta extensão!",
+          "content": "Obrigado por escolher o Antigravity Cockpit!\n\nEsta extensão ajuda você a:\n• Monitorar o uso de cota de modelos de IA em tempo real\n• Agrupar automaticamente vários modelos\n• Personalizar nomes e ordenação de modelos\n• Definir notificações de aviso de cota\n\nSeu feedback é sempre bem-vindo!",
+          "actionLabel": "Feedback"
+        },
+        "tr": {
+          "title": "👋 Antigravity Cockpit'e Hoş Geldiniz",
+          "summary": "Bu uzantıyı kullandığınız için teşekkür ederiz!",
+          "content": "Antigravity Cockpit'i seçtiğiniz için teşekkürler!\n\nBu uzantı şunları yapmanıza yardımcı olur:\n• Yapay zeka modeli kota kullanımını gerçek zamanlı izleyin\n• Birden fazla modeli otomatik olarak gruplandırın\n• Model adlarını ve sıralamasını özelleştirin\n• Kota uyarı bildirimlerini ayarlayın\n\nGeri bildirimlerinizi her zaman bekleriz!",
+          "actionLabel": "Geri Bildirim"
+        },
+        "pl": {
+          "title": "👋 Witamy w Antigravity Cockpit",
+          "summary": "Dziękujemy za korzystanie z tego rozszerzenia!",
+          "content": "Dziękujemy za wybranie Antigravity Cockpit!\n\nTo rozszerzenie pomaga Ci:\n• Monitorować zużycie limitów modeli AI w czasie rzeczywistym\n• Automatycznie grupować wiele modeli\n• Dostosowywać nazwy i kolejność modeli\n• Ustawiać powiadomienia o ostrzeżeniach dotyczących limitów\n\nOpinie są zawsze mile widziane!",
+          "actionLabel": "Opinie"
+        },
+        "cs": {
+          "title": "👋 Vítejte v Antigravity Cockpit",
+          "summary": "Děkujeme, že používáte toto rozšíření!",
+          "content": "Děkujeme, že jste si vybrali Antigravity Cockpit!\n\nToto rozšíření vám pomůže:\n• Sledovat využití kvót modelů AI v reálném čase\n• Automaticky seskupovat více modelů\n• Přizpůsobit názvy a pořadí modelů\n• Nastavit upozornění na kvóty\n\nZpětná vazba je vždy vítána!",
+          "actionLabel": "Zpětná vazba"
+        }
+      },
+      "targetVersions": "*",
+      "showOnce": true,
+      "popup": false,
+      "createdAt": "2025-12-01T00:00:00Z",
+      "expiresAt": null
+    }
+  ]
+}
