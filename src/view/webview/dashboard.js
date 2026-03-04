@@ -4,6 +4,7 @@
  */
 
 import { AUTH_MODEL_BLACKLIST_IDS, AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../shared/recommended_models';
+import * as ModelUtils from '../../shared/model_utils';
 import { createHistoryModule } from './dashboard_history';
 import { createAnnouncementModule } from './dashboard_announcements';
 
@@ -113,20 +114,14 @@ import { createAnnouncementModule } from './dashboard_announcements';
     let shouldBurstNewTags = true;
     let newTagBurstTimer = null;
 
-    const normalizeRecommendedKey = value => (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const AUTH_RECOMMENDED_LABEL_RANK = new Map(
-        AUTH_RECOMMENDED_LABELS.map((label, index) => [label, index])
-    );
-    const AUTH_RECOMMENDED_ID_RANK = new Map(
-        AUTH_RECOMMENDED_MODEL_IDS.map((id, index) => [id, index])
-    );
+    const normalizeRecommendedKey = value => (value || '').toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
     const AUTH_RECOMMENDED_LABEL_KEY_RANK = new Map(
         AUTH_RECOMMENDED_LABELS.map((label, index) => [normalizeRecommendedKey(label), index])
     );
     const AUTH_RECOMMENDED_ID_KEY_RANK = new Map(
         AUTH_RECOMMENDED_MODEL_IDS.map((id, index) => [normalizeRecommendedKey(id), index])
     );
-    const AUTH_MODEL_BLACKLIST_ID_SET = new Set(AUTH_MODEL_BLACKLIST_IDS);
+    const AUTH_MODEL_BLACKLIST_ID_SET = new Set(AUTH_MODEL_BLACKLIST_IDS.map(id => id.toLowerCase()));
 
     // 自定义分组弹框状态
     const customGroupingModal = document.getElementById('custom-grouping-modal');
@@ -143,59 +138,8 @@ import { createAnnouncementModule } from './dashboard_announcements';
         gemini_flash: 2,
         gemini_image: 3,
     };
-
-    function normalizeGroupMatchText(value) {
-        return (value || '')
-            .toLowerCase()
-            .replace(/[_-]+/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
-
     function resolveGroupFamily(modelId, label) {
-        const modelIdLower = (modelId || '').toLowerCase();
-        const labelText = normalizeGroupMatchText(label || modelId || '');
-
-        if (
-            /^gemini-\d+(?:\.\d+)?-pro-image(?:-|$)/.test(modelIdLower)
-            || /^gemini \d+(?:\.\d+)? pro image\b/.test(labelText)
-            || modelIdLower === 'model_placeholder_m9'
-        ) {
-            return 'gemini_image';
-        }
-
-        if (
-            /^gemini-\d+(?:\.\d+)?-pro-(high|low)(?:-|$)/.test(modelIdLower)
-            || /^gemini \d+(?:\.\d+)? pro(?: \((high|low)\)| (high|low))\b/.test(labelText)
-            || modelIdLower === 'model_placeholder_m7'
-            || modelIdLower === 'model_placeholder_m8'
-            || modelIdLower === 'model_placeholder_m36'
-            || modelIdLower === 'model_placeholder_m37'
-        ) {
-            return 'gemini_pro';
-        }
-
-        if (
-            /^gemini-\d+(?:\.\d+)?-flash(?:-|$)/.test(modelIdLower)
-            || /^gemini \d+(?:\.\d+)? flash\b/.test(labelText)
-            || modelIdLower === 'model_placeholder_m18'
-        ) {
-            return 'gemini_flash';
-        }
-
-        if (
-            modelIdLower.startsWith('claude-')
-            || modelIdLower.startsWith('model_claude')
-            || labelText.startsWith('claude ')
-            || modelIdLower === 'model_placeholder_m12'
-            || modelIdLower === 'model_placeholder_m26'
-            || modelIdLower === 'model_placeholder_m35'
-            || modelIdLower === 'model_openai_gpt_oss_120b_medium'
-        ) {
-            return 'claude';
-        }
-
-        return null;
+        return ModelUtils.resolveGroupFamily(modelId, label);
     }
 
     function resolveGroupFamilyByModels(group, allModels) {
@@ -706,7 +650,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 nameSpan.textContent = newName;
             }
         }
-        
+
         // 2. 更新缓存 (lastSnapshot)
         if (lastSnapshot && lastSnapshot.groups) {
             const group = lastSnapshot.groups.find(g => g.groupId === groupId);
@@ -965,14 +909,14 @@ import { createAnnouncementModule } from './dashboard_announcements';
         if (message.type === 'antigravityToolsSyncComplete') {
             handleAntigravityToolsSyncComplete(message.data?.success, message.data?.error);
         }
-        
+
         // 处理 Cockpit Tools 数据同步消息
         if (message.type === 'refreshAccounts') {
             // Cockpit Tools 数据变更，刷新授权状态和账号列表
             vscode.postMessage({ command: 'getAutoTriggerState' });
             showToast(i18n['cockpitTools.dataChanged'] || '账号数据已更新', 'info');
         }
-        
+
         if (message.type === 'accountSwitched') {
             // 账号切换完成
             vscode.postMessage({ command: 'getAutoTriggerState' });
@@ -997,23 +941,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
         });
     }
 
-    function requestQuotaSourceChange(source, options = {}) {
-        source = 'authorized';
-        const force = options.force === true;
-        if (!force) {
-            if (!isQuotaSourceSwitching && source === currentQuotaSource) {
-                return;
-            }
-            if (isQuotaSourceSwitching && source === pendingQuotaSource) {
-                return;
-            }
-        }
-        const command = options.command || 'updateQuotaSource';
-        setQuotaSourceSwitching(true, source);
-        currentQuotaSource = source;
-        updateQuotaSourceUI(lastSnapshot?.isConnected);
-        vscode.postMessage({ command, quotaSource: source });
-    }
 
     // attachAntigravityToolsSyncActions 保留但需要在某处调用
     // 当前由 authUi 模块处理，此函数作为兼容备用
@@ -1109,7 +1036,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
 
             // 绑定关闭按钮
             document.getElementById('close-at-sync-config-modal')?.addEventListener('click', closeATSyncConfigModal);
-            
+
             // 点击背景关闭
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) closeATSyncConfigModal();
@@ -1331,7 +1258,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 </div>
             `;
             modal.classList.remove('hidden');
-            
+
             modal.querySelector('#antigravityTools-sync-close')?.addEventListener('click', () => {
                 modal.classList.add('hidden');
             });
@@ -1737,14 +1664,14 @@ import { createAnnouncementModule } from './dashboard_announcements';
     function updateAntigravityToolsSyncProgress(current, total, email) {
         const cancelText = i18n['common.cancel'] || '取消';
         const progressText = `${i18n['autoTrigger.importing'] || 'Importing...'} ${current}/${total}`;
-        
+
         // 更新 antigravityTools-sync-modal 中的按钮
         const syncModal = document.getElementById('antigravityTools-sync-modal');
         if (syncModal) {
             const importOnlyBtn = syncModal.querySelector('#antigravityTools-sync-import-only');
             const importSwitchBtn = syncModal.querySelector('#antigravityTools-sync-import-switch');
             const cancelBtn = syncModal.querySelector('#antigravityTools-sync-cancel');
-            
+
             // 显示进度
             if (importOnlyBtn && importOnlyBtn.disabled) {
                 importOnlyBtn.textContent = progressText;
@@ -1752,7 +1679,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
             if (importSwitchBtn && importSwitchBtn.disabled) {
                 importSwitchBtn.textContent = progressText;
             }
-            
+
             // 启用取消按钮
             if (cancelBtn) {
                 cancelBtn.disabled = false;
@@ -1770,11 +1697,11 @@ import { createAnnouncementModule } from './dashboard_announcements';
         if (jsonModal) {
             const importBtn = jsonModal.querySelector('#antigravityTools-json-import');
             const cancelBtn = jsonModal.querySelector('#antigravityTools-json-cancel');
-            
+
             if (importBtn && importBtn.disabled) {
                 importBtn.textContent = progressText;
             }
-            
+
             // 启用取消按钮
             if (cancelBtn) {
                 cancelBtn.disabled = false;
@@ -1885,7 +1812,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 ? `<span class="account-count-badge" title="${escapeHtml(i18n['autoTrigger.manageAccounts'] || 'Manage Accounts')}">+${extraCount}</span>`
                 : '';
             const manageBtn = `<button id="quota-account-manage-btn" class="quota-account-manage-btn" title="${escapeHtml(i18n['autoTrigger.manageAccounts'])}">${escapeHtml(i18n['autoTrigger.manageAccounts'])}</button>`;
-            
+
             row.innerHTML = `
                 <div class="quota-auth-info quota-auth-info-clickable" title="${escapeHtml(i18n['autoTrigger.manageAccounts'])}">
                     <span class="quota-auth-email">${escapeHtml(activeEmail)}</span>
@@ -1964,7 +1891,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
 
             // 绑定关闭按钮
             document.getElementById('close-account-manage-modal')?.addEventListener('click', closeAccountManageModal);
-            
+
             // 点击背景关闭
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) closeAccountManageModal();
@@ -2068,7 +1995,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
             item.addEventListener('click', (e) => {
                 // 如果点击的是按钮，则忽略（按钮已有阻止冒泡，但多一层判断更安全）
                 if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
-                
+
                 // 如果已激活，不执行操作
                 if (item.classList.contains('active')) return;
 
@@ -2206,17 +2133,11 @@ import { createAnnouncementModule } from './dashboard_announcements';
     function getRecommendedRank(model) {
         const label = model?.label || '';
         const modelId = model?.modelId || '';
-        if (AUTH_RECOMMENDED_ID_RANK.has(modelId)) {
-            return AUTH_RECOMMENDED_ID_RANK.get(modelId);
-        }
-        if (AUTH_RECOMMENDED_LABEL_RANK.has(label)) {
-            return AUTH_RECOMMENDED_LABEL_RANK.get(label);
-        }
         const normalizedId = normalizeRecommendedKey(modelId);
         const normalizedLabel = normalizeRecommendedKey(label);
         return Math.min(
-            AUTH_RECOMMENDED_ID_KEY_RANK.get(normalizedId) ?? Number.MAX_SAFE_INTEGER,
-            AUTH_RECOMMENDED_LABEL_KEY_RANK.get(normalizedLabel) ?? Number.MAX_SAFE_INTEGER
+            AUTH_RECOMMENDED_ID_KEY_RANK[normalizedId] ?? Number.MAX_SAFE_INTEGER,
+            AUTH_RECOMMENDED_LABEL_KEY_RANK[normalizedLabel] ?? Number.MAX_SAFE_INTEGER
         );
     }
 
@@ -3250,7 +3171,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
         const smartGroupCanonicalNames = {};
         for (const defaultGroup of defaultGroups) {
             const groupModels = [];
-            
+
             for (const model of models) {
                 const exactMatch = defaultGroup.modelIds.includes(model.modelId);
                 const familyMatch = resolveGroupFamily(model.modelId, model.label) === defaultGroup.family;

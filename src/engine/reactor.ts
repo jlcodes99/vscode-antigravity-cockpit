@@ -4,10 +4,10 @@
  */
 
 import * as https from 'https';
-import { 
-    QuotaSnapshot, 
-    ModelQuotaInfo, 
-    PromptCreditsInfo, 
+import {
+    QuotaSnapshot,
+    ModelQuotaInfo,
+    PromptCreditsInfo,
     ServerUserStatusResponse,
     ClientModelConfig,
     QuotaGroup,
@@ -29,6 +29,8 @@ import {
     isApiCacheValid,
     type QuotaApiCacheRecord,
 } from '../services/quota_api_cache';
+import * as modelUtils from '../shared/model_utils';
+import * as recommendedModels from '../shared/recommended_models';
 
 
 interface AuthorizedQuotaInfo {
@@ -74,49 +76,7 @@ export interface AccountQuotaFetchResult {
     fromApiCacheFile: boolean;
 }
 
-const AUTHORIZED_EXTRA_IMAGE_MODEL_KEY = 'gemini-3-pro-image';
-const AUTHORIZED_EXTRA_IMAGE_MODEL_ID = 'MODEL_PLACEHOLDER_M9';
-type AutoGroupFamily = 'claude' | 'gemini_pro' | 'gemini_flash' | 'gemini_image';
-
-const AUTO_GROUP_GEMINI_PRO_ID_PATTERN = /^gemini-\d+(?:\.\d+)?-pro-(high|low)(?:-|$)/;
-const AUTO_GROUP_GEMINI_FLASH_ID_PATTERN = /^gemini-\d+(?:\.\d+)?-flash(?:-|$)/;
-const AUTO_GROUP_GEMINI_IMAGE_ID_PATTERN = /^gemini-\d+(?:\.\d+)?-pro-image(?:-|$)/;
-
-const AUTO_GROUP_GEMINI_PRO_LABEL_PATTERN = /^gemini \d+(?:\.\d+)? pro(?: \((high|low)\)| (high|low))\b/;
-const AUTO_GROUP_GEMINI_FLASH_LABEL_PATTERN = /^gemini \d+(?:\.\d+)? flash\b/;
-const AUTO_GROUP_GEMINI_IMAGE_LABEL_PATTERN = /^gemini \d+(?:\.\d+)? pro image\b/;
-
-const AUTO_GROUP_CLAUDE_ID_SET = new Set(
-    [
-        'MODEL_CLAUDE_4_5_SONNET',
-        'MODEL_CLAUDE_4_5_SONNET_THINKING',
-        'MODEL_PLACEHOLDER_M12',
-        'MODEL_PLACEHOLDER_M26',
-        'MODEL_PLACEHOLDER_M35',
-        'MODEL_OPENAI_GPT_OSS_120B_MEDIUM',
-    ].map(id => id.toLowerCase()),
-);
-
-const AUTO_GROUP_GEMINI_PRO_ID_SET = new Set(
-    [
-        'MODEL_PLACEHOLDER_M7',
-        'MODEL_PLACEHOLDER_M8',
-        'MODEL_PLACEHOLDER_M36',
-        'MODEL_PLACEHOLDER_M37',
-    ].map(id => id.toLowerCase()),
-);
-
-const AUTO_GROUP_GEMINI_FLASH_ID_SET = new Set(
-    [
-        'MODEL_PLACEHOLDER_M18',
-    ].map(id => id.toLowerCase()),
-);
-
-const AUTO_GROUP_GEMINI_IMAGE_ID_SET = new Set(
-    [
-        'MODEL_PLACEHOLDER_M9',
-    ].map(id => id.toLowerCase()),
-);
+const AUTHORIZED_EXTRA_IMAGE_MODEL_ID = recommendedModels.AUTH_RECOMMENDED_MODEL_IDS.find(id => id.includes('M9')) || 'MODEL_PLACEHOLDER_M9';
 
 
 /**
@@ -132,7 +92,7 @@ export class ReactorCore {
     private pulseTimer?: ReturnType<typeof setInterval>;
     public currentInterval: number = 0;
     private lastScanDiagnostics?: ScanDiagnostics;
-    
+
     /** 上一次的配额快照缓存 */
     private lastSnapshot?: QuotaSnapshot;
     /** 上一次快照的来源 */
@@ -284,7 +244,7 @@ export class ReactorCore {
 
             // 构建快照（复用现有分组/过滤逻辑）
             const snapshot = this.buildSnapshot(models);
-            
+
             logger.info(`[ReactorCore] Quota for ${email}: ${models.length} models, ${snapshot.groups?.length ?? 0} groups`);
             return {
                 snapshot,
@@ -348,11 +308,11 @@ export class ReactorCore {
                         resolve(JSON.parse(body) as T);
                     } catch (e) {
                         const error = e instanceof Error ? e : new Error(String(e));
-                        
+
                         // Log body preview for diagnosis
                         const bodyPreview = body.length > 200 ? body.substring(0, 200) + '...' : body;
                         logger.error(`JSON parse failed. Response preview: ${bodyPreview}`);
-                        
+
                         reject(new Error(`Signal Corrupted: ${error.message}`));
                     }
                 });
@@ -429,7 +389,7 @@ export class ReactorCore {
                 logger.info(`[ReactorCore] Ignoring ${this.getSyncErrorSource(err)} init error after source switch: ${err.message}`);
                 return;
             }
-            
+
             if (retryToken !== this.initRetryToken) {
                 logger.info('Init sync retry canceled after error');
                 return;
@@ -440,16 +400,16 @@ export class ReactorCore {
                 const sourceInfo = source ? `source=${source}` : 'source=unknown';
                 const endpointInfo = `endpoint=${endpoint}`;
                 logger.warn(`Init sync failed (${sourceInfo}, ${endpointInfo}), retry ${currentRetry + 1}/${maxRetries} in ${delay}ms: ${err.message}`);
-                
+
                 await this.delay(delay);
                 return this.initWithRetry(maxRetries, currentRetry + 1, retryToken);
             }
-            
+
             // 超过最大重试次数，触发错误回调
             const sourceInfo = source ? `source=${source}` : 'source=unknown';
             const endpointInfo = `endpoint=${endpoint}`;
             logger.error(`Init sync failed after ${maxRetries} retries (${sourceInfo}, ${endpointInfo}): ${err.message}`);
-            
+
             if (this.errorHandler) {
                 this.errorHandler(err);
             }
@@ -518,7 +478,7 @@ export class ReactorCore {
                 ? 'v1internal:fetchAvailableModels'
                 : API_ENDPOINTS.GET_USER_STATUS;
             logger.error(`Telemetry Sync Failed (${sourceInfo}, current=${currentSource}, endpoint=${endpoint}): ${err.message}`);
-            
+
             if (this.errorHandler) {
                 this.errorHandler(err);
             }
@@ -696,7 +656,7 @@ export class ReactorCore {
                 const pct = m.remainingPercentage !== undefined ? m.remainingPercentage.toFixed(2) + '%' : 'N/A';
                 return `    ${m.label.padEnd(maxLabelLen)} : ${pct}`;
             }).join('\n');
-            
+
             logger.info(`Quota Update:\n${quotaSummary}`);
         } else {
             logger.info('Quota Update: No models available');
@@ -705,7 +665,7 @@ export class ReactorCore {
         if (this.updateHandler) {
             this.updateHandler(telemetry);
         }
-        
+
         // 检查配额重置并触发自动唤醒（异步执行，不阻塞主流程）
         // 注意：现在 checkQuotaResetTrigger 会自行获取每个选中账号的配额数据
         this.checkQuotaResetTrigger().catch(err => {
@@ -789,59 +749,12 @@ export class ReactorCore {
         return normalized ? normalized : null;
     }
 
-    private normalizeAutoGroupMatchText(value: string | undefined): string {
-        return (value || '')
-            .toLowerCase()
-            .replace(/[_-]+/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
+    private resolveAutoGroupFamily(modelId: string, label?: string): modelUtils.ModelGroupFamily | null {
+        return modelUtils.resolveGroupFamily(modelId, label);
     }
 
-    private resolveAutoGroupFamily(modelId: string, label?: string): AutoGroupFamily | null {
-        const normalizedId = modelId.trim().toLowerCase();
-        if (!normalizedId) {
-            return null;
-        }
-        const normalizedLabel = this.normalizeAutoGroupMatchText(label || modelId);
-
-        if (
-            AUTO_GROUP_GEMINI_IMAGE_ID_SET.has(normalizedId)
-            || AUTO_GROUP_GEMINI_IMAGE_ID_PATTERN.test(normalizedId)
-            || AUTO_GROUP_GEMINI_IMAGE_LABEL_PATTERN.test(normalizedLabel)
-        ) {
-            return 'gemini_image';
-        }
-
-        if (
-            AUTO_GROUP_GEMINI_PRO_ID_SET.has(normalizedId)
-            || AUTO_GROUP_GEMINI_PRO_ID_PATTERN.test(normalizedId)
-            || AUTO_GROUP_GEMINI_PRO_LABEL_PATTERN.test(normalizedLabel)
-        ) {
-            return 'gemini_pro';
-        }
-
-        if (
-            AUTO_GROUP_GEMINI_FLASH_ID_SET.has(normalizedId)
-            || AUTO_GROUP_GEMINI_FLASH_ID_PATTERN.test(normalizedId)
-            || AUTO_GROUP_GEMINI_FLASH_LABEL_PATTERN.test(normalizedLabel)
-        ) {
-            return 'gemini_flash';
-        }
-
-        if (
-            AUTO_GROUP_CLAUDE_ID_SET.has(normalizedId)
-            || normalizedId.startsWith('claude-')
-            || normalizedId.startsWith('model_claude')
-            || normalizedLabel.startsWith('claude ')
-        ) {
-            return 'claude';
-        }
-
-        return null;
-    }
-
-    private buildAutoFamilyGroupMap(groupMappings: Record<string, string>): Partial<Record<AutoGroupFamily, string>> {
-        const familyStats = new Map<AutoGroupFamily, Map<string, number>>();
+    private buildAutoFamilyGroupMap(groupMappings: Record<string, string>): Partial<Record<modelUtils.ModelGroupFamily, string>> {
+        const familyStats = new Map<modelUtils.ModelGroupFamily, Map<string, number>>();
 
         for (const [modelId, groupId] of Object.entries(groupMappings)) {
             if (!groupId) {
@@ -859,8 +772,8 @@ export class ReactorCore {
             groupCounter.set(groupId, (groupCounter.get(groupId) || 0) + 1);
         }
 
-        const familyGroupMap: Partial<Record<AutoGroupFamily, string>> = {};
-        for (const family of ['claude', 'gemini_pro', 'gemini_flash', 'gemini_image'] as AutoGroupFamily[]) {
+        const familyGroupMap: Partial<Record<modelUtils.ModelGroupFamily, string>> = {};
+        for (const family of ['claude', 'gemini_pro', 'gemini_flash', 'gemini_image'] as modelUtils.ModelGroupFamily[]) {
             const groupCounter = familyStats.get(family);
             if (!groupCounter || groupCounter.size === 0) {
                 continue;
@@ -906,8 +819,7 @@ export class ReactorCore {
             });
         } catch (error) {
             logger.warn(
-                `[AutoGroup] Failed to compare api cache payload: ${
-                    error instanceof Error ? error.message : String(error)
+                `[AutoGroup] Failed to compare api cache payload: ${error instanceof Error ? error.message : String(error)
                 }`,
             );
             return [];
@@ -1135,7 +1047,7 @@ export class ReactorCore {
         // 在官方列表基础上补入 Gemini 3 Pro Image（若接口返回且未包含）
         this.pushAuthorizedModelKeyIfExists(
             data.models,
-            AUTHORIZED_EXTRA_IMAGE_MODEL_KEY,
+            'gemini-3-pro-image',
             added,
             orderedKeys,
         );
@@ -1299,11 +1211,11 @@ export class ReactorCore {
                 throw new AntigravityError(t('error.serverError', { message: data.message }));
             }
 
-            throw new Error(t('error.invalidResponse', { 
-                details: data ? JSON.stringify(data).substring(0, 100) : 'empty response', 
+            throw new Error(t('error.invalidResponse', {
+                details: data ? JSON.stringify(data).substring(0, 100) : 'empty response',
             }));
         }
-        
+
         const status = data.userStatus;
         const plan = status.planStatus?.planInfo;
         const credits = status.planStatus?.availablePromptCredits;
@@ -1344,7 +1256,7 @@ export class ReactorCore {
             tierDescription: status.userTier?.description || 'N/A',
             upgradeUri: status.userTier?.upgradeSubscriptionUri || '',
             upgradeText: status.userTier?.upgradeSubscriptionText || '',
-            
+
             // New fields population
             teamsTier: plan?.teamsTier || 'N/A',
             hasTabToJump: plan?.hasTabToJump === true,
@@ -1381,7 +1293,7 @@ export class ReactorCore {
         }
 
         const models: ModelQuotaInfo[] = configs
-            .filter((m): m is ClientModelConfig & { quotaInfo: NonNullable<ClientModelConfig['quotaInfo']> } => 
+            .filter((m): m is ClientModelConfig & { quotaInfo: NonNullable<ClientModelConfig['quotaInfo']> } =>
                 !!m.quotaInfo,
             )
             .map((m) => {
@@ -1399,8 +1311,8 @@ export class ReactorCore {
                     label: m.label,
                     modelId: m.modelOrAlias?.model || 'unknown',
                     remainingFraction: m.quotaInfo.remainingFraction,
-                    remainingPercentage: m.quotaInfo.remainingFraction !== undefined 
-                        ? m.quotaInfo.remainingFraction * 100 
+                    remainingPercentage: m.quotaInfo.remainingFraction !== undefined
+                        ? m.quotaInfo.remainingFraction * 100
                         : undefined,
                     isExhausted: m.quotaInfo.remainingFraction === 0,
                     resetTime: reset,
@@ -1479,7 +1391,7 @@ export class ReactorCore {
         if (visibleModels.length > 0) {
             const visibleSet = new Set(visibleModels);
             const filteredModels = models.filter(model => visibleSet.has(model.modelId));
-            
+
             // 安全检查：如果过滤后为空但原始列表不为空，可能是配置问题
             if (filteredModels.length === 0 && models.length > 0) {
                 logger.warn('[buildSnapshot] Visible models filter resulted in empty list. ' +
@@ -1494,12 +1406,12 @@ export class ReactorCore {
 
         // 分组逻辑：使用存储的 groupMappings 进行分组
         let groups: QuotaGroup[] | undefined;
-        
+
         if (config.groupingEnabled) {
             const groupMap = new Map<string, ModelQuotaInfo[]>();
             const savedMappings = config.groupMappings;
             const hasSavedMappings = Object.keys(savedMappings).length > 0;
-            
+
             if (hasSavedMappings) {
                 // 使用存储的分组映射
                 for (const model of models) {
@@ -1511,31 +1423,31 @@ export class ReactorCore {
                         groupMap.get(groupId)!.push(model);
                     }
                 }
-                
+
                 // 自动分组检查：检查每个分组内模型的配额是否一致
                 // 如果不一致，只将不一致的模型移出分组（保留用户自定义设置）
                 const modelsToRemove: string[] = [];
-                
+
                 for (const [groupId, groupModels] of groupMap) {
                     if (groupModels.length <= 1) {
                         continue; // 单模型组无需检查
                     }
-                    
+
                     // 检查组内所有模型的配额签名（remainingFraction + resetTime）是否一致
                     // 使用多数派原则：找出最常见的配额签名，将不符合的模型移除
                     const signatureCount = new Map<string, { count: number; fraction: number; resetTime: number }>();
-                    
+
                     for (const model of groupModels) {
                         const fraction = model.remainingFraction ?? 0;
                         const resetTime = model.resetTime.getTime();
                         const signature = `${fraction.toFixed(6)}_${resetTime}`;
-                        
+
                         if (!signatureCount.has(signature)) {
                             signatureCount.set(signature, { count: 0, fraction, resetTime });
                         }
                         signatureCount.get(signature)!.count++;
                     }
-                    
+
                     // 找出最常见的签名（多数派）
                     let majoritySignature = '';
                     let maxCount = 0;
@@ -1545,31 +1457,31 @@ export class ReactorCore {
                             majoritySignature = sig;
                         }
                     }
-                    
+
                     // 标记不符合多数派的模型移出分组
                     for (const model of groupModels) {
                         const fraction = model.remainingFraction ?? 0;
                         const resetTime = model.resetTime.getTime();
                         const signature = `${fraction.toFixed(6)}_${resetTime}`;
-                        
+
                         if (signature !== majoritySignature) {
                             logger.info(`[GroupCheck] Removing model "${model.label}" from group "${groupId}" due to quota mismatch`);
                             modelsToRemove.push(model.modelId);
                         }
                     }
                 }
-                
+
                 // 更新 groupMappings，移除不一致的模型
                 if (modelsToRemove.length > 0) {
                     const newMappings = { ...savedMappings };
                     for (const modelId of modelsToRemove) {
                         delete newMappings[modelId];
                     }
-                    
+
                     configService.updateGroupMappings(newMappings).catch(err => {
                         logger.warn(`Failed to save updated groupMappings: ${err}`);
                     });
-                    
+
                     // 从 groupMap 中移除这些模型（未分组模型在分组视图中隐藏）
                     for (const modelId of modelsToRemove) {
                         for (const [_gid, gModels] of groupMap) {
@@ -1580,30 +1492,30 @@ export class ReactorCore {
                             }
                         }
                     }
-                    
+
                     // 清理空的分组
                     for (const [gid, gModels] of groupMap) {
                         if (gModels.length === 0) {
                             groupMap.delete(gid);
                         }
                     }
-                    
+
                     logger.info(`[GroupCheck] Removed ${modelsToRemove.length} models from groups due to quota mismatch (hidden in grouped view)`);
                 }
             } else {
                 // 没有存储映射时，不展示未分组模型
                 logger.debug('Grouping enabled but no saved mappings; ungrouped models are hidden');
             }
-            
+
             // 转换为 QuotaGroup 数组
             groups = [];
             let groupIndex = 1;
-            
+
             for (const [groupId, groupModels] of groupMap) {
                 // 锚点共识：查找组内模型的自定义名称
                 let groupName = '';
                 const customNames = config.groupingCustomNames;
-                
+
                 // 统计每个自定义名称的投票数
                 const nameVotes = new Map<string, number>();
                 for (const model of groupModels) {
@@ -1612,7 +1524,7 @@ export class ReactorCore {
                         nameVotes.set(customName, (nameVotes.get(customName) || 0) + 1);
                     }
                 }
-                
+
                 // 选择投票数最多的名称
                 if (nameVotes.size > 0) {
                     let maxVotes = 0;
@@ -1623,7 +1535,7 @@ export class ReactorCore {
                         }
                     }
                 }
-                
+
                 // 如果没有自定义名称，使用默认名称
                 if (!groupName) {
                     if (groupModels.length === 1) {
@@ -1632,11 +1544,11 @@ export class ReactorCore {
                         groupName = `Group ${groupIndex}`;
                     }
                 }
-                
+
                 const firstModel = groupModels[0];
                 // 计算组内所有模型的平均/最低配额
                 const minPercentage = Math.min(...groupModels.map(m => m.remainingPercentage ?? 0));
-                
+
                 groups.push({
                     groupId,
                     groupName,
@@ -1647,10 +1559,10 @@ export class ReactorCore {
                     timeUntilResetFormatted: firstModel.timeUntilResetFormatted,
                     isExhausted: groupModels.some(m => m.isExhausted),
                 });
-                
+
                 groupIndex++;
             }
-            
+
             // 按组内模型在原始列表中的最小索引排序，保持相对顺序
             const modelIndexMap = new Map<string, number>();
             models.forEach((m, i) => modelIndexMap.set(m.modelId, i));
@@ -1662,7 +1574,7 @@ export class ReactorCore {
                 const minIndexB = Math.min(...b.models.map(m => modelIndexMap.get(m.modelId) ?? 99999));
                 return minIndexA - minIndexB;
             });
-            
+
             logger.debug(`Grouping enabled: ${groups.length} groups created (saved mappings: ${hasSavedMappings})`);
         }
 
@@ -1692,46 +1604,38 @@ export class ReactorCore {
 
     private getAuthorizedDefaultVisibleIds(models: ModelQuotaInfo[]): string[] {
         return models
-            .filter(model => !AUTH_MODEL_BLACKLIST_ID_SET.has(model.modelId))
+            .filter(model => !recommendedModels.AUTH_MODEL_BLACKLIST_ID_SET.has(model.modelId.toLowerCase()))
             .map(model => model.modelId);
     }
 
     private getAuthorizedRecommendedRank(model: ModelQuotaInfo): number {
-        const idRank = AUTH_RECOMMENDED_ID_RANK.get(model.modelId);
+        const modelIdLower = model.modelId.toLowerCase();
+        const idRank = recommendedModels.AUTH_RECOMMENDED_ID_KEY_RANK[modelIdLower];
         if (idRank !== undefined) {
             return idRank;
         }
-        const labelRank = AUTH_RECOMMENDED_LABEL_RANK.get(model.label);
+        const normalizedLabel = recommendedModels.normalizeRecommendedKey(model.label || model.modelId);
+        const labelRank = recommendedModels.AUTH_RECOMMENDED_LABEL_KEY_RANK[normalizedLabel];
         if (labelRank !== undefined) {
             return labelRank;
         }
-        const normalizedId = normalizeRecommendedKey(model.modelId);
-        const normalizedLabel = normalizeRecommendedKey(model.label);
-        return Math.min(
-            AUTH_RECOMMENDED_ID_KEY_RANK.get(normalizedId) ?? Number.MAX_SAFE_INTEGER,
-            AUTH_RECOMMENDED_LABEL_KEY_RANK.get(normalizedLabel) ?? Number.MAX_SAFE_INTEGER,
-        );
+        return Number.MAX_SAFE_INTEGER;
     }
 
     private getAuthorizedRecommendedRankFromRaw(modelKey: string, info: AuthorizedModelInfo): number {
         const modelId = info.model || modelKey;
-        const label = info.displayName?.trim() || modelKey;
-
-        const idRank = AUTH_RECOMMENDED_ID_RANK.get(modelId);
+        const modelIdLower = modelId.toLowerCase();
+        const idRank = RecommendedModels.AUTH_RECOMMENDED_ID_KEY_RANK[modelIdLower];
         if (idRank !== undefined) {
             return idRank;
         }
-        const labelRank = AUTH_RECOMMENDED_LABEL_RANK.get(label);
+        const label = info.displayName?.trim() || modelKey;
+        const normalizedLabel = RecommendedModels.normalizeRecommendedKey(label);
+        const labelRank = RecommendedModels.AUTH_RECOMMENDED_LABEL_KEY_RANK[normalizedLabel];
         if (labelRank !== undefined) {
             return labelRank;
         }
-
-        const normalizedId = normalizeRecommendedKey(modelId);
-        const normalizedLabel = normalizeRecommendedKey(label);
-        return Math.min(
-            AUTH_RECOMMENDED_ID_KEY_RANK.get(normalizedId) ?? Number.MAX_SAFE_INTEGER,
-            AUTH_RECOMMENDED_LABEL_KEY_RANK.get(normalizedLabel) ?? Number.MAX_SAFE_INTEGER,
-        );
+        return Number.MAX_SAFE_INTEGER;
     }
 
     private async ensureAuthorizedVisibleModels(models: ModelQuotaInfo[]): Promise<void> {
@@ -1788,20 +1692,20 @@ export class ReactorCore {
             return t('dashboard.online');
         }
         const totalMinutes = Math.ceil(ms / 60000);
-        
+
         // 小于 60 分钟：只显示分钟
         if (totalMinutes < 60) {
             return `${totalMinutes}m`;
         }
-        
+
         const totalHours = Math.floor(totalMinutes / 60);
         const remainingMinutes = totalMinutes % 60;
-        
+
         // 小于 24 小时：显示小时和分钟
         if (totalHours < 24) {
             return `${totalHours}h ${remainingMinutes}m`;
         }
-        
+
         // >= 24 小时：显示天、小时、分钟
         const days = Math.floor(totalHours / 24);
         const remainingHours = totalHours % 24;
@@ -1841,7 +1745,7 @@ export class ReactorCore {
             logger.info('Auto-grouping detected degenerate state (all models identical), falling back to ID-based fallback grouping.');
             return this.groupBasedOnSeries(models);
         }
-        
+
         // 3. 正常情况：使用配额指纹生成映射
         const mappings: Record<string, string> = {};
         for (const [, modelIds] of statsMap) {
@@ -1850,7 +1754,7 @@ export class ReactorCore {
                 mappings[modelId] = stableGroupId;
             }
         }
-        
+
         return mappings;
     }
 

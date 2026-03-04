@@ -163,7 +163,8 @@ Sends notifications when model quota falls below warning threshold or is exhaust
 - **Multi-Model Support**: Wake up multiple models simultaneously
 - **Multi-Account Authorization**: Authorize multiple accounts, switch active account, and view account status
 - **Account Management**: Manage accounts with reauthorize/remove actions
-- **Secure**: Credentials encrypted in VS Code Secret Storage, running locally
+- **Secure**: All OAuth tokens (`refreshToken`, `accessToken`) are encrypted using VS Code's native `SecretStorage` API, which leverages your OS Keychain (macOS Keychain Access, Windows Credential Manager, or gnome-keyring). Local shared files are automatically sanitized using a **hardened recursive process** to ensure no sensitive keys are ever exposed. Shared directory permissions are also strictly enforced (700) on supported systems.
+- **Model Management**: Refactored with a **centralized model registry** and shared utilities, ensuring 100% consistency between the background engine and the UI dashboard. This architecture provides more reliable auto-grouping and faster updates for new model families.
 - **History**: View detailed trigger logs and AI responses
 - **Use Case**: Wake up before work to run through the reset cooldown during idle time
 

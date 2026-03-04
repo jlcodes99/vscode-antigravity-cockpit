@@ -7,6 +7,9 @@
  */
 
 import * as vscode from 'vscode';
+import * as os from 'os';
+import * as path from 'path';
+import * as fs from 'fs';
 import { OAuthCredential, AuthorizationStatus, AccountInfo } from './types';
 import { logger } from '../shared/log_service';
 
@@ -52,6 +55,88 @@ class CredentialStorage {
         this.migrationTask = this.migrateFromLegacy().catch(err => {
             logger.error(`[CredentialStorage] Migration failed: ${err.message}`);
         });
+        // 初始化完成后同步到共享文件（供 Cockpit Tools 读取）
+        this.syncExistingCredentials();
+
+        // 从共享目录读取当前账号，自动设置为活动账号
+        this.syncActiveAccountFromShared();
+
+        // Ensure existing credentials.json does not contain sensitive information
+        this.sanitizeSharedFile().catch(err => {
+            logger.error(`[CredentialStorage] Sanitizing shared file failed: ${err.message}`);
+        });
+    }
+
+    /**
+     * Sanitizes sensitive information in the shared file (if it exists).
+     * Hardened version: explicitly removes tokens and ensures file permissions.
+     */
+    private async sanitizeSharedFile(): Promise<void> {
+        const sharedDir = this.getSharedDir();
+        const sharedFile = path.join(sharedDir, 'credentials.json');
+
+        if (fs.existsSync(sharedFile)) {
+            try {
+                // Check and fix directory permissions (700 or 755 depending on OS/env)
+                // For shared files, we usually want at least 700 to be safe.
+                try {
+                    const stats = fs.statSync(sharedDir);
+                    if (process.platform !== 'win32' && (stats.mode & 0o077) !== 0o000) {
+                        fs.chmodSync(sharedDir, 0o700);
+                        logger.info(`[CredentialStorage] Hardened permissions for shared directory: ${sharedDir}`);
+                    }
+                } catch (err) {
+                    // Ignore permission fix errors
+                }
+
+                const content = fs.readFileSync(sharedFile, 'utf-8');
+                const data = JSON.parse(content);
+                let changed = false;
+
+                // Recursive sanitizer to catch tokens anywhere in the object
+                const sanitize = (obj: any): void => {
+                    if (!obj || typeof obj !== 'object') {
+                        return;
+                    }
+
+                    const sensitiveKeys = ['accessToken', 'refreshToken', 'expiresAt', 'token', 'secret'];
+                    for (const key of Object.keys(obj)) {
+                        if (sensitiveKeys.includes(key)) {
+                            delete obj[key];
+                            changed = true;
+                        } else if (typeof obj[key] === 'object') {
+                            sanitize(obj[key]);
+                        }
+                    }
+                };
+
+                sanitize(data);
+
+                if (changed) {
+                    fs.writeFileSync(sharedFile, JSON.stringify(data, null, 2), { mode: 0o600 });
+                    logger.info('[CredentialStorage] Hardened sanitization for credentials.json (recursive removal of tokens)');
+                }
+            } catch (error) {
+                // If it's not valid JSON, it's safer to just clear it or ignore
+                // Here we ignore to avoid data loss if it's just temporarily locked/malformed
+            }
+        }
+    }
+
+    /**
+     * 同步现有凭据到共享文件
+     */
+    private async syncExistingCredentials(): Promise<void> {
+        try {
+            await this.ensureMigrated();
+            const storage = await this.getCredentialsStorage();
+            if (Object.keys(storage.accounts).length > 0) {
+                await this.syncToSharedFile(storage);
+                logger.info('[CredentialStorage] Synced existing credentials to shared file');
+            }
+        } catch (error) {
+            // 忽略同步错误
+        }
     }
 
     /**
@@ -105,6 +190,8 @@ class CredentialStorage {
             await this.secretStorage!.store(CREDENTIALS_KEY, json);
             logger.info('[CredentialStorage] Credentials storage saved');
 
+            // 同步到共享文件供 Cockpit Tools 读取
+            await this.syncToSharedFile(storage);
             // 通过 WebSocket 通知 Cockpit Tools 数据已变更
             if (!options?.skipNotifyTools) {
                 this.notifyDataChanged();
@@ -115,7 +202,7 @@ class CredentialStorage {
             throw err;
         }
     }
-    
+
     /**
      * 通知 Cockpit Tools 数据已变更
      */
@@ -133,7 +220,7 @@ class CredentialStorage {
             // 忽略错误
         }
     }
-    
+
     /**
      * 同步账号到 Cockpit Tools（添加/更新）
      */
@@ -165,7 +252,7 @@ class CredentialStorage {
             // 忽略错误
         }
     }
-    
+
     /**
      * 从 Cockpit Tools 删除账号
      */
@@ -190,7 +277,7 @@ class CredentialStorage {
             // 忽略错误
         }
     }
-    
+
     /**
      * 通知 Cockpit Tools 切换账号 (暂时禁用，仅查看模式)
      */
@@ -216,7 +303,98 @@ class CredentialStorage {
         }
     }
     */
-    
+
+    /**
+     * 从共享目录读取当前账号，自动设置为活动账号
+     */
+    private async syncActiveAccountFromShared(): Promise<void> {
+        try {
+            await this.ensureMigrated();
+
+            const sharedDir = this.getSharedDir();
+            const currentAccountFile = path.join(sharedDir, 'current_account.json');
+
+            if (!fs.existsSync(currentAccountFile)) {
+                logger.info('[CredentialStorage] No current_account.json found in shared dir');
+                return;
+            }
+
+            const content = fs.readFileSync(currentAccountFile, 'utf-8');
+            const data = JSON.parse(content) as { email: string; updated_at: number };
+
+            if (!data.email) {
+                return;
+            }
+
+            // 检查该账号是否存在
+            const hasAccount = await this.hasAccount(data.email);
+            if (!hasAccount) {
+                logger.info(`[CredentialStorage] Account ${data.email} from shared dir not found locally`);
+                return;
+            }
+
+            // 检查是否已经是活动账号
+            const currentActive = await this.getActiveAccount();
+            if (currentActive === data.email) {
+                logger.info(`[CredentialStorage] Account ${data.email} is already active`);
+                return;
+            }
+
+            // 设置为活动账号（不触发切换流程）
+            await this.setActiveAccount(data.email);
+            logger.info(`[CredentialStorage] Synced active account from shared dir: ${data.email}`);
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.warn(`[CredentialStorage] Failed to sync active account from shared: ${err.message}`);
+        }
+    }
+
+    /**
+     * 获取共享目录路径（供 Cockpit Tools 读取）
+     */
+    private getSharedDir(): string {
+        return path.join(os.homedir(), '.antigravity_cockpit');
+    }
+
+    /**
+     * 同步凭据到共享文件
+     * 供 Cockpit Tools 导入使用
+     */
+    private async syncToSharedFile(storage: CredentialsStorage): Promise<void> {
+        try {
+            const sharedDir = this.getSharedDir();
+
+            // 确保目录存在
+            if (!fs.existsSync(sharedDir)) {
+                fs.mkdirSync(sharedDir, { recursive: true });
+            }
+
+            const sharedFile = path.join(sharedDir, 'credentials.json');
+
+            // 转换格式，只保存必要信息（排除敏感 token）
+            const exportData: Record<string, {
+                email: string;
+                projectId?: string;
+            }> = {};
+
+            for (const [email, cred] of Object.entries(storage.accounts)) {
+                // 跳过无效账号
+                if (cred.isInvalid) { continue; }
+
+                exportData[email] = {
+                    email: cred.email || email,
+                    projectId: cred.projectId,
+                };
+            }
+
+            fs.writeFileSync(sharedFile, JSON.stringify({ accounts: exportData }, null, 2));
+            logger.debug('[CredentialStorage] Synced to shared file for Cockpit Tools');
+        } catch (error) {
+            // 同步失败不影响主流程
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.warn(`[CredentialStorage] Failed to sync to shared file: ${err.message}`);
+        }
+    }
     /**
      * Check if an account with given email already exists
      */
@@ -253,12 +431,12 @@ class CredentialStorage {
         }
 
         logger.info(`[CredentialStorage] Account ${email} added successfully`);
-        
+
         // 同步到 Cockpit Tools
         if (!options?.skipNotifyTools) {
             this.syncAccountToCockpitTools(email, credential);
         }
-        
+
         return 'added';
     }
 
@@ -306,7 +484,7 @@ class CredentialStorage {
         }
 
         logger.info(`[CredentialStorage] Account ${email} deleted`);
-        
+
         // 通知 Cockpit Tools 删除账号
         if (!_skipNotifyTools) {
             this.deleteAccountFromCockpitTools(email);
@@ -345,9 +523,9 @@ class CredentialStorage {
         const storage = await this.getCredentialsStorage();
         const localEmails = Object.keys(storage.accounts);
         const remoteEmailSet = new Set(remoteEmails);
-        
+
         let changed = false;
-        
+
         for (const email of localEmails) {
             if (!remoteEmailSet.has(email)) {
                 logger.info(`[CredentialStorage] Syncing: Account ${email} not found in remote, deleting locally`);
@@ -356,7 +534,7 @@ class CredentialStorage {
                 changed = true;
             }
         }
-        
+
         if (changed) {
             logger.info('[CredentialStorage] Synced with remote account list');
         }
@@ -367,7 +545,7 @@ class CredentialStorage {
      */
     async markAccountInvalid(email: string, invalid: boolean = true): Promise<void> {
         const storage = await this.getCredentialsStorage();
-        
+
         if (!(email in storage.accounts)) {
             logger.warn(`[CredentialStorage] Account ${email} not found for marking invalid`);
             return;
@@ -375,7 +553,7 @@ class CredentialStorage {
 
         storage.accounts[email].isInvalid = invalid;
         await this.saveCredentialsStorage(storage);
-        
+
         logger.info(`[CredentialStorage] Account ${email} marked as ${invalid ? 'invalid' : 'valid'}`);
     }
 
@@ -440,7 +618,7 @@ class CredentialStorage {
 
         // Backward compatibility: sync to legacy key so older versions can read it
         await this.syncToLegacyKey(email);
-        
+
         // REVERTED: 自动同步切换逻辑已回滚
         // 现在的逻辑是：插件端切换账号仅为了查看配额，不改变客户端实际账户
         /*
@@ -569,7 +747,7 @@ class CredentialStorage {
         }
 
         logger.info(`[CredentialStorage] Credential saved for ${credential.email}`);
-        
+
         // 同步到 Cockpit Tools
         this.syncAccountToCockpitTools(credential.email, credential);
     }
