@@ -89,6 +89,8 @@ export interface QuotaSnapshot {
     errorMessage?: string;
     /** 本地账户邮箱（local 模式下使用远端 API 时） */
     localAccountEmail?: string;
+    /** 当前选中的模型 ID */
+    activeModelId?: string;
 }
 
 /** 配额健康状态 */

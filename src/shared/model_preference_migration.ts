@@ -1,7 +1,4 @@
-/**
- * 模型偏好迁移工具
- * 负责将已下线/废弃模型 ID 或旧标签映射到当前可用模型。
- */
+import * as Models from './model_ids';
 
 export interface ModelPreferenceMigrationSummary {
     changed: boolean;
@@ -26,11 +23,11 @@ export interface ModelPreferenceNormalizationResult<T extends ModelPreferenceSta
 // 插件内部实际用于过滤/置顶/排序的模型 ID（Authorized response 中 info.model）。
 // 覆盖旧模型 -> 新模型 4 个替代关系（Gemini 3 Pro -> 3.1 Pro，Claude 4.5 -> 4.6）。
 export const DEPRECATED_MODEL_ID_REPLACEMENTS: Record<string, string> = {
-    MODEL_PLACEHOLDER_M7: 'MODEL_PLACEHOLDER_M36', // Gemini 3 Pro (Low) -> Gemini 3.1 Pro (Low)
-    MODEL_PLACEHOLDER_M8: 'MODEL_PLACEHOLDER_M37', // Gemini 3 Pro (High) -> Gemini 3.1 Pro (High)
-    MODEL_CLAUDE_4_5_SONNET: 'MODEL_PLACEHOLDER_M35', // Claude Sonnet 4.5 -> Claude Sonnet 4.6 (Thinking)
-    MODEL_CLAUDE_4_5_SONNET_THINKING: 'MODEL_PLACEHOLDER_M35', // Claude Sonnet 4.5 (Thinking) -> Claude Sonnet 4.6 (Thinking)
-    MODEL_PLACEHOLDER_M12: 'MODEL_PLACEHOLDER_M26', // Claude Opus 4.5 (Thinking) -> Claude Opus 4.6 (Thinking)
+    [Models.MODEL_GEMINI_3_PRO_LOW]: Models.MODEL_GEMINI_3_1_PRO_LOW, // Gemini 3 Pro (Low) -> Gemini 3.1 Pro (Low)
+    [Models.MODEL_GEMINI_3_PRO_HIGH]: Models.MODEL_GEMINI_3_1_PRO_HIGH, // Gemini 3 Pro (High) -> Gemini 3.1 Pro (High)
+    [Models.MODEL_CLAUDE_4_5_SONNET]: Models.MODEL_CLAUDE_SONNET_4_6_THINKING, // Claude Sonnet 4.5 -> Claude Sonnet 4.6 (Thinking)
+    [Models.MODEL_CLAUDE_4_5_SONNET_THINKING]: Models.MODEL_CLAUDE_SONNET_4_6_THINKING, // Claude Sonnet 4.5 (Thinking) -> Claude Sonnet 4.6 (Thinking)
+    [Models.MODEL_CLAUDE_OPUS_4_5_THINKING]: Models.MODEL_CLAUDE_OPUS_4_6_THINKING, // Claude Opus 4.5 (Thinking) -> Claude Opus 4.6 (Thinking)
 };
 
 // 上游 catalog key（非插件配置主路径，但保留用于调试/兼容扩展）。
