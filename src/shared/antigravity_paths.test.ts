@@ -30,6 +30,25 @@ describe('antigravity_paths', () => {
             '/mnt/c/Users/Alice/AppData/Roaming/Antigravity/User/globalStorage/state.vscdb',
         );
         expect(execFileSyncMock).toHaveBeenCalledTimes(2);
+        expect(execFileSyncMock).toHaveBeenNthCalledWith(
+            1,
+            'cmd.exe',
+            ['/d', '/u', '/c', 'echo', '%APPDATA%'],
+            expect.objectContaining({ encoding: 'utf16le' }),
+        );
+    });
+
+    it('should preserve non-ASCII Windows profile names when running in WSL', () => {
+        const execFileSyncMock = childProcess.execFileSync as jest.MockedFunction<typeof childProcess.execFileSync>;
+        execFileSyncMock
+            .mockImplementationOnce(() => 'C:\\Users\\李杰\\AppData\\Roaming\r\n' as never)
+            .mockImplementationOnce(() => '/mnt/c/Users/李杰/AppData/Roaming\n' as never);
+
+        setAntigravityRemoteName('wsl');
+
+        expect(getAntigravityStateDbPath()).toBe(
+            '/mnt/c/Users/李杰/AppData/Roaming/Antigravity/User/globalStorage/state.vscdb',
+        );
     });
 
     it('should keep using the current instance path outside WSL', () => {

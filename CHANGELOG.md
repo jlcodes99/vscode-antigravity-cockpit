@@ -8,6 +8,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [2.1.32] - 2026-03-21
+
+### Fixed
+- **WSL local account import with non-ASCII Windows usernames**: When the extension runs in VS Code Remote - WSL, Windows `%APPDATA%` is now resolved through a Unicode-safe command path, preventing imported database paths from degrading into garbled `/mnt/c/Users/???/...` values for local accounts.
+
+### Engineering
+- **WSL path normalization regression coverage**: WSL-resolved `state.vscdb` paths now keep POSIX separators and include regression tests for non-ASCII Windows profile names.
+
+---
+
 ## [2.1.31] - 2026-03-21
 
 ### Fixed

@@ -28,11 +28,13 @@ function resolveWslWindowsAppDataDir(): string {
     }
 
     try {
+        // `cmd.exe /u` makes the built-in `echo` emit UTF-16LE, which preserves
+        // non-ASCII Windows profile paths when this code runs inside WSL.
         const windowsAppData = childProcess.execFileSync(
             'cmd.exe',
-            ['/d', '/c', 'echo', '%APPDATA%'],
-            { encoding: 'utf8' },
-        ).trim();
+            ['/d', '/u', '/c', 'echo', '%APPDATA%'],
+            { encoding: 'utf16le' },
+        ).replace(/^\uFEFF/, '').trim();
 
         if (!windowsAppData || windowsAppData.includes('%APPDATA%')) {
             throw new Error(`Unexpected APPDATA output: ${windowsAppData || '<empty>'}`);
@@ -59,7 +61,7 @@ function resolveWslWindowsAppDataDir(): string {
 
 export function getAntigravityStateDbPath(): string {
     if (currentRemoteName === 'wsl') {
-        return path.join(
+        return path.posix.join(
             resolveWslWindowsAppDataDir(),
             'Antigravity',
             'User',
