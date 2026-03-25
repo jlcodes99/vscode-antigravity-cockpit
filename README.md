@@ -245,11 +245,11 @@ npm run package
 
 ## 💬 交流群
 
-微信群5个群都扫码上限了，欢迎加入QQ交流群
+QQ交流群 或者加我微信 拉微信群
 
-| QQ 群 |
-| :---: |
-| <img src="docs/qq_group.png" width="200" /> | 
+| QQ 群 | 微信（个人） |
+| :---: | :---: |
+| <img src="docs/qq_group.png" width="200" /> | <img src="docs/wechat_info.jpg" width="200" /> |
 
 ---
 
