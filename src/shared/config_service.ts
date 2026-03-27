@@ -47,6 +47,8 @@ export interface CockpitConfig {
     warningThreshold: number;
     /** 危险阈值 (%) */
     criticalThreshold: number;
+    /** 自动切换阈值 (%)，0 表示禁用 */
+    autoSwitchThreshold: number;
     /** 配额来源 */
     quotaSource: string;
     /** 显示模式 */
@@ -140,6 +142,7 @@ class ConfigService {
             groupMappings: this.getConfigStateValue(CONFIG_KEYS.GROUP_MAPPINGS, {}),
             warningThreshold: config.get<number>(CONFIG_KEYS.WARNING_THRESHOLD, QUOTA_THRESHOLDS.WARNING_DEFAULT),
             criticalThreshold: config.get<number>(CONFIG_KEYS.CRITICAL_THRESHOLD, QUOTA_THRESHOLDS.CRITICAL_DEFAULT),
+            autoSwitchThreshold: config.get<number>(CONFIG_KEYS.AUTO_SWITCH_THRESHOLD, 20),
             quotaSource: 'authorized',
             displayMode: config.get<string>(CONFIG_KEYS.DISPLAY_MODE, DISPLAY_MODE.WEBVIEW),
             profileHidden: config.get<boolean>(CONFIG_KEYS.PROFILE_HIDDEN, false),

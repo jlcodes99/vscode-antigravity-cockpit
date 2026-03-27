@@ -8,6 +8,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Automatic account switching**: Added a configurable auto-switch threshold so the extension can switch away from the current account when its quota drops below the chosen percentage.
+- **Auto-switch command**: Added a command palette action to update the threshold without editing settings manually.
+
+### Fixed
+- **Account rotation stays on healthier accounts**: The new switcher prefers the strongest eligible fallback account instead of bouncing to an equally low account.
+
 ## [2.1.33] - 2026-03-25
 
 ### Improved

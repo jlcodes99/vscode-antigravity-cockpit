@@ -237,6 +237,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await credentialStorage.setActiveAccount(payload.email, true);
 
         await accountsRefreshService.refresh({ reason: 'ws.accountSwitched' });
+        reactor.syncTelemetry();
         // 通知 Webview 刷新
         hud.sendMessage({ type: 'accountSwitched', email: payload.email });
         vscode.window.showInformationMessage(t('ws.accountSwitched', { email: payload.email }));

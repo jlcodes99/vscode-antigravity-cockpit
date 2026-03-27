@@ -174,6 +174,34 @@ export class CommandController {
             }),
         );
 
+        // 设置自动切换阈值
+        this.context.subscriptions.push(
+            vscode.commands.registerCommand('agCockpit.setAutoSwitchThreshold', async () => {
+                const config = configService.getConfig();
+                const input = await vscode.window.showInputBox({
+                    prompt: t('threshold.setAutoSwitch', { value: config.autoSwitchThreshold }),
+                    placeHolder: t('threshold.inputAutoSwitch'),
+                    value: String(config.autoSwitchThreshold),
+                    validateInput: (value) => {
+                        const num = parseInt(value, 10);
+                        if (isNaN(num) || num < 0 || num > 100) {
+                            return t('threshold.invalid', { min: 0, max: 100 });
+                        }
+                        return null;
+                    },
+                });
+                if (input) {
+                    const newValue = parseInt(input, 10);
+                    await configService.updateConfig('autoSwitchThreshold', newValue);
+                    if (newValue <= 0) {
+                        vscode.window.showInformationMessage(t('threshold.autoSwitchDisabled'));
+                    } else {
+                        vscode.window.showInformationMessage(t('threshold.autoSwitchUpdated', { value: newValue }));
+                    }
+                }
+            }),
+        );
+
         // 强制刷新公告
         this.context.subscriptions.push(
             vscode.commands.registerCommand('agCockpit.refreshAnnouncements', async () => {

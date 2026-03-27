@@ -79,6 +79,11 @@
         "category": "Antigravity"
       },
       {
+        "command": "agCockpit.setAutoSwitchThreshold",
+        "title": "Set Auto Switch Threshold",
+        "category": "Antigravity"
+      },
+      {
         "command": "agCockpit.refreshAnnouncements",
         "title": "Refresh Announcements",
         "category": "Antigravity",
@@ -223,6 +228,13 @@
           "minimum": 1,
           "maximum": 50,
           "description": "Critical threshold percentage. Quota below this value will show red danger alert. (1-50)"
+        },
+        "agCockpit.autoSwitchThreshold": {
+          "type": "number",
+          "default": 20,
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Automatically switch to another account when the current account quota falls below this percentage. Set to 0 to disable."
         },
         "agCockpit.quotaSource": {
           "type": "string",
