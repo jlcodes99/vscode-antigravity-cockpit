@@ -410,6 +410,8 @@ export interface WebviewMessage {
     warningThreshold?: number;
     /** 危险阈值 (updateThresholds) */
     criticalThreshold?: number;
+    /** 自动切换阈值 (updateThresholds) */
+    autoSwitchThreshold?: number;
     /** 状态栏显示格式 (updateStatusBarFormat) */
     statusBarFormat?: string;
     /** 配额来源 (updateQuotaSource) */

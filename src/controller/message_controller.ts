@@ -327,13 +327,29 @@ export class MessageController {
                     if (message.warningThreshold !== undefined && message.criticalThreshold !== undefined) {
                         const warningVal = message.warningThreshold as number;
                         const criticalVal = message.criticalThreshold as number;
+                        const hasAutoSwitch = message.autoSwitchThreshold !== undefined;
+                        const autoSwitchVal = hasAutoSwitch ? (message.autoSwitchThreshold as number) : undefined;
 
                         if (criticalVal < warningVal && warningVal >= 5 && warningVal <= 80 && criticalVal >= 1 && criticalVal <= 50) {
                             await configService.updateConfig('warningThreshold', warningVal);
                             await configService.updateConfig('criticalThreshold', criticalVal);
-                            logger.info(`Thresholds updated: warning=${warningVal}%, critical=${criticalVal}%`);
+                            if (hasAutoSwitch && autoSwitchVal !== undefined && autoSwitchVal >= 0 && autoSwitchVal <= 100) {
+                                await configService.updateConfig('autoSwitchThreshold', autoSwitchVal);
+                            }
+
+                            // Note: threshold.updated 文案模板末尾自带一个 "%"，
+                            // 这里保证最后一个字段不再带 "%"，避免出现 "%%"。
+                            const summaryText = hasAutoSwitch && autoSwitchVal !== undefined
+                                ? `Warning: ${warningVal}%, Critical: ${criticalVal}%, Auto Switch: ${autoSwitchVal}`
+                                : `Warning: ${warningVal}%, Critical: ${criticalVal}`;
+
+                            logger.info(
+                                hasAutoSwitch && autoSwitchVal !== undefined
+                                    ? `Thresholds updated: warning=${warningVal}%, critical=${criticalVal}%, autoSwitch=${autoSwitchVal}%`
+                                    : `Thresholds updated: warning=${warningVal}%, critical=${criticalVal}%`,
+                            );
                             vscode.window.showInformationMessage(
-                                t('threshold.updated', { value: `Warning: ${warningVal}%, Critical: ${criticalVal}%` }),
+                                t('threshold.updated', { value: summaryText }),
                             );
                             // 注意：notifiedModels 清理逻辑通常在 TelemetryController，这里可能无法直接访问
                             // 我们可以让 reactor 重新发送数据，如果 TelemetryController 监听了 configChange 或数据变化，会自动处理？
