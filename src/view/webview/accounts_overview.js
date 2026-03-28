@@ -29,8 +29,10 @@
     let lastRenderViewMode = viewMode;
     let refreshCooldownTimer = null;
     const REFRESH_COOLDOWN_SECONDS = 10;
+    const PRIVACY_MODE_STORAGE_KEY = 'agtools.privacy_mode_enabled';
     let refreshAllLabel = '';
     let toolsConnected = false;
+    let privacyModeEnabled = false;
 
     const elements = {
         backBtn: document.getElementById('ao-back-btn'),
@@ -42,6 +44,7 @@
         filterSelect: document.getElementById('ao-filter-select'),
         sortSelect: document.getElementById('ao-sort-select'),
         sortDirectionBtn: document.getElementById('ao-sort-direction-btn'),
+        togglePrivacyBtn: document.getElementById('ao-toggle-privacy-btn'),
         viewListBtn: document.getElementById('ao-view-list'),
         viewGridBtn: document.getElementById('ao-view-grid'),
         refreshAllBtn: document.getElementById('ao-refresh-all-btn'),
@@ -147,6 +150,84 @@
                 container.appendChild(document.createElement('br'));
             }
         });
+    }
+
+    function isPrivacyModeEnabledByDefault() {
+        try {
+            return localStorage.getItem(PRIVACY_MODE_STORAGE_KEY) === '1';
+        } catch {
+            return false;
+        }
+    }
+
+    function persistPrivacyModeEnabled(enabled) {
+        try {
+            localStorage.setItem(PRIVACY_MODE_STORAGE_KEY, enabled ? '1' : '0');
+        } catch {
+            // ignore localStorage write failures
+        }
+    }
+
+    function maskSegment(value, keepStart = 2, keepEnd = 2) {
+        const raw = String(value || '').trim();
+        if (!raw) return raw;
+        if (raw.length <= 2) return `${raw.charAt(0)}*`;
+        if (raw.length <= keepStart + keepEnd) return `${raw.slice(0, 1)}***${raw.slice(-1)}`;
+        return `${raw.slice(0, keepStart)}***${raw.slice(-keepEnd)}`;
+    }
+
+    function maskEmail(value) {
+        const [localPart = '', domainPart = ''] = String(value || '').split('@');
+        const localMasked = maskSegment(localPart, 2, 1);
+        if (!domainPart) return `${localMasked}@***`;
+
+        const domainTokens = domainPart.split('.').filter(Boolean);
+        if (domainTokens.length === 0) return `${localMasked}@***`;
+
+        if (domainTokens.length === 1) {
+            return `${localMasked}@${maskSegment(domainTokens[0], 1, 1)}`;
+        }
+
+        const tld = domainTokens[domainTokens.length - 1];
+        const host = domainTokens.slice(0, -1).map((item) => maskSegment(item, 1, 1)).join('.');
+        return `${localMasked}@${host}.${tld}`;
+    }
+
+    function maskGeneric(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return raw;
+        if (raw.length <= 3) return `${raw.charAt(0)}**`;
+        if (raw.length <= 6) return `${raw.slice(0, 1)}***${raw.slice(-1)}`;
+        if (raw.length <= 10) return `${raw.slice(0, 2)}***${raw.slice(-2)}`;
+        return `${raw.slice(0, 3)}***${raw.slice(-3)}`;
+    }
+
+    function maskSensitiveValue(value, enabled) {
+        const raw = String(value || '').trim();
+        if (!raw || !enabled) return raw;
+        if (raw.includes('@')) return maskEmail(raw);
+        return maskGeneric(raw);
+    }
+
+    function getDisplayEmail(email) {
+        return maskSensitiveValue(email, privacyModeEnabled);
+    }
+
+    function updatePrivacyToggleButton() {
+        if (!elements.togglePrivacyBtn) return;
+        const label = privacyModeEnabled
+            ? getString('showSensitive', 'Show Email')
+            : getString('hideSensitive', 'Hide Email');
+        elements.togglePrivacyBtn.textContent = label;
+        elements.togglePrivacyBtn.title = label;
+        elements.togglePrivacyBtn.setAttribute('aria-label', label);
+    }
+
+    function togglePrivacyMode() {
+        privacyModeEnabled = !privacyModeEnabled;
+        persistPrivacyModeEnabled(privacyModeEnabled);
+        updatePrivacyToggleButton();
+        render();
     }
 
     function formatDate(timestamp) {
@@ -474,6 +555,7 @@
     }
 
     function renderAccountCard(account) {
+        const displayEmail = getDisplayEmail(account.email);
         const tier = getTierLabel(account);
         const tierClass = getTierClass(tier);
         const tierBadge = tier ? `<span class="tier-badge ${tierClass}">${tier}</span>` : '';
@@ -493,7 +575,7 @@
                     <div class="card-select">
                         <input type="checkbox" data-action="select" ${isSelected ? 'checked' : ''} data-email="${escapeHtml(account.email)}" />
                     </div>
-                    <span class="account-email" title="${escapeHtml(account.email)}">${escapeHtml(account.email)}</span>
+                    <span class="account-email" title="${escapeHtml(displayEmail)}">${escapeHtml(displayEmail)}</span>
                     ${isCurrent ? `<span class="current-tag">${escapeHtml(getString('current', 'Current'))}</span>` : ''}
                     ${tierBadge}
                 </div>
@@ -520,6 +602,7 @@
     }
 
     function renderAccountRow(account) {
+        const displayEmail = getDisplayEmail(account.email);
         const tier = getTierLabel(account);
         const tierClass = getTierClass(tier);
         const tierBadge = tier ? `<span class="tier-badge ${tierClass}">${tier}</span>` : '';
@@ -546,7 +629,7 @@
                 <td>
                     <div class="account-cell">
                         <div class="account-main-line">
-                            <span class="account-email-text" title="${escapeHtml(account.email)}">${escapeHtml(account.email)}</span>
+                            <span class="account-email-text" title="${escapeHtml(displayEmail)}">${escapeHtml(displayEmail)}</span>
                             ${isCurrent ? `<span class="mini-tag current">${escapeHtml(getString('current', 'Current'))}</span>` : ''}
                         </div>
                         <div class="account-sub-line">
@@ -636,8 +719,9 @@
         if (elements.currentAccount) {
             const current = accounts.find(acc => acc.isCurrent);
             if (current) {
-                elements.currentAccount.textContent = `${getString('current', 'Current')} ${current.email}`;
-                elements.currentAccount.title = current.email;
+                const displayEmail = getDisplayEmail(current.email);
+                elements.currentAccount.textContent = `${getString('current', 'Current')} ${displayEmail}`;
+                elements.currentAccount.title = displayEmail;
                 elements.currentAccount.classList.remove('hidden');
             } else {
                 elements.currentAccount.classList.add('hidden');
@@ -929,6 +1013,7 @@
 
         elements.viewListBtn?.addEventListener('click', () => setViewMode('list'));
         elements.viewGridBtn?.addEventListener('click', () => setViewMode('grid'));
+        elements.togglePrivacyBtn?.addEventListener('click', togglePrivacyMode);
 
         elements.refreshAllBtn?.addEventListener('click', () => {
             if (elements.refreshAllBtn.disabled) return;
@@ -1076,6 +1161,7 @@
             openQuotaModal(email);
             break;
         case 'switch':
+            showActionMessage(getString('switching', 'Switching...'), 'info');
             vscode.postMessage({ command: 'switchAccount', email });
             break;
         case 'refresh':
@@ -1620,6 +1706,7 @@
             if (message.data.config) {
                 currentConfig = message.data.config;
             }
+            updatePrivacyToggleButton();
             refreshAllLabel = getString('refreshAll', 'Refresh');
             if (elements.refreshAllBtn && !elements.refreshAllBtn.disabled) {
                 elements.refreshAllBtn.textContent = refreshAllLabel;
@@ -1670,6 +1757,11 @@
         const message = data.message || '';
         if (data.context === 'add') {
             setAddFeedback('loading', message);
+            return;
+        }
+
+        if (message) {
+            showActionMessage(message, 'info');
         }
     }
 
@@ -1682,6 +1774,8 @@
         if (state?.viewMode) {
             viewMode = state.viewMode;
         }
+        privacyModeEnabled = isPrivacyModeEnabledByDefault();
+        updatePrivacyToggleButton();
         refreshAllLabel = getString('refreshAll', 'Refresh');
         setViewMode(viewMode);
         setOauthUrl(oauthUrl);

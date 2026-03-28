@@ -10,6 +10,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.1.36] - 2026-03-28
+
+### Added
+- **Accounts Overview email privacy toggle**: Added a toolbar switch to hide/show account emails, with local persistence in webview storage.
+- **Official host diagnostics**: Startup logs now include the detected official Antigravity `ideVersion` and official extension version for easier environment troubleshooting.
+
+### Changed
+- **Local auth token source selection**: Local account import now explicitly selects token source by key presence (`antigravityUnifiedStateSync.oauthToken` vs legacy `jetskiStateSync.agentManagerInitState`) and logs the selected source.
+- **Cloud Code request identity metadata**: Cloud Code metadata now includes official-host-aware `ideVersion`, plugin version, platform enum, update channel, plugin type, and optional `duetProject`.
+
+### Improved
+- **Cloud Code eligibility check payload**: `loadCodeAssist` requests now send `mode: FULL_ELIGIBILITY_CHECK` for closer parity with the official flow.
+- **Accounts Overview feedback flow**: Non-add action progress now appears in the in-page action message area, and account switch actions immediately display a "Switching..." status.
+
 ## [2.1.34] - 2026-03-27
 
 ### Added

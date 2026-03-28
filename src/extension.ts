@@ -11,6 +11,7 @@ import { logger } from './shared/log_service';
 import { setAntigravityRemoteName, setAntigravityUserDataDir } from './shared/antigravity_paths';
 import { configService, CockpitConfig } from './shared/config_service';
 import { t, i18n, normalizeLocaleInput } from './shared/i18n';
+import { getOfficialIdeVersion, getOfficialProductJsonPath } from './shared/official_host_version';
 import { CockpitHUD } from './view/hud';
 import { QuickPickView } from './view/quickpick_view';
 import { AccountsRefreshService } from './services/accountsRefreshService';
@@ -18,7 +19,7 @@ import { AccountsRefreshService } from './services/accountsRefreshService';
 // Controllers
 import { StatusBarController } from './controller/status_bar_controller';
 import { CommandController } from './controller/command_controller';
-import { MessageController } from './controller/message_controller';
+import { AccountSwitchExecutionRequest, MessageController } from './controller/message_controller';
 import { TelemetryController } from './controller/telemetry_controller';
 import { autoTriggerController } from './auto_trigger/controller';
 import { credentialStorage } from './auto_trigger';
@@ -29,8 +30,14 @@ import { announcementService } from './announcement';
 import { AccountTreeProvider, registerAccountTreeCommands } from './view/accountTree';
 
 // WebSocket Client
-import { cockpitToolsWs } from './services/cockpitToolsWs';
+import {
+    cockpitToolsWs,
+    PluginSetSwitchModePayload,
+    PluginSwitchAccountPayload,
+    WsSwitchMode,
+} from './services/cockpitToolsWs';
 import { cockpitToolsSyncEvents } from './services/cockpitToolsSync';
+import { accountSwitchService, AccountSwitchMode, AccountSwitchModeInput } from './services/accountSwitchService';
 
 // 全局模块实例
 let hunter: ProcessHunter;
@@ -52,6 +59,7 @@ let lastQuotaSource: 'local' | 'authorized';
 let autoRetryCount = 0;
 const MAX_AUTO_RETRY = 3;
 const AUTO_RETRY_DELAY_MS = 5000;
+const OFFICIAL_ANTIGRAVITY_EXTENSION_ID = 'google.antigravity';
 
 /**
  * 扩展激活入口
@@ -59,6 +67,7 @@ const AUTO_RETRY_DELAY_MS = 5000;
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     // 初始化日志
     logger.init();
+    logOfficialAntigravityIdeVersion();
     await configService.initialize(context);
     const modelPrefMigrationSummary = configService.getLastModelPreferenceMigrationSummary();
     if (modelPrefMigrationSummary?.changed) {
@@ -213,6 +222,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         logger.info('[Sync] Webview refreshAccounts');
         hud.sendMessage({ type: 'refreshAccounts' });
     });
+
+    const normalizeRequestedSwitchMode = (value: unknown): AccountSwitchModeInput => {
+        if (value === 'default' || value === 'seamless' || value === 'auto') {
+            return value;
+        }
+        return 'auto';
+    };
+
+    const normalizeManagedSwitchMode = (value: unknown): AccountSwitchMode | null => {
+        if (value === 'default' || value === 'seamless') {
+            return value;
+        }
+        return null;
+    };
+
+    const toWsSwitchMode = (mode: AccountSwitchMode): Exclude<WsSwitchMode, 'auto'> => {
+        return mode;
+    };
     
     // WebSocket 连接成功后刷新账号树
     cockpitToolsWs.on('connected', () => {
@@ -245,6 +272,109 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     
     cockpitToolsWs.on('switchError', (payload: { message: string }) => {
         vscode.window.showErrorMessage(t('ws.switchFailed', { message: payload.message }));
+    });
+
+    cockpitToolsWs.on('pluginSetSwitchMode', async (payload: PluginSetSwitchModePayload) => {
+        const requestId = typeof payload.request_id === 'string' ? payload.request_id : undefined;
+        try {
+            const requestedMode = normalizeManagedSwitchMode(payload.switch_mode);
+            const finishedAt = new Date().toISOString();
+
+            if (!requestedMode) {
+                const sent = cockpitToolsWs.sendPluginSetSwitchModeResponse({
+                    request_id: requestId,
+                    success: false,
+                    error_message: `非法 switch_mode: ${String(payload.switch_mode ?? 'undefined')}`,
+                    finished_at: finishedAt,
+                });
+                if (!sent) {
+                    logger.warn(`[WS] 回传切换方式失败结果失败: request_id=${requestId ?? 'none'}`);
+                }
+                return;
+            }
+
+            await accountSwitchService.setMode(requestedMode);
+            logger.info(`[WS] 已应用外部切换方式: mode=${requestedMode}, request_id=${requestId ?? 'none'}`);
+            const sent = cockpitToolsWs.sendPluginSetSwitchModeResponse({
+                request_id: requestId,
+                success: true,
+                applied_mode: toWsSwitchMode(requestedMode),
+                finished_at: finishedAt,
+            });
+            if (!sent) {
+                logger.warn(`[WS] 回传切换方式成功结果失败: request_id=${requestId ?? 'none'}`);
+            }
+        } catch (error) {
+            const finishedAt = new Date().toISOString();
+            const err = error instanceof Error ? error.message : String(error);
+            logger.error(`[WS] 处理外部切换方式请求失败: request_id=${requestId ?? 'none'}, error=${err}`);
+            const sent = cockpitToolsWs.sendPluginSetSwitchModeResponse({
+                request_id: requestId,
+                success: false,
+                error_message: err,
+                finished_at: finishedAt,
+            });
+            if (!sent) {
+                logger.warn(`[WS] 回传切换方式异常结果失败: request_id=${requestId ?? 'none'}`);
+            }
+        }
+    });
+
+    cockpitToolsWs.on('pluginSwitchAccount', async (payload: PluginSwitchAccountPayload) => {
+        const requestId = typeof payload.request_id === 'string' ? payload.request_id : undefined;
+        try {
+            const executionRequest: AccountSwitchExecutionRequest = {
+                requestId,
+                targetEmail: typeof payload.target_email === 'string' ? payload.target_email : '',
+                switchMode: normalizeRequestedSwitchMode(payload.switch_mode),
+                triggerType: payload.trigger_type === 'auto' ? 'auto' : 'manual',
+                triggerSource: typeof payload.trigger_source === 'string' ? payload.trigger_source : 'ws.external',
+                reason: typeof payload.reason === 'string' ? payload.reason : '',
+                metadata: payload.metadata,
+            };
+
+            logger.info(
+                `[WS] 执行外部切号: request_id=${requestId ?? 'none'}, target=${executionRequest.targetEmail || 'none'}, mode=${executionRequest.switchMode}, triggerType=${executionRequest.triggerType}, source=${executionRequest.triggerSource ?? 'none'}`,
+            );
+            const execution = await _messageController.executeAccountSwitch(executionRequest);
+            const sent = cockpitToolsWs.sendPluginSwitchAccountResponse({
+                execution_id: execution.executionId,
+                request_id: execution.requestId,
+                success: execution.success,
+                effective_mode: toWsSwitchMode(execution.effectiveMode),
+                from_email: execution.fromEmail,
+                to_email: execution.toEmail,
+                duration_ms: execution.durationMs,
+                error_code: execution.errorCode,
+                error_message: execution.errorMessage,
+                finished_at: execution.finishedAt,
+            });
+            if (!sent) {
+                logger.warn(
+                    `[WS] 回传外部切号结果失败: request_id=${execution.requestId ?? 'none'}, execution_id=${execution.executionId}`,
+                );
+            }
+        } catch (error) {
+            const err = error instanceof Error ? error.message : String(error);
+            const finishedAt = new Date().toISOString();
+            const fallbackExecutionId = `switch_${Date.now()}_failed`;
+            logger.error(`[WS] 执行外部切号异常: request_id=${requestId ?? 'none'}, error=${err}`);
+            const sent = cockpitToolsWs.sendPluginSwitchAccountResponse({
+                execution_id: fallbackExecutionId,
+                request_id: requestId,
+                success: false,
+                effective_mode: 'default',
+                from_email: null,
+                to_email: typeof payload.target_email === 'string' ? payload.target_email : '',
+                duration_ms: 0,
+                error_code: 'unknown',
+                error_message: err,
+                finished_at: finishedAt,
+            });
+            if (!sent) {
+                logger.warn(`[WS] 回传外部切号异常结果失败: request_id=${requestId ?? 'none'}`);
+            }
+        }
     });
 
     cockpitToolsWs.on('languageChanged', async (payload: { language: string; source?: string }) => {
@@ -298,6 +428,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await bootSystems();
 
     logger.info('Antigravity Cockpit Fully Operational');
+}
+
+function logOfficialAntigravityIdeVersion(): void {
+    const ideVersion = getOfficialIdeVersion();
+    if (ideVersion) {
+        logger.info(`[Startup] Official Antigravity ideVersion: ${ideVersion}`);
+    } else {
+        logger.warn(`[Startup] Failed to read official ideVersion from ${getOfficialProductJsonPath()}`);
+    }
+
+    const officialExtension = vscode.extensions.getExtension(OFFICIAL_ANTIGRAVITY_EXTENSION_ID);
+    if (officialExtension) {
+        const officialVersion = String(officialExtension.packageJSON?.version ?? 'unknown');
+        logger.info(
+            `[Startup] Official Antigravity extension: ${officialExtension.id} v${officialVersion} (active=${officialExtension.isActive})`,
+        );
+    } else {
+        logger.warn(`[Startup] Official extension not found: ${OFFICIAL_ANTIGRAVITY_EXTENSION_ID}; version unavailable`);
+    }
 }
 
 /**

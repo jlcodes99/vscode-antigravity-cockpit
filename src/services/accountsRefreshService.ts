@@ -10,6 +10,7 @@ import { t } from '../shared/i18n';
 import { recordQuotaHistory } from './quota_history';
 import { QuotaRefreshManager } from './quotaRefreshManager';
 import { getAccountRemainingPercentage, selectAutoSwitchTarget, type AutoSwitchCandidate } from './account_auto_switch';
+import { accountSwitchService } from './accountSwitchService';
 
 export interface AccountQuotaCache {
     snapshot: QuotaSnapshot;
@@ -441,23 +442,25 @@ export class AccountsRefreshService {
                 `[AccountsRefresh] Auto-switching from ${currentEmail} (${Math.round(currentRemaining)}%) to ${target.email} (${Math.round(target.remainingPercentage)}%) (threshold: ${threshold}%, reason: ${reason})`,
             );
 
-            if (cockpitToolsWs.isConnected) {
-                const accountId = await this.getAccountId(target.email);
-                if (accountId) {
-                    const result = await cockpitToolsWs.switchAccount(accountId);
-                    if (result.success) {
-                        return;
-                    }
-                    logger.warn(`[AccountsRefresh] Cockpit Tools switch failed for ${target.email}: ${result.message}`);
+            const switchResult = await accountSwitchService.switchAccount(target.email);
+            if (!switchResult.success) {
+                if (switchResult.mode === 'default' && switchResult.errorCode === 'tools_offline') {
+                    logger.warn('[AccountsRefresh] Tools offline during auto-switch, fallback to local active account switch');
+                    await credentialStorage.setActiveAccount(target.email);
                 } else {
-                    logger.warn(`[AccountsRefresh] Cannot resolve Cockpit Tools account id for ${target.email}, falling back to local switch`);
+                    logger.warn(`[AccountsRefresh] Auto-switch failed for ${target.email}: ${switchResult.message || 'unknown error'}`);
+                    return;
                 }
             }
 
-            await credentialStorage.setActiveAccount(target.email);
+            const switchedEmail = switchResult.email ?? target.email;
             await this.loadAccountsFromPluginStorage();
             void this.reactor.syncTelemetry();
-            vscode.window.showInformationMessage(t('ws.accountSwitched', { email: target.email }));
+            if (accountSwitchService.isSeamlessMode(switchResult.mode)) {
+                vscode.window.showInformationMessage(`已无感切换到账号：${switchedEmail}`);
+            } else {
+                vscode.window.showInformationMessage(t('ws.accountSwitched', { email: switchedEmail }));
+            }
         } catch (error) {
             const err = error instanceof Error ? error.message : String(error);
             logger.warn(`[AccountsRefresh] Auto-switch failed for ${currentEmail}: ${err}`);
@@ -590,9 +593,19 @@ export class AccountsRefreshService {
 
     private async loadAccountsFromWebSocket(): Promise<void> {
         this.toolsAvailable = true;
+        const previousCurrentEmail = this.currentEmail;
 
         const toolsResp = await cockpitToolsWs.getAccounts();
         const toolsAccounts = toolsResp.accounts ?? [];
+        const currentMode = accountSwitchService.getMode();
+        const isSeamlessMode = accountSwitchService.isSeamlessMode(currentMode);
+        const activeEmailInPlugin = isSeamlessMode ? await credentialStorage.getActiveAccount() : null;
+        const activeEmailInPluginLower = activeEmailInPlugin?.trim().toLowerCase();
+        if (isSeamlessMode) {
+            logger.info(
+                `[AccountsRefresh] Seamless marker source email=${activeEmailInPlugin ?? 'none'}, toolsAccounts=${toolsAccounts.length}`,
+            );
+        }
 
         const credentials = await credentialStorage.getAllCredentials();
         const pluginEmails = new Set(Object.keys(credentials));
@@ -602,7 +615,11 @@ export class AccountsRefreshService {
         let currentEmail: string | null = null;
 
         for (const acc of toolsAccounts) {
-            const isCurrent = acc.is_current || (toolsResp.current_account_id ? acc.id === toolsResp.current_account_id : false);
+            const isCurrentByTools = acc.is_current || (toolsResp.current_account_id ? acc.id === toolsResp.current_account_id : false);
+            const isCurrentBySeamless = Boolean(
+                activeEmailInPluginLower && acc.email.trim().toLowerCase() === activeEmailInPluginLower,
+            );
+            const isCurrent = isSeamlessMode ? isCurrentBySeamless : isCurrentByTools;
             if (isCurrent) {
                 currentEmail = acc.email;
             }
@@ -624,6 +641,25 @@ export class AccountsRefreshService {
                 forbiddenReason: credential?.isForbidden ? t('accountsRefresh.forbidden') : undefined,
                 expiresAt: credential?.expiresAt,
             });
+        }
+
+        if (!currentEmail && !isSeamlessMode && toolsResp.current_account_id) {
+            const currentAcc = toolsAccounts.find((acc) => acc.id === toolsResp.current_account_id);
+            if (currentAcc) {
+                currentEmail = currentAcc.email;
+            }
+        }
+
+        if (isSeamlessMode && activeEmailInPlugin && !currentEmail) {
+            logger.warn(
+                `[AccountsRefresh] Seamless marker email not found in tools list: ${activeEmailInPlugin}`,
+            );
+        }
+
+        if (previousCurrentEmail !== currentEmail) {
+            logger.info(
+                `[AccountsRefresh] Current marker changed: ${previousCurrentEmail ?? 'none'} -> ${currentEmail ?? 'none'} (mode=${currentMode})`,
+            );
         }
 
         this.currentEmail = currentEmail;

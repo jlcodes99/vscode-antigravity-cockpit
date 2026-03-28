@@ -13,10 +13,33 @@ import { previewLocalCredential, commitLocalCredential } from '../auto_trigger/l
 import { announcementService } from '../announcement';
 import { antigravityToolsSyncService } from '../antigravityTools_sync';
 import { cockpitToolsWs } from '../services/cockpitToolsWs';
-import { cockpitToolsLocal } from '../services/cockpitToolsLocal';
 import { getQuotaHistory, clearHistory, clearAllHistory } from '../services/quota_history';
 import { oauthService } from '../auto_trigger';
 import { AccountsRefreshService } from '../services/accountsRefreshService';
+import { accountSwitchService, AccountSwitchMode, AccountSwitchModeInput, AccountSwitchResult } from '../services/accountSwitchService';
+
+export interface AccountSwitchExecutionRequest {
+    requestId?: string;
+    targetEmail: string;
+    switchMode?: AccountSwitchModeInput;
+    triggerType?: 'manual' | 'auto';
+    triggerSource?: string;
+    reason?: string;
+    metadata?: Record<string, unknown>;
+}
+
+export interface AccountSwitchExecutionResult {
+    executionId: string;
+    requestId?: string;
+    success: boolean;
+    effectiveMode: AccountSwitchMode;
+    fromEmail: string | null;
+    toEmail: string;
+    durationMs: number;
+    errorCode: string | null;
+    errorMessage: string | null;
+    finishedAt: string;
+}
 
 export class MessageController {
     // 跟踪已通知的模型以避免重复弹窗 (虽然主要逻辑在 TelemetryController，但 CheckAndNotify 可能被消息触发吗? 不, 主要是 handleMessage)
@@ -77,6 +100,123 @@ export class MessageController {
         const cacheStale = cacheAge === undefined || cacheAge > refreshIntervalMs;
         if (!hasCache || cacheStale) {
             this.reactor.syncTelemetry();
+        }
+    }
+
+    private async switchLoginAccountByMode(
+        email: string,
+        requestedMode: AccountSwitchModeInput = 'auto',
+    ): Promise<AccountSwitchResult> {
+        const targetEmail = email.trim();
+        const effectiveMode = accountSwitchService.resolveRequestedMode(requestedMode);
+        try {
+            const result = await accountSwitchService.switchAccount(targetEmail, { requestedMode });
+            if (!result.success) {
+                logger.warn(
+                    `[MsgCtrl] Account switch failed: target=${targetEmail}, mode=${result.mode}, code=${result.errorCode ?? 'none'}, message=${result.message ?? 'none'}`,
+                );
+                return result;
+            }
+
+            if (this.refreshService) {
+                await this.refreshService.refresh({
+                    skipSync: true,
+                    skipQuotaRefresh: true,
+                    reason: requestedMode === 'auto' ? 'manualAccountSwitch' : `manualAccountSwitch:${requestedMode}`,
+                });
+            }
+            this.reactor.syncTelemetry();
+            logger.info(
+                `[MsgCtrl] Account switch succeeded: target=${targetEmail}, resolved=${result.email ?? targetEmail}, mode=${result.mode}`,
+            );
+            return result;
+        } catch (error) {
+            const err = error instanceof Error ? error.message : String(error);
+            logger.error(`[MsgCtrl] Account switch exception for ${targetEmail}: ${err}`);
+            return {
+                success: false,
+                mode: effectiveMode,
+                email: targetEmail,
+                errorCode: 'unknown',
+                message: err,
+            };
+        }
+    }
+
+    private createSwitchExecutionId(): string {
+        return `switch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    public async executeAccountSwitch(request: AccountSwitchExecutionRequest): Promise<AccountSwitchExecutionResult> {
+        const startedAt = Date.now();
+        const executionId = this.createSwitchExecutionId();
+        const requestId = typeof request.requestId === 'string' ? request.requestId : undefined;
+        const targetEmail = (request.targetEmail || '').trim();
+        const requestedMode = request.switchMode ?? 'auto';
+        const triggerType = request.triggerType === 'auto' ? 'auto' : 'manual';
+        const triggerSource = request.triggerSource || 'unknown';
+        const reason = request.reason || '';
+        const metadata = request.metadata;
+        const fromEmail = await credentialStorage.getActiveAccount();
+
+        if (!targetEmail) {
+            const finishedAt = new Date().toISOString();
+            return {
+                executionId,
+                requestId,
+                success: false,
+                effectiveMode: accountSwitchService.resolveRequestedMode(requestedMode),
+                fromEmail: fromEmail ?? null,
+                toEmail: '',
+                durationMs: Date.now() - startedAt,
+                errorCode: 'invalid_request',
+                errorMessage: 'targetEmail 不能为空',
+                finishedAt,
+            };
+        }
+
+        logger.info(
+            `[MsgCtrl] Switch execution start: executionId=${executionId}, requestId=${requestId ?? 'none'}, target=${targetEmail}, requestedMode=${requestedMode}, triggerType=${triggerType}, triggerSource=${triggerSource}, reason=${reason || 'none'}, metadata=${metadata ? JSON.stringify(metadata) : 'none'}`,
+        );
+
+        const result = await this.switchLoginAccountByMode(targetEmail, requestedMode);
+        const finishedAt = new Date().toISOString();
+        const toEmail = (result.email ?? targetEmail).trim();
+        const durationMs = Date.now() - startedAt;
+        const success = result.success;
+        const errorCode = success ? null : (result.errorCode ?? 'unknown');
+        const errorMessage = success ? null : (result.message ?? null);
+
+        logger.info(
+            `[MsgCtrl] Switch execution done: executionId=${executionId}, success=${success}, effectiveMode=${result.mode}, from=${fromEmail ?? 'none'}, to=${toEmail}, durationMs=${durationMs}, errorCode=${errorCode ?? 'none'}`,
+        );
+
+        return {
+            executionId,
+            requestId,
+            success,
+            effectiveMode: result.mode,
+            fromEmail: fromEmail ?? null,
+            toEmail,
+            durationMs,
+            errorCode,
+            errorMessage,
+            finishedAt,
+        };
+    }
+
+    private async showToolsNotRunningActions(): Promise<void> {
+        const launchAction = t('accountTree.launchCockpitTools');
+        const downloadAction = t('accountTree.downloadCockpitTools');
+        const action = await vscode.window.showWarningMessage(
+            t('accountTree.cockpitToolsNotRunning'),
+            launchAction,
+            downloadAction,
+        );
+        if (action === launchAction) {
+            vscode.commands.executeCommand('agCockpit.accountTree.openManager');
+        } else if (action === downloadAction) {
+            vscode.env.openExternal(vscode.Uri.parse('https://github.com/jlcodes99/antigravity-cockpit-tools/releases'));
         }
     }
 
@@ -875,49 +1015,24 @@ export class MessageController {
                     break;
 
                 case 'autoTrigger.switchLoginAccount':
-                    // 切换登录账户（实际切换客户端账户，需要通知 Cockpit Tools）
                     if (message.email) {
                         logger.info(`User switching login account to: ${message.email}`);
-                        
-                        // 检查 WebSocket 连接状态，如果未连接则尝试等待重连
-                        if (!cockpitToolsWs.isConnected) {
-                            logger.info('[MsgCtrl] WS 未连接，尝试等待重连后执行切换...');
-                            const connected = await cockpitToolsWs.waitForConnection(5000);
-                            if (!connected) {
-                                const action = await vscode.window.showWarningMessage(
-                                    'Cockpit Tools 未运行，无法切换账号',
-                                    '启动 Cockpit Tools',
-                                    '下载 Cockpit Tools',
-                                );
-                                
-                                if (action === '启动 Cockpit Tools') {
-                                    vscode.commands.executeCommand('agCockpit.accountTree.openManager');
-                                } else if (action === '下载 Cockpit Tools') {
-                                    vscode.env.openExternal(vscode.Uri.parse('https://github.com/jlcodes99/antigravity-cockpit-tools/releases'));
-                                }
-                                return;
-                            }
-                            logger.info('[MsgCtrl] WS 重连成功，继续执行切换操作');
-                        }
-                        
-                        try {
-                            // 从本地文件获取账号 ID（不依赖 WebSocket）
-                            const accountId = cockpitToolsLocal.getAccountIdByEmail(message.email);
-                            
-                            if (accountId) {
-                                const result = await cockpitToolsWs.switchAccount(accountId);
-                                if (result.success) {
-                                    vscode.window.showInformationMessage(t('autoTrigger.switchLoginSuccess') || `已切换登录账户至 ${message.email}`);
-                                } else {
-                                    vscode.window.showErrorMessage(t('autoTrigger.switchLoginFailed') || `切换登录账户失败: ${result.message}`);
-                                }
-                            } else {
-                                vscode.window.showErrorMessage(t('autoTrigger.accountNotFound') || '未找到该账户');
-                            }
-                        } catch (error) {
-                            const err = error instanceof Error ? error : new Error(String(error));
-                            logger.error(`Switch login account failed: ${err.message}`);
-                            vscode.window.showErrorMessage(t('autoTrigger.switchLoginFailed') || `切换登录账户失败: ${err.message}`);
+                        const execution = await this.executeAccountSwitch({
+                            targetEmail: message.email,
+                            switchMode: 'auto',
+                            triggerType: 'manual',
+                            triggerSource: 'webview.autoTrigger.switchLoginAccount',
+                        });
+                        if (execution.success) {
+                            const successMessage = accountSwitchService.isSeamlessMode(execution.effectiveMode)
+                                ? `已无感切换登录账户至 ${execution.toEmail}`
+                                : (t('autoTrigger.switchLoginSuccess') || `已切换登录账户至 ${message.email}`);
+                            vscode.window.showInformationMessage(successMessage);
+                        } else if (execution.errorCode === 'tools_offline' && execution.effectiveMode === 'default') {
+                            await this.showToolsNotRunningActions();
+                        } else {
+                            const failedMessage = t('autoTrigger.switchLoginFailed') || '切换登录账户失败';
+                            vscode.window.showErrorMessage(`${failedMessage}: ${execution.errorMessage || 'Unknown error'}`);
                         }
                     } else {
                         logger.warn('switchLoginAccount missing email');
@@ -950,58 +1065,51 @@ export class MessageController {
                 
                 case 'switchAccount': // Alias for switching client account
                     if (typeof message.email === 'string') {
-                        // Reusing autoTrigger.switchLoginAccount logic basically
                         const email = message.email;
                         logger.info(`[MsgCtrl] Switching account to: ${email}`);
-                        if (!cockpitToolsWs.isConnected) {
-                            logger.info('[MsgCtrl] WS 未连接，尝试等待重连后执行切换...');
-                            const connected = await cockpitToolsWs.waitForConnection(5000);
-                            if (!connected) {
-                                const launchAction = t('accountTree.launchCockpitTools');
-                                const downloadAction = t('accountTree.downloadCockpitTools');
-                                const action = await vscode.window.showWarningMessage(
-                                    t('accountTree.cockpitToolsNotRunning'),
-                                    launchAction,
-                                    downloadAction,
-                                );
-                                if (action === launchAction) {
-                                    vscode.commands.executeCommand('agCockpit.accountTree.openManager');
-                                } else if (action === downloadAction) {
-                                    vscode.env.openExternal(vscode.Uri.parse('https://github.com/jlcodes99/antigravity-cockpit-tools/releases'));
-                                }
-                                return;
-                            }
-                            logger.info('[MsgCtrl] WS 重连成功，继续执行切换操作');
-                        }
-                        try {
-                            // 从本地文件获取账号 ID（不依赖 WebSocket）
-                            const accountId = cockpitToolsLocal.getAccountIdByEmail(email);
-                            if (accountId) {
-                                const result = await cockpitToolsWs.switchAccount(accountId);
-                                if (result.success) {
-                                    // active account updated via WS event
-                                    this.hud.sendMessage({
-                                        type: 'actionResult',
-                                        data: { status: 'success', message: t('accountsOverview.switchSuccess', { email }) },
-                                    });
-                                } else {
-                                    this.hud.sendMessage({
-                                        type: 'actionResult',
-                                        data: { status: 'error', message: result.message },
-                                    });
-                                }
-                            } else {
-                                this.hud.sendMessage({
-                                    type: 'actionResult',
-                                    data: { status: 'error', message: t('autoTrigger.accountNotFound') || '未找到该账户' },
-                                });
-                            }
-                        } catch (e) {
-                            const err = e instanceof Error ? e : new Error(String(e));
+                        this.hud.sendMessage({
+                            type: 'actionProgress',
+                            data: { context: 'switch', message: `正在切换到 ${email}...` },
+                        });
+                        const execution = await this.executeAccountSwitch({
+                            targetEmail: email,
+                            switchMode: 'auto',
+                            triggerType: 'manual',
+                            triggerSource: 'webview.accounts.switchAccount',
+                        });
+                        if (execution.success) {
+                            const switchedEmail = execution.toEmail;
+                            const successMessage = accountSwitchService.isSeamlessMode(execution.effectiveMode)
+                                ? `已无感切换到 ${switchedEmail}`
+                                : t('accountsOverview.switchSuccess', { email: switchedEmail });
+                            const markerMessage = `当前账号标识已切换为 ${switchedEmail}`;
                             this.hud.sendMessage({
                                 type: 'actionResult',
-                                data: { status: 'error', message: err.message },
+                                data: { status: 'success', message: `${successMessage}。${markerMessage}` },
                             });
+                            vscode.window.showInformationMessage(`${successMessage}，${markerMessage}`);
+                            logger.info(
+                                `[MsgCtrl] switchAccount completed with marker update: target=${email}, current=${switchedEmail}, mode=${execution.effectiveMode}`,
+                            );
+                        } else if (execution.errorCode === 'tools_offline' && execution.effectiveMode === 'default') {
+                            this.hud.sendMessage({
+                                type: 'actionResult',
+                                data: {
+                                    status: 'error',
+                                    message: execution.errorMessage || t('accountsOverview.switchFailed', { error: 'Cockpit Tools not running' }),
+                                },
+                            });
+                            await this.showToolsNotRunningActions();
+                        } else {
+                            const failedMessage = execution.errorMessage || t('accountsOverview.switchFailed', { error: 'Unknown' });
+                            this.hud.sendMessage({
+                                type: 'actionResult',
+                                data: { status: 'error', message: failedMessage },
+                            });
+                            vscode.window.showErrorMessage(failedMessage);
+                            logger.warn(
+                                `[MsgCtrl] switchAccount failed: target=${email}, mode=${execution.effectiveMode}, code=${execution.errorCode ?? 'none'}, message=${failedMessage}`,
+                            );
                         }
                     }
                     break;

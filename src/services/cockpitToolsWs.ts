@@ -98,6 +98,48 @@ export interface WakeupOverridePayload {
     enabled: boolean;
 }
 
+export type WsSwitchMode = 'default' | 'seamless' | 'auto';
+export type WsTriggerType = 'manual' | 'auto';
+
+export interface PluginSetSwitchModePayload {
+    request_id?: string;
+    switch_mode?: WsSwitchMode;
+    source?: string;
+    reason?: string;
+    metadata?: Record<string, unknown>;
+}
+
+export interface PluginSetSwitchModeResponsePayload {
+    request_id?: string;
+    success: boolean;
+    applied_mode?: Exclude<WsSwitchMode, 'auto'>;
+    error_message?: string;
+    finished_at: string;
+}
+
+export interface PluginSwitchAccountPayload {
+    request_id?: string;
+    target_email?: string;
+    switch_mode?: WsSwitchMode;
+    trigger_type?: WsTriggerType;
+    trigger_source?: string;
+    reason?: string;
+    metadata?: Record<string, unknown>;
+}
+
+export interface PluginSwitchAccountResponsePayload {
+    execution_id: string;
+    request_id?: string;
+    success: boolean;
+    effective_mode: Exclude<WsSwitchMode, 'auto'>;
+    from_email: string | null;
+    to_email: string;
+    duration_ms: number;
+    error_code: string | null;
+    error_message: string | null;
+    finished_at: string;
+}
+
 /** 账号信息（来自 Cockpit Tools） */
 export interface AccountInfo {
     id: string;
@@ -425,6 +467,20 @@ class CockpitToolsWsClient extends EventEmitter {
         }
     }
 
+    sendPluginSetSwitchModeResponse(payload: PluginSetSwitchModeResponsePayload): boolean {
+        return this.send({
+            type: 'response.plugin_set_switch_mode',
+            payload,
+        });
+    }
+
+    sendPluginSwitchAccountResponse(payload: PluginSwitchAccountResponsePayload): boolean {
+        return this.send({
+            type: 'response.plugin_switch_account',
+            payload,
+        });
+    }
+
     // ========================================================================
     // Private Methods
     // ========================================================================
@@ -539,6 +595,24 @@ class CockpitToolsWsClient extends EventEmitter {
                     const overridePayload = payload as unknown as WakeupOverridePayload;
                     logger.info(`[WS] 唤醒互斥状态: enabled=${overridePayload.enabled}`);
                     this.emit('wakeupOverride', overridePayload);
+                    break;
+                }
+
+                case 'event.plugin_set_switch_mode': {
+                    const modePayload = payload as unknown as PluginSetSwitchModePayload;
+                    logger.info(
+                        `[WS] 收到外部切换模式请求: request_id=${modePayload.request_id ?? 'none'}, mode=${modePayload.switch_mode ?? 'none'}`,
+                    );
+                    this.emit('pluginSetSwitchMode', modePayload);
+                    break;
+                }
+
+                case 'event.plugin_switch_account': {
+                    const switchPayload = payload as unknown as PluginSwitchAccountPayload;
+                    logger.info(
+                        `[WS] 收到外部切号请求: request_id=${switchPayload.request_id ?? 'none'}, target=${switchPayload.target_email ?? 'none'}, mode=${switchPayload.switch_mode ?? 'auto'}`,
+                    );
+                    this.emit('pluginSwitchAccount', switchPayload);
                     break;
                 }
 

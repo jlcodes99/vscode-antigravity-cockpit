@@ -997,24 +997,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
         });
     }
 
-    function requestQuotaSourceChange(source, options = {}) {
-        source = 'authorized';
-        const force = options.force === true;
-        if (!force) {
-            if (!isQuotaSourceSwitching && source === currentQuotaSource) {
-                return;
-            }
-            if (isQuotaSourceSwitching && source === pendingQuotaSource) {
-                return;
-            }
-        }
-        const command = options.command || 'updateQuotaSource';
-        setQuotaSourceSwitching(true, source);
-        currentQuotaSource = source;
-        updateQuotaSourceUI(lastSnapshot?.isConnected);
-        vscode.postMessage({ command, quotaSource: source });
-    }
-
     // attachAntigravityToolsSyncActions 保留但需要在某处调用
     // 当前由 authUi 模块处理，此函数作为兼容备用
     function _attachAntigravityToolsSyncActions() {

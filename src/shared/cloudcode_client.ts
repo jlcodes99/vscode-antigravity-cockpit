@@ -7,6 +7,7 @@ import * as path from 'path';
 import { CloudCodeRouteOptions, resolveCloudCodeBaseUrl, buildCloudCodeUrl } from './cloudcode_base';
 import { TIMING } from './constants';
 import { logger } from './log_service';
+import { getOfficialIdeVersion } from './official_host_version';
 
 export interface CloudCodeProjectInfo {
     projectId?: string;
@@ -81,11 +82,11 @@ const BACKOFF_BASE_MS = 500;
 const BACKOFF_MAX_MS = 4000;
 const ONBOARD_POLL_DELAY_MS = 500;
 
-let cachedIdeVersion: string | null = null;
+let cachedPluginVersion: string | null = null;
 
-function getIdeVersion(): string {
-    if (cachedIdeVersion) {
-        return cachedIdeVersion;
+function getPluginVersion(): string {
+    if (cachedPluginVersion) {
+        return cachedPluginVersion;
     }
 
     try {
@@ -93,15 +94,19 @@ function getIdeVersion(): string {
         const content = fs.readFileSync(packageJsonPath, 'utf8');
         const parsed = JSON.parse(content) as { version?: unknown };
         if (typeof parsed.version === 'string' && parsed.version.trim()) {
-            cachedIdeVersion = parsed.version.trim();
-            return cachedIdeVersion;
+            cachedPluginVersion = parsed.version.trim();
+            return cachedPluginVersion;
         }
     } catch {
         // ignore, fallback below
     }
 
-    cachedIdeVersion = 'unknown';
-    return cachedIdeVersion;
+    cachedPluginVersion = 'unknown';
+    return cachedPluginVersion;
+}
+
+function getIdeVersion(): string {
+    return getOfficialIdeVersion() || getPluginVersion();
 }
 
 function normalizeUserAgentPlatform(value: NodeJS.Platform): string {
@@ -119,12 +124,41 @@ function normalizeUserAgentArch(value: string): string {
     }
 }
 
-function getCloudCodeMetadata(): Record<string, string> {
-    return {
+function getCloudCodePlatform(): string {
+    const platform = normalizeUserAgentPlatform(process.platform);
+    const arch = normalizeUserAgentArch(process.arch);
+    const combined = `${platform}/${arch}`;
+    switch (combined) {
+        case 'darwin/amd64':
+            return 'DARWIN_AMD64';
+        case 'darwin/arm64':
+            return 'DARWIN_ARM64';
+        case 'linux/amd64':
+            return 'LINUX_AMD64';
+        case 'linux/arm64':
+            return 'LINUX_ARM64';
+        case 'windows/amd64':
+            return 'WINDOWS_AMD64';
+        default:
+            return 'PLATFORM_UNSPECIFIED';
+    }
+}
+
+function getCloudCodeMetadata(opts?: { duetProject?: string }): Record<string, string> {
+    const metadata: Record<string, string> = {
         ideName: 'antigravity',
         ideType: 'ANTIGRAVITY',
         ideVersion: getIdeVersion(),
+        pluginVersion: getPluginVersion(),
+        platform: getCloudCodePlatform(),
+        updateChannel: 'stable',
+        pluginType: 'GEMINI',
     };
+    const duetProject = opts?.duetProject?.trim();
+    if (duetProject) {
+        metadata.duetProject = duetProject;
+    }
+    return metadata;
 }
 
 function getCloudCodeUserAgent(): string {
@@ -255,8 +289,10 @@ export class CloudCodeClient {
         cloudaicompanionProject: string | undefined,
         options?: CloudCodeRequestOptions,
     ): Promise<LoadCodeAssistResponse> {
+        const duetProject = cloudaicompanionProject ?? options?.route?.enterpriseProjectId;
         const payload: Record<string, unknown> = {
-            metadata: getCloudCodeMetadata(),
+            metadata: getCloudCodeMetadata({ duetProject }),
+            mode: 'FULL_ELIGIBILITY_CHECK',
         };
         if (cloudaicompanionProject) {
             payload.cloudaicompanionProject = cloudaicompanionProject;
@@ -642,9 +678,10 @@ export class CloudCodeClient {
         tierId: string,
         options?: CloudCodeRequestOptions,
     ): Promise<string | null> {
+        const duetProject = options?.route?.cloudaicompanionProject ?? options?.route?.enterpriseProjectId;
         const payload: Record<string, unknown> = {
             tierId,
-            metadata: getCloudCodeMetadata(),
+            metadata: getCloudCodeMetadata({ duetProject }),
         };
         const cloudaicompanionProject = options?.route?.cloudaicompanionProject ?? options?.route?.enterpriseProjectId;
         if (cloudaicompanionProject) {

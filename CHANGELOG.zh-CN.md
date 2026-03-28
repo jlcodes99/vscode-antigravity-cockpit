@@ -10,6 +10,20 @@
 
 ## [未发布]
 
+## [2.1.36] - 2026-03-28
+
+### 新增
+- **账号总览邮箱隐私开关**：账号总览工具栏新增“隐藏/显示邮箱”切换，邮箱脱敏状态会在 Webview 本地持久化。
+- **官方宿主诊断日志**：启动日志新增官方 Antigravity `ideVersion` 与官方扩展版本信息，便于快速排查环境问题。
+
+### 调整
+- **本地授权 token 来源选择**：本地账号导入会根据键是否存在显式选择 token 来源（`antigravityUnifiedStateSync.oauthToken` 或 legacy `jetskiStateSync.agentManagerInitState`），并记录来源日志。
+- **Cloud Code 身份元数据**：Cloud Code 请求元数据新增官方宿主感知 `ideVersion`、插件版本、平台枚举、更新通道、插件类型与可选 `duetProject`。
+
+### 优化
+- **Cloud Code 资格检查参数**：`loadCodeAssist` 请求补充 `mode: FULL_ELIGIBILITY_CHECK`，与官方链路更一致。
+- **账号总览反馈流程**：非新增账号场景的进度信息会展示到页面操作提示区，切号动作会立即显示“正在切换”状态。
+
 ## [2.1.34] - 2026-03-27
 
 ### 新增

@@ -3,7 +3,7 @@
   "displayName": "Antigravity Cockpit",
   "icon": "assets/icon.png",
   "description": "A premium, dashboard-style quota monitor for Antigravity AI.",
-  "version": "2.1.34",
+  "version": "2.1.36",
   "publisher": "jlcodes",
   "engines": {
     "vscode": "^1.90.0"
@@ -81,6 +81,11 @@
       {
         "command": "agCockpit.setAutoSwitchThreshold",
         "title": "Set Auto Switch Threshold",
+        "category": "Antigravity"
+      },
+      {
+        "command": "agCockpit.setAccountSwitchMode",
+        "title": "Set Account Switch Mode",
         "category": "Antigravity"
       },
       {
@@ -295,6 +300,10 @@
         {
           "command": "agCockpit.retry",
           "when": "true"
+        },
+        {
+          "command": "agCockpit.setAccountSwitchMode",
+          "when": "false"
         },
         {
           "command": "agCockpit.accountTree.switch",

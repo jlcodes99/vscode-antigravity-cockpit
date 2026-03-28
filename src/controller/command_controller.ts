@@ -202,6 +202,13 @@ export class CommandController {
             }),
         );
 
+        // 设置账号切换方式（默认 / 无感）
+        this.context.subscriptions.push(
+            vscode.commands.registerCommand('agCockpit.setAccountSwitchMode', async () => {
+                vscode.window.showInformationMessage('账号切换方式已改为由 Cockpit Tools 通过 WebSocket 统一下发管理。');
+            }),
+        );
+
         // 强制刷新公告
         this.context.subscriptions.push(
             vscode.commands.registerCommand('agCockpit.refreshAnnouncements', async () => {

@@ -14,10 +14,10 @@
 import * as vscode from 'vscode';
 import { logger } from '../shared/log_service';
 import { cockpitToolsWs } from '../services/cockpitToolsWs';
-import { cockpitToolsLocal } from '../services/cockpitToolsLocal';
 import { AccountsRefreshService } from '../services/accountsRefreshService';
 import { ModelQuotaInfo, QuotaGroup } from '../shared/types';
 import { t } from '../shared/i18n';
+import { accountSwitchService } from '../services/accountSwitchService';
 
 // ============================================================================
 // Types
@@ -362,7 +362,7 @@ export function registerAccountTreeCommands(
         }),
     );
 
-    // Switch account (通过 WebSocket 请求 Cockpit Tools 执行真正的切换)
+    // Switch account (根据当前切换模式执行默认切号或无感切号)
     context.subscriptions.push(
         vscode.commands.registerCommand('agCockpit.accountTree.switch', async (node: AccountNode) => {
             // 🆕 二次确认对话框
@@ -382,18 +382,9 @@ export function registerAccountTreeCommands(
                 return;  // 中止操作
             }
             
-            // 1. 先从本地文件获取账号 ID（不依赖 WebSocket）
-            const accountId = cockpitToolsLocal.getAccountIdByEmail(node.email);
-            if (!accountId) {
-                vscode.window.showWarningMessage(t('accountTree.cannotGetAccountId'));
-                return;
-            }
-
-            // 2. 再检查 WS 连接，未连接则等待重连
-            if (!cockpitToolsWs.isConnected) {
-                logger.info('[AccountTree] WS 未连接，尝试等待重连后执行切换...');
-                const connected = await cockpitToolsWs.waitForConnection(5000);
-                if (!connected) {
+            const result = await accountSwitchService.switchAccount(node.email);
+            if (!result.success) {
+                if (result.errorCode === 'tools_offline' && result.mode === 'default') {
                     const launchAction = t('accountTree.launchCockpitTools');
                     const downloadAction = t('accountTree.downloadCockpitTools');
                     const action = await vscode.window.showWarningMessage(
@@ -401,7 +392,7 @@ export function registerAccountTreeCommands(
                         launchAction,
                         downloadAction,
                     );
-                    
+
                     if (action === launchAction) {
                         vscode.commands.executeCommand('agCockpit.accountTree.openManager');
                     } else if (action === downloadAction) {
@@ -409,18 +400,16 @@ export function registerAccountTreeCommands(
                     }
                     return;
                 }
-                logger.info('[AccountTree] WS 重连成功，继续执行切换操作');
+                vscode.window.showErrorMessage(result.message || t('accountTree.sendSwitchFailed'));
+                return;
             }
 
-            // 3. 通过 WebSocket 请求切换
-            const sent = cockpitToolsWs.requestSwitchAccount(accountId);
-            if (sent) {
-                vscode.window.showInformationMessage(
-                    t('accountTree.switchingTo', { email: node.email }),
-                );
+            if (accountSwitchService.isSeamlessMode(result.mode)) {
+                vscode.window.showInformationMessage(`已无感切换到账号：${result.email ?? node.email}`);
             } else {
-                vscode.window.showErrorMessage(t('accountTree.sendSwitchFailed'));
+                vscode.window.showInformationMessage(t('accountTree.switchingTo', { email: node.email }));
             }
+            await provider.refresh();
         }),
     );
 

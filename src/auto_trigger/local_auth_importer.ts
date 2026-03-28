@@ -212,25 +212,25 @@ function parseUnifiedOAuthTokenInfo(stateValue: string): LocalTokenInfo {
     return parseOAuthTokenInfo(oauthInfoRaw);
 }
 
-async function readLocalTokenInfo(): Promise<LocalTokenInfo> {
-    const dbPath = getAntigravityStateDbPath();
-    logger.info(`[LocalAuth] state.vscdb path: ${dbPath}`);
-
-    // 新格式优先：antigravityUnifiedStateSync.oauthToken
+async function hasStateValueForKey(dbPath: string, key: string): Promise<boolean> {
     try {
-        const unifiedValue = await readStateValueByKey(dbPath, UNIFIED_STATE_KEY);
-        const unifiedInfo = parseUnifiedOAuthTokenInfo(unifiedValue);
-        if (unifiedInfo.refreshToken) {
-            logger.debug('[LocalAuth] Parsed oauth token from unified state key');
-            return unifiedInfo;
-        }
-        logger.debug('[LocalAuth] Unified state key parsed but refresh_token missing, fallback to legacy key');
-    } catch (error) {
-        const err = error instanceof Error ? error.message : String(error);
-        logger.debug(`[LocalAuth] Unified state parse failed, fallback to legacy key: ${err}`);
+        await readStateValueByKey(dbPath, key);
+        return true;
+    } catch {
+        return false;
     }
+}
 
-    // 旧格式兜底：jetskiStateSync.agentManagerInitState -> field 6
+async function readUnifiedTokenInfo(dbPath: string): Promise<LocalTokenInfo> {
+    const unifiedValue = await readStateValueByKey(dbPath, UNIFIED_STATE_KEY);
+    const unifiedInfo = parseUnifiedOAuthTokenInfo(unifiedValue);
+    if (!unifiedInfo.refreshToken) {
+        throw new Error('Unified state key parsed but refresh_token missing');
+    }
+    return unifiedInfo;
+}
+
+async function readLegacyTokenInfo(dbPath: string): Promise<LocalTokenInfo> {
     const legacyValue = await readStateValueByKey(dbPath, LEGACY_STATE_KEY);
     const raw = Buffer.from(legacyValue.trim(), 'base64');
     const oauthField = findField(raw, 6);
@@ -238,6 +238,31 @@ async function readLocalTokenInfo(): Promise<LocalTokenInfo> {
         throw new Error('OAuth field not found in legacy state');
     }
     return parseOAuthTokenInfo(oauthField);
+}
+
+async function readLocalTokenInfo(): Promise<LocalTokenInfo> {
+    const dbPath = getAntigravityStateDbPath();
+    logger.info(`[LocalAuth] state.vscdb path: ${dbPath}`);
+
+    const hasUnifiedState = await hasStateValueForKey(dbPath, UNIFIED_STATE_KEY);
+    const hasLegacyState = await hasStateValueForKey(dbPath, LEGACY_STATE_KEY);
+
+    if (hasUnifiedState && !hasLegacyState) {
+        logger.info(`[LocalAuth] Token state source selected: ${UNIFIED_STATE_KEY}`);
+        return readUnifiedTokenInfo(dbPath);
+    }
+
+    if (!hasUnifiedState && hasLegacyState) {
+        logger.info(`[LocalAuth] Token state source selected: ${LEGACY_STATE_KEY}`);
+        return readLegacyTokenInfo(dbPath);
+    }
+
+    if (hasUnifiedState && hasLegacyState) {
+        logger.info(`[LocalAuth] Token state source selected: ${UNIFIED_STATE_KEY} (both-keys-present)`);
+        return readUnifiedTokenInfo(dbPath);
+    }
+
+    throw new Error(`No oauth token state key found (${UNIFIED_STATE_KEY} / ${LEGACY_STATE_KEY})`);
 }
 
 async function loadCredentialFromStateDb(): Promise<OAuthCredential | null> {

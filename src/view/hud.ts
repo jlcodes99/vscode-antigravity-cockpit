@@ -592,6 +592,8 @@ export class CockpitHUD {
             'close': t('common.close') || 'Close',
             'viewList': t('accountsOverview.viewList') || 'List',
             'viewGrid': t('accountsOverview.viewGrid') || 'Grid',
+            'hideSensitive': t('profile.hideData') || '隐藏邮箱',
+            'showSensitive': t('profile.showData') || '显示邮箱',
             'filterLabel': t('accountsOverview.filterLabel') || 'Filter',
             'filterAll': t('accountsOverview.filterAll') || 'All',
             'filterPro': t('accountsOverview.filterPro') || 'PRO',
@@ -861,6 +863,9 @@ export class CockpitHUD {
                     </div>
 
                     <div class="toolbar-right">
+                        <button id="ao-toggle-privacy-btn" class="btn btn-secondary" title="${t('profile.hideData') || '隐藏邮箱'}" aria-label="${t('profile.hideData') || '隐藏邮箱'}">
+                            ${t('profile.hideData') || '隐藏邮箱'}
+                        </button>
                         <button id="ao-add-btn" class="btn btn-primary" title="${t('accountsOverview.addAccount')}" aria-label="${t('accountsOverview.addAccount')}">
                             ${t('accountsOverview.addAccount')}
                         </button>
