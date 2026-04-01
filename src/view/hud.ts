@@ -838,6 +838,7 @@ export class CockpitHUD {
                         </div>
 
                         <div class="view-switcher">
+                            <button id="ao-view-compact" class="view-btn" title="Compact">▤</button>
                             <button id="ao-view-list" class="view-btn" title="${t('accountsOverview.viewList') || 'List'}">☰</button>
                             <button id="ao-view-grid" class="view-btn active" title="${t('accountsOverview.viewGrid') || 'Grid'}">▦</button>
                         </div>

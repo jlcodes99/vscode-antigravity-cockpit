@@ -10,6 +10,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.1.40] - 2026-04-01
+
+### Added
+- **Accounts Overview compact view mode**: Added a new `Compact` mode (`▤`) in the view switcher. It shows account rows in a denser layout with inline quota chips and quick actions (`Details` / `Switch` / `Refresh`), while keeping responsive behavior on narrow widths.
+
+### Fixed
+- **Invalid persisted view mode fallback**: Persisted webview state now normalizes unknown view modes back to `grid`, avoiding inconsistent active-button state and render behavior.
+
 ## [2.1.39] - 2026-03-30
 
 ### Fixed

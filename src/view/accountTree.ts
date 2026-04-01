@@ -362,7 +362,6 @@ export function registerAccountTreeCommands(
         }),
     );
 
-    // Switch account (根据当前切换模式执行默认切号或无感切号)
     context.subscriptions.push(
         vscode.commands.registerCommand('agCockpit.accountTree.switch', async (node: AccountNode) => {
             // 🆕 二次确认对话框
@@ -382,7 +381,9 @@ export function registerAccountTreeCommands(
                 return;  // 中止操作
             }
             
-            const result = await accountSwitchService.switchAccount(node.email);
+            const result = await accountSwitchService.switchAccount(node.email, {
+                requestedMode: 'default',
+            });
             if (!result.success) {
                 if (result.errorCode === 'tools_offline' && result.mode === 'default') {
                     const launchAction = t('accountTree.launchCockpitTools');

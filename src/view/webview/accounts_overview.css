@@ -709,6 +709,131 @@ body {
     color: var(--danger);
 }
 
+/* Compact layout (new mode) */
+
+.accounts-grid.compact-mode {
+    grid-template-columns: repeat(auto-fill, minmax(460px, 1fr));
+    gap: 12px;
+}
+
+.accounts-grid.compact-mode .account-compact-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 62px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-sm);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.accounts-grid.compact-mode .account-compact-row:hover {
+    border-color: rgba(59, 130, 246, 0.4);
+    box-shadow: var(--shadow-md);
+}
+
+.accounts-grid.compact-mode .account-compact-row.current {
+    border-color: rgba(59, 130, 246, 0.65);
+}
+
+.accounts-grid.compact-mode .account-compact-row.selected {
+    border-color: rgba(14, 165, 165, 0.55);
+}
+
+.accounts-grid.compact-mode .account-compact-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+}
+
+.compact-email {
+    flex: 1;
+    min-width: 120px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.compact-quotas {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 120px;
+}
+
+.compact-quota-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+}
+
+.compact-quota-item.high { color: var(--success); }
+.compact-quota-item.medium { color: var(--warning); }
+.compact-quota-item.low { color: var(--danger); }
+
+.compact-quota-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.compact-quota-empty {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.compact-quota-empty.is-error {
+    color: var(--danger);
+}
+
+.compact-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.compact-action-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.compact-action-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.compact-action-btn.success:hover {
+    border-color: rgba(34, 197, 94, 0.6);
+    color: var(--success);
+}
+
+.compact-current-tag {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(16, 185, 129, 0.2);
+    color: var(--success);
+}
+
 /* Table view */
 
 .account-table-container {
@@ -1182,5 +1307,27 @@ body {
 
     .accounts-grid {
         grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    }
+
+    .accounts-grid.compact-mode {
+        grid-template-columns: 1fr;
+    }
+
+    .accounts-grid.compact-mode .account-compact-row {
+        flex-wrap: wrap;
+        align-items: flex-start;
+    }
+
+    .compact-email {
+        min-width: 100%;
+    }
+
+    .compact-quotas {
+        width: 100%;
+    }
+
+    .compact-actions {
+        width: 100%;
+        justify-content: flex-end;
     }
 }

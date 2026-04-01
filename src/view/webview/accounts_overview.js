@@ -22,6 +22,7 @@
     let viewMode = 'grid';
     let sortGroups =  [];
     const resetSortPrefix = 'reset:'; // 重置时间排序前缀
+    const GROUP_COLOR_PALETTE = ['#8b5cf6', '#3b82f6', '#14b8a6', '#f59e0b', '#ef4444', '#22c55e'];
     let currentConfig = {};
     let isInitialLoading = true;
     let actionMessageTimer = null;
@@ -47,6 +48,7 @@
         togglePrivacyBtn: document.getElementById('ao-toggle-privacy-btn'),
         viewListBtn: document.getElementById('ao-view-list'),
         viewGridBtn: document.getElementById('ao-view-grid'),
+        viewCompactBtn: document.getElementById('ao-view-compact'),
         refreshAllBtn: document.getElementById('ao-refresh-all-btn'),
         addBtn: document.getElementById('ao-add-btn'),
         importBtn: document.getElementById('ao-import-btn'),
@@ -166,6 +168,13 @@
         } catch {
             // ignore localStorage write failures
         }
+    }
+
+    function normalizeViewMode(mode) {
+        if (mode === 'list' || mode === 'grid' || mode === 'compact') {
+            return mode;
+        }
+        return 'grid';
     }
 
     function maskSegment(value, keepStart = 2, keepEnd = 2) {
@@ -337,15 +346,17 @@
         return groups.slice(0, 4);
     }
 
+    function getGroupColor(groupId) {
+        const groupIndex = sortGroups.findIndex((group) => group.id === groupId);
+        const index = groupIndex >= 0 ? groupIndex : 0;
+        return GROUP_COLOR_PALETTE[index % GROUP_COLOR_PALETTE.length];
+    }
+
     function setViewMode(mode) {
-        viewMode = mode;
-        if (viewMode === 'list') {
-            elements.viewListBtn.classList.add('active');
-            elements.viewGridBtn.classList.remove('active');
-        } else {
-            elements.viewGridBtn.classList.add('active');
-            elements.viewListBtn.classList.remove('active');
-        }
+        viewMode = normalizeViewMode(mode);
+        elements.viewListBtn?.classList.toggle('active', viewMode === 'list');
+        elements.viewGridBtn?.classList.toggle('active', viewMode === 'grid');
+        elements.viewCompactBtn?.classList.toggle('active', viewMode === 'compact');
         vscode.setState({ viewMode });
         render();
     }
@@ -554,6 +565,55 @@
         }).join('');
     }
 
+    function renderCompactQuotaInline(account) {
+        if (account.loading) {
+            return `<span class="compact-quota-empty">${escapeHtml(getString('loading', 'Loading...'))}</span>`;
+        }
+        if (account.error) {
+            return `<span class="compact-quota-empty is-error">⚠️ ${escapeHtml(getString('error', 'Error'))}</span>`;
+        }
+
+        const groups = getDisplayGroups(account);
+        if (groups.length === 0) {
+            const pct = Math.round(getOverallQuota(account));
+            const cls = getQuotaClass(pct);
+            return `<span class="compact-quota-item ${cls}">${pct}%</span>`;
+        }
+
+        return groups.map((group) => {
+            const pct = Math.round(group.percentage || 0);
+            const cls = getQuotaClass(pct);
+            return `
+                <span class="compact-quota-item ${cls}" title="${escapeHtml(group.groupName)}">
+                    <span class="compact-quota-dot" style="background:${escapeHtml(getGroupColor(group.groupId))}"></span>
+                    ${pct}%
+                </span>
+            `;
+        }).join('');
+    }
+
+    function renderAccountCompact(account) {
+        const displayEmail = getDisplayEmail(account.email);
+        const isCurrent = account.isCurrent;
+        const isSelected = selected.has(account.email);
+        const switchLabel = escapeHtml(getString('switch', 'Switch'));
+        const detailsLabel = escapeHtml(getString('details', 'Details'));
+        const refreshLabel = escapeHtml(getString('refresh', 'Refresh'));
+
+        return `
+            <div class="account-compact-row ${isCurrent ? 'current' : ''} ${isSelected ? 'selected' : ''}" data-email="${escapeHtml(account.email)}">
+                <input type="checkbox" data-action="select" ${isSelected ? 'checked' : ''} data-email="${escapeHtml(account.email)}" />
+                <span class="compact-email" title="${escapeHtml(displayEmail)}">${escapeHtml(displayEmail)}</span>
+                <div class="compact-quotas">${renderCompactQuotaInline(account)}</div>
+                <div class="compact-actions">
+                    <button class="compact-action-btn" data-action="details" data-email="${escapeHtml(account.email)}" data-tooltip="${detailsLabel}" aria-label="${detailsLabel}">ℹ️</button>
+                    ${isCurrent ? `<span class="compact-current-tag">${escapeHtml(getString('current', 'Current'))}</span>` : `<button class="compact-action-btn success" data-action="switch" data-email="${escapeHtml(account.email)}" data-tooltip="${switchLabel}" aria-label="${switchLabel}">▶</button>`}
+                    <button class="compact-action-btn" data-action="refresh" data-email="${escapeHtml(account.email)}" data-tooltip="${refreshLabel}" aria-label="${refreshLabel}">↻</button>
+                </div>
+            </div>
+        `;
+    }
+
     function renderAccountCard(account) {
         const displayEmail = getDisplayEmail(account.email);
         const tier = getTierLabel(account);
@@ -759,6 +819,7 @@
 
         const nextRenderOrder = getRenderOrder(filteredAccounts);
         const canPatch = viewMode === lastRenderViewMode && isSameRenderOrder(nextRenderOrder);
+        const cardRenderer = viewMode === 'compact' ? renderAccountCompact : renderAccountCard;
 
         const finalizeRender = () => {
             const filteredEmails = filteredAccounts.map(acc => acc.email);
@@ -789,7 +850,7 @@
         if (canPatch) {
             const target = viewMode === 'list' ? elements.accountsTbody : elements.accountsGrid;
             const useTableContext = viewMode === 'list';
-            if (patchRender(target, filteredAccounts, viewMode === 'list' ? renderAccountRow : renderAccountCard, useTableContext)) {
+            if (patchRender(target, filteredAccounts, viewMode === 'list' ? renderAccountRow : cardRenderer, useTableContext)) {
                 finalizeRender();
                 return;
             }
@@ -808,7 +869,9 @@
             renderFully(elements.accountsTbody, filteredAccounts, renderAccountRow);
         } else {
             elements.accountsGrid.classList.remove('hidden');
-            renderFully(elements.accountsGrid, filteredAccounts, renderAccountCard);
+            elements.accountsGrid.classList.toggle('compact-mode', viewMode === 'compact');
+            elements.accountsGrid.classList.toggle('cards-mode', viewMode === 'grid');
+            renderFully(elements.accountsGrid, filteredAccounts, cardRenderer);
         }
 
         lastRenderOrder = nextRenderOrder;
@@ -1013,6 +1076,7 @@
 
         elements.viewListBtn?.addEventListener('click', () => setViewMode('list'));
         elements.viewGridBtn?.addEventListener('click', () => setViewMode('grid'));
+        elements.viewCompactBtn?.addEventListener('click', () => setViewMode('compact'));
         elements.togglePrivacyBtn?.addEventListener('click', togglePrivacyMode);
 
         elements.refreshAllBtn?.addEventListener('click', () => {
@@ -1772,7 +1836,7 @@
     function init() {
         const state = vscode.getState();
         if (state?.viewMode) {
-            viewMode = state.viewMode;
+            viewMode = normalizeViewMode(state.viewMode);
         }
         privacyModeEnabled = isPrivacyModeEnabledByDefault();
         updatePrivacyToggleButton();
