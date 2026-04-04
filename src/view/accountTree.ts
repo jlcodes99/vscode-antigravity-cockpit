@@ -12,12 +12,12 @@
  */
 
 import * as vscode from 'vscode';
-import { logger } from '../shared/log_service';
 import { cockpitToolsWs } from '../services/cockpitToolsWs';
 import { AccountsRefreshService } from '../services/accountsRefreshService';
 import { ModelQuotaInfo, QuotaGroup } from '../shared/types';
 import { t } from '../shared/i18n';
 import { accountSwitchService } from '../services/accountSwitchService';
+import { openCockpitToolsDesktop } from '../shared/cockpit_tools_launcher';
 
 // ============================================================================
 // Types
@@ -417,26 +417,8 @@ export function registerAccountTreeCommands(
     // Open Cockpit Tools
     context.subscriptions.push(
         vscode.commands.registerCommand('agCockpit.accountTree.openManager', async () => {
-            const platform = process.platform;
-            let command: string;
-
-            if (platform === 'darwin') {
-                command = 'open -a "Cockpit Tools"';
-            } else if (platform === 'win32') {
-                command = 'start "" "Cockpit Tools"';
-            } else {
-                command = 'cockpit-tools';
-            }
-
-            try {
-                const { exec } = await import('child_process');
-                exec(command, (error) => {
-                    if (error) {
-                        logger.warn('[AccountTree] Failed to open Cockpit Tools:', error);
-                        vscode.window.showWarningMessage(t('accountTree.cannotOpenCockpitTools'));
-                    }
-                });
-            } catch {
+            const opened = await openCockpitToolsDesktop('AccountTree');
+            if (!opened) {
                 vscode.window.showWarningMessage(t('accountTree.cannotOpenCockpitTools'));
             }
         }),

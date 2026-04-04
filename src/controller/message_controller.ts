@@ -17,6 +17,7 @@ import { getQuotaHistory, clearHistory, clearAllHistory } from '../services/quot
 import { oauthService } from '../auto_trigger';
 import { AccountsRefreshService } from '../services/accountsRefreshService';
 import { accountSwitchService, AccountSwitchMode, AccountSwitchModeInput, AccountSwitchResult } from '../services/accountSwitchService';
+import { openCockpitToolsDesktop } from '../shared/cockpit_tools_launcher';
 
 export interface AccountSwitchExecutionRequest {
     requestId?: string;
@@ -1759,34 +1760,7 @@ export class MessageController {
     }
 
     private async openCockpitToolsOrDownload(): Promise<void> {
-        const platform = process.platform;
-        let command: string;
-
-        if (platform === 'darwin') {
-            command = 'open -a "Cockpit Tools"';
-        } else if (platform === 'win32') {
-            command = 'start "" "Cockpit Tools"';
-        } else {
-            command = 'cockpit-tools';
-        }
-
-        const opened = await new Promise<boolean>((resolve) => {
-            import('child_process')
-                .then(({ exec }) => {
-                    exec(command, (error) => {
-                        if (error) {
-                            logger.warn(`[AutoTriggerRisk] Failed to open Cockpit Tools, fallback to download: ${error.message}`);
-                            resolve(false);
-                            return;
-                        }
-                        resolve(true);
-                    });
-                })
-                .catch((error) => {
-                    logger.warn(`[AutoTriggerRisk] Failed to import child_process, fallback to download: ${String(error)}`);
-                    resolve(false);
-                });
-        });
+        const opened = await openCockpitToolsDesktop('AutoTriggerRisk');
 
         if (!opened) {
             await this.downloadCockpitTools();

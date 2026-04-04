@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.1.42] - 2026-04-04
+
+### Fixed
+- **Cockpit Tools launch reliability on Windows**: When command-based launch fails due to command-not-found errors, the extension now retries with the `cockpit-tools://` deep link.
+- **Consistent open behavior across entry points**: `Open Cockpit Tools` from Accounts Tree and wake-up risk dialog now share the same desktop launch logic and failure handling path.
+
 ## [2.1.41] - 2026-04-03
 
 ### Changed

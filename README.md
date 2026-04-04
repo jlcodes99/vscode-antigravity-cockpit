@@ -249,7 +249,7 @@ QQ交流群 或者加我微信 拉微信群
 
 | QQ 群 | 微信（个人） |
 | :---: | :---: |
-| <img src="docs/qq_group.png" width="200" /> | <img src="docs/wechat_info.jpg" width="200" /> |
+| <img src="docs/qq_group_20260404_183718.png" width="200" /> | <img src="docs/wechat_info.jpg" width="200" /> |
 
 ---
 
