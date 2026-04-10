@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as childProcess from 'child_process';
 import {
+    getCockpitToolsSharedDir,
     getAntigravityStateDbPath,
     setAntigravityRemoteName,
     setAntigravityUserDataDir,
@@ -48,6 +49,24 @@ describe('antigravity_paths', () => {
 
         expect(getAntigravityStateDbPath()).toBe(
             '/mnt/c/Users/李杰/AppData/Roaming/Antigravity/User/globalStorage/state.vscdb',
+        );
+    });
+
+    it('should resolve Cockpit Tools shared dir from Windows user profile when running in WSL', () => {
+        const execFileSyncMock = childProcess.execFileSync as jest.MockedFunction<typeof childProcess.execFileSync>;
+        execFileSyncMock
+            .mockImplementationOnce(() => 'C:\\Users\\Alice\r\n' as never)
+            .mockImplementationOnce(() => '/mnt/c/Users/Alice\n' as never);
+
+        setAntigravityRemoteName('wsl');
+
+        expect(getCockpitToolsSharedDir()).toBe('/mnt/c/Users/Alice/.antigravity_cockpit');
+        expect(execFileSyncMock).toHaveBeenCalledTimes(2);
+        expect(execFileSyncMock).toHaveBeenNthCalledWith(
+            1,
+            'cmd.exe',
+            ['/d', '/u', '/c', 'echo', '%USERPROFILE%'],
+            expect.objectContaining({ encoding: 'utf16le' }),
         );
     });
 

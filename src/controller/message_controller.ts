@@ -206,14 +206,21 @@ export class MessageController {
         };
     }
 
+    /**
+     * 当检测到 Cockpit Tools 未运行时，给用户展示可执行动作：
+     * 1. 启动本地管理器；
+     * 2. 打开 releases 页面下载工具。
+     */
     private async showToolsNotRunningActions(): Promise<void> {
         const launchAction = t('accountTree.launchCockpitTools');
         const downloadAction = t('accountTree.downloadCockpitTools');
+        // 显示警告并等待用户选择操作。
         const action = await vscode.window.showWarningMessage(
             t('accountTree.cockpitToolsNotRunning'),
             launchAction,
             downloadAction,
         );
+        // 根据用户选择执行对应动作；未选择时不做任何处理。
         if (action === launchAction) {
             vscode.commands.executeCommand('agCockpit.accountTree.openManager');
         } else if (action === downloadAction) {

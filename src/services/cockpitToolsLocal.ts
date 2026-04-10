@@ -6,10 +6,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { logger } from '../shared/log_service';
+import { getCockpitToolsSharedDir } from '../shared/antigravity_paths';
 
-const SHARED_DIR = path.join(os.homedir(), '.antigravity_cockpit');
 const ACCOUNTS_INDEX = 'accounts.json';
 
 /** accounts.json 中的账号条目 */
@@ -33,7 +32,7 @@ class CockpitToolsLocal {
      * 读取 accounts.json 索引文件
      */
     private readAccountsIndex(): AccountsIndex | null {
-        const filePath = path.join(SHARED_DIR, ACCOUNTS_INDEX);
+        const filePath = path.join(getCockpitToolsSharedDir(), ACCOUNTS_INDEX);
         try {
             if (!fs.existsSync(filePath)) {
                 logger.warn('[CockpitToolsLocal] accounts.json 不存在');

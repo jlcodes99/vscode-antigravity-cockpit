@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { logger } from './log_service';
+import { isAntigravityWslRemote } from './antigravity_paths';
 
 const COCKPIT_TOOLS_DEEP_LINK = 'cockpit-tools://';
 
@@ -9,6 +10,9 @@ function getLaunchCommand(): string {
     }
     if (process.platform === 'win32') {
         return 'start "" "Cockpit Tools"';
+    }
+    if (process.platform === 'linux' && isAntigravityWslRemote()) {
+        return 'cmd.exe /d /c start "" "cockpit-tools://"';
     }
     return 'cockpit-tools';
 }
@@ -75,6 +79,12 @@ export async function openCockpitToolsDesktop(sourceTag: string): Promise<boolea
     if (process.platform === 'win32' && isWindowsNotFoundError(errorMessage)) {
         logger.warn(
             `[${sourceTag}] Cockpit Tools command not found, trying deep link fallback: ${errorMessage}`,
+        );
+        return launchByDeepLink(sourceTag);
+    }
+    if (process.platform === 'linux' && isAntigravityWslRemote()) {
+        logger.warn(
+            `[${sourceTag}] WSL launch command failed, trying deep link fallback: ${errorMessage || 'unknown error'}`,
         );
         return launchByDeepLink(sourceTag);
     }
