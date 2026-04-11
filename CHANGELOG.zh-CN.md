@@ -10,6 +10,13 @@
 
 ## [未发布]
 
+## [2.1.43] - 2026-04-11
+
+### 修复
+- **WSL 下 Cockpit Tools 共享目录解析**：当扩展运行在 WSL 中时，Cockpit Tools 共享文件现在会从 Windows 用户目录（`%USERPROFILE%/.antigravity_cockpit`）解析，而不是 Linux Home 目录，`accounts.json` 与 `server.json` 会读取桌面端实际使用的位置。
+- **WSL 下 Cockpit Tools WebSocket 主机解析**：桌面端 WebSocket 连接目标现在会优先使用 WSL 默认网关，必要时回退到 `/etc/resolv.conf`，并正确处理 IPv6 主机地址，提升连接 Windows 侧 Cockpit Tools 服务的稳定性。
+- **WSL 运行时识别与桌面端拉起路径**：WSL 检测不再只依赖 remoteName 标记；扩展会结合运行时信号识别 WSL，并在 WSL 会话中走 Windows 深链拉起路径，提升 Cockpit Tools 启动成功率。
+
 ## [2.1.42] - 2026-04-04
 
 ### 修复
