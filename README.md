@@ -263,7 +263,7 @@ QQ交流群 或者加我微信 拉微信群
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=jlcodes99/vscode-antigravity-cockpit&type=Date)](https://star-history.com/#jlcodes99/vscode-antigravity-cockpit&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=jlcodes99/vscode-antigravity-cockpit&type=Date)](https://star-history.dera.page/#jlcodes99/vscode-antigravity-cockpit&Date)
 
 ---
 
