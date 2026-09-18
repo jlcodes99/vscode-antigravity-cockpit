@@ -66,6 +66,7 @@ export class CloudCodeRequestError extends Error {
 }
 
 interface LoadCodeAssistAvailableCredit {
+    creditType?: string;
     creditAmount?: string | number;
 }
 
@@ -119,7 +120,11 @@ function sumAvailableAICredits(tier?: LoadCodeAssistTier): number | undefined {
     let total = 0;
     let hasValidAmount = false;
     for (const credit of credits) {
-        const amount = parseAvailableCreditAmount(credit?.creditAmount);
+        if (credit?.creditType !== 'GOOGLE_ONE_AI') {
+            continue;
+        }
+        // Proto JSON omits the amount when the balance is zero.
+        const amount = parseAvailableCreditAmount(credit.creditAmount ?? 0);
         if (amount === null) {
             continue;
         }
