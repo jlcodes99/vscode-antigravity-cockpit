@@ -10,6 +10,9 @@
 
 ## [未发布]
 
+### 工程（Webview）
+- **Webview 纳入类型检查**：新增 `tsconfig.webview.json`（checkJs + DOM lib）与 `typecheck:webview` 脚本并接入 CI。约 9k 行原生 JS 从 246 个类型问题收敛到 0：新增有类型的 `webview.globals.d.ts` 声明 hud 注入契约，DOM 胶水层有界收窄（不使用 `any`）。修复真实问题：智能分组提示 `replace('{count}', 数字)` 永不替换、`Date` 算术改用 `getTime()`、输入框赋数字转字符串、带布尔参的 click 监听器包裹调用、删除过期 JSDoc；移除已废弃的 `copy-webview` 脚本和未使用的 `shx` 依赖。
+
 ### 工程
 - 新增 CI workflow（`.github/workflows/ci.yml`）：PR 与 main 推送强制跑 `tsc --noEmit` + ESLint + Jest + 生产构建；release / Open VSX 发布流水线同样补齐类型检查、Lint 与测试门禁。
 

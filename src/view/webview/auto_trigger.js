@@ -440,7 +440,7 @@
 
         document.getElementById('at-enable-schedule').checked = configEnabled;
         document.getElementById('at-mode-select').value = configMode;
-        document.getElementById('at-interval-hours').value = configIntervalHours;
+        document.getElementById('at-interval-hours').value = String(configIntervalHours);
         document.getElementById('at-interval-start').value = configIntervalStart;
 
         // 唤醒方式

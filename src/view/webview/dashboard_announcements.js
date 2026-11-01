@@ -46,7 +46,7 @@ export function createAnnouncementModule({
         if (announcementMarkAllRead) announcementMarkAllRead.addEventListener('click', markAllAnnouncementsRead);
 
         const announcementPopupLater = document.getElementById('announcement-popup-later');
-        if (announcementPopupLater) announcementPopupLater.addEventListener('click', closeAnnouncementPopup);
+        if (announcementPopupLater) announcementPopupLater.addEventListener('click', () => closeAnnouncementPopup());
 
         const announcementPopupGotIt = document.getElementById('announcement-popup-got-it');
         if (announcementPopupGotIt) announcementPopupGotIt.addEventListener('click', handleAnnouncementGotIt);
@@ -62,7 +62,7 @@ export function createAnnouncementModule({
         if (badge) {
             const count = announcementState.unreadIds.length;
             if (count > 0) {
-                badge.textContent = count > 9 ? '9+' : count;
+                badge.textContent = String(count > 9 ? '9+' : count);
                 badge.classList.remove('hidden');
             } else {
                 badge.classList.add('hidden');
@@ -171,7 +171,7 @@ export function createAnnouncementModule({
     function formatTimeAgo(dateStr) {
         const date = new Date(dateStr);
         const now = new Date();
-        const diffMs = now - date;
+        const diffMs = now.getTime() - date.getTime();
         const diffMins = Math.floor(diffMs / 60000);
         const diffHours = Math.floor(diffMs / 3600000);
         const diffDays = Math.floor(diffMs / 86400000);

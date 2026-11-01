@@ -1252,7 +1252,7 @@
         document.getElementById('announcement-btn')?.addEventListener('click', openAnnouncementList);
         document.getElementById('announcement-list-close')?.addEventListener('click', closeAnnouncementList);
         document.getElementById('announcement-mark-all-read')?.addEventListener('click', markAllAnnouncementsRead);
-        document.getElementById('announcement-popup-later')?.addEventListener('click', closeAnnouncementPopup);
+        document.getElementById('announcement-popup-later')?.addEventListener('click', () => closeAnnouncementPopup());
         document.getElementById('announcement-popup-got-it')?.addEventListener('click', handleAnnouncementGotIt);
         document.getElementById('announcement-popup-action')?.addEventListener('click', handleAnnouncementAction);
     }
@@ -1314,7 +1314,7 @@
         if (!badge) return;
         const count = announcementState.unreadIds.length;
         if (count > 0) {
-            badge.textContent = count > 9 ? '9+' : count;
+            badge.textContent = String(count > 9 ? '9+' : count);
             badge.classList.remove('hidden');
         } else {
             badge.classList.add('hidden');
@@ -1411,7 +1411,7 @@
     function formatTimeAgo(dateStr) {
         const date = new Date(dateStr);
         const now = new Date();
-        const diffMs = now - date;
+        const diffMs = now.getTime() - date.getTime();
         const diffMins = Math.floor(diffMs / 60000);
         const diffHours = Math.floor(diffMs / 3600000);
         const diffDays = Math.floor(diffMs / 86400000);
@@ -1768,8 +1768,8 @@
             if (criticalValue < 1) criticalValue = 1;
         }
 
-        if (warningInput) warningInput.value = warningValue;
-        if (criticalInput) criticalInput.value = criticalValue;
+        if (warningInput) warningInput.value = String(warningValue);
+        if (criticalInput) criticalInput.value = String(criticalValue);
 
         saveThresholds();
     }
@@ -1886,7 +1886,7 @@
     // =====================================================================
 
     function init() {
-        const state = vscode.getState();
+        const state = /** @type {{ viewMode?: string } | undefined} */ (vscode.getState());
         if (state?.viewMode) {
             viewMode = normalizeViewMode(state.viewMode);
         }
