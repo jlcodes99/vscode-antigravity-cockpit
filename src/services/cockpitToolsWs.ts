@@ -217,6 +217,27 @@ export interface AccountsWithTokensResponse {
     current_account_id: string | null;
 }
 
+/** 入站指令 payload 必须是非数组对象 */
+export function isObjectPayload(payload: unknown): payload is Record<string, unknown> {
+    return typeof payload === 'object' && payload !== null && !Array.isArray(payload);
+}
+
+/**
+ * 校验外部切号指令：payload 必须为对象且 target_email 为非空字符串。
+ * 返回类型化 payload（调用方仍需自行做 switch_mode 枚举归一化），非法返回 null。
+ */
+export function parsePluginSwitchAccountPayload(
+    payload: unknown,
+): PluginSwitchAccountPayload | null {
+    if (!isObjectPayload(payload)) {
+        return null;
+    }
+    if (typeof payload.target_email !== 'string' || payload.target_email.length === 0) {
+        return null;
+    }
+    return payload as unknown as PluginSwitchAccountPayload;
+}
+
 // ============================================================================
 // WebSocket Client
 // ============================================================================
@@ -581,7 +602,7 @@ class CockpitToolsWsClient extends EventEmitter {
         try {
             const message = JSON.parse(data) as WsMessage;
             const payload = message.payload as Record<string, unknown> | undefined;
-            
+
             // 处理响应消息
             if (message.type.startsWith('response.') && payload?.request_id) {
                 const requestId = payload.request_id as string;
@@ -589,16 +610,16 @@ class CockpitToolsWsClient extends EventEmitter {
                 if (pending) {
                     this.pendingRequests.delete(requestId);
                     clearTimeout(pending.timeout);
-                    
+
                     if (message.type === 'response.error') {
-                        pending.reject(new Error(payload.error as string || '未知错误'));
+                        pending.reject(new Error((typeof payload.error === 'string' && payload.error) || '未知错误'));
                     } else {
                         pending.resolve(payload);
                     }
                     return;
                 }
             }
-            
+
             switch (message.type) {
                 case 'event.ready': {
                     const readyPayload = payload as unknown as ReadyPayload;
@@ -644,6 +665,10 @@ class CockpitToolsWsClient extends EventEmitter {
                 }
 
                 case 'event.plugin_set_switch_mode': {
+                    if (!isObjectPayload(payload)) {
+                        logger.warn('[WS] 丢弃 plugin_set_switch_mode: payload 必须为对象');
+                        break;
+                    }
                     const modePayload = payload as unknown as PluginSetSwitchModePayload;
                     logger.info(
                         `[WS] 收到外部切换模式请求: request_id=${modePayload.request_id ?? 'none'}, mode=${modePayload.switch_mode ?? 'none'}`,
@@ -653,9 +678,13 @@ class CockpitToolsWsClient extends EventEmitter {
                 }
 
                 case 'event.plugin_switch_account': {
-                    const switchPayload = payload as unknown as PluginSwitchAccountPayload;
+                    const switchPayload = parsePluginSwitchAccountPayload(payload);
+                    if (!switchPayload) {
+                        logger.warn('[WS] 丢弃 plugin_switch_account: payload 非法或 target_email 缺失');
+                        break;
+                    }
                     logger.info(
-                        `[WS] 收到外部切号请求: request_id=${switchPayload.request_id ?? 'none'}, target=${switchPayload.target_email ?? 'none'}, mode=${switchPayload.switch_mode ?? 'auto'}`,
+                        `[WS] 收到外部切号请求: request_id=${switchPayload.request_id ?? 'none'}, target=${switchPayload.target_email}, mode=${switchPayload.switch_mode ?? 'auto'}`,
                     );
                     this.emit('pluginSwitchAccount', switchPayload);
                     break;

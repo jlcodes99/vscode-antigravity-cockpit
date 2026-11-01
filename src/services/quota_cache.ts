@@ -2,6 +2,7 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { createHash } from 'crypto';
+import { writePrivateFileAtomic } from '../shared/secure_fs';
 
 export type QuotaCacheSource = 'authorized' | 'local';
 
@@ -42,11 +43,6 @@ function getCacheFilePath(source: QuotaCacheSource, email: string): string {
     return path.join(CACHE_ROOT, source, filename);
 }
 
-async function ensureCacheDir(source: QuotaCacheSource): Promise<void> {
-    const dir = path.join(CACHE_ROOT, source);
-    await fs.mkdir(dir, { recursive: true });
-}
-
 export async function readQuotaCache(
     source: QuotaCacheSource,
     email: string,
@@ -68,12 +64,9 @@ export async function writeQuotaCache(record: QuotaCacheRecord): Promise<void> {
     if (!record.email) {
         return;
     }
-    await ensureCacheDir(record.source);
     const filePath = getCacheFilePath(record.source, record.email);
-    const tempPath = `${filePath}.tmp`;
     const content = JSON.stringify(record, null, 2);
-    await fs.writeFile(tempPath, content, 'utf8');
-    await fs.rename(tempPath, filePath);
+    await writePrivateFileAtomic(filePath, content);
 }
 
 /** 缓存过期时间（毫秒）：60秒 */

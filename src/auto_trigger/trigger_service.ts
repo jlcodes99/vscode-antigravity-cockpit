@@ -12,6 +12,9 @@ import { TriggerRecord, ModelInfo } from './types';
 import { logger } from '../shared/log_service';
 import { cloudCodeClient } from '../shared/cloudcode_client';
 import { t } from '../shared/i18n';
+import { writePrivateFileAtomic } from '../shared/secure_fs';
+import { AUTH_MODEL_BLACKLIST_IDS } from '../shared/recommended_models';
+import { isHiddenAuthorizedModel, type AuthorizedModelInfo } from '../engine/model_catalog';
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const RESET_TRIGGER_COOLDOWN_MS = 10 * 60 * 1000;
@@ -475,12 +478,20 @@ class TriggerService {
             return [];
         }
 
-        // 构建 ModelInfo 数组
-        const allModels: ModelInfo[] = Object.entries(data.models).map(([id, info]) => ({
-            id,
-            displayName: info.displayName || id,
-            modelConstant: info.model || '',
-        }));
+        // 构建 ModelInfo 数组（排除内部实验/禁用/tab 补全/旧别名模型，
+        // 避免把 chat_20706、tab_flash_lite_preview 等噪声写入缓存与可触发列表）
+        const blacklist = new Set(AUTH_MODEL_BLACKLIST_IDS);
+        const allModels: ModelInfo[] = Object.entries(data.models)
+            .filter(([id, info]) => !isHiddenAuthorizedModel(
+                id,
+                info as AuthorizedModelInfo,
+                blacklist,
+            ))
+            .map(([id, info]) => ({
+                id,
+                displayName: info.displayName || id,
+                modelConstant: info.model || '',
+            }));
 
         if (allModels.length > 0) {
             await this.writeAvailableModelsCache(allModels);
@@ -512,15 +523,12 @@ class TriggerService {
 
     private async writeAvailableModelsCache(models: ModelInfo[]): Promise<void> {
         try {
-            await fs.mkdir(path.dirname(AVAILABLE_MODELS_CACHE_FILE), { recursive: true });
             const record: AvailableModelsCache = {
                 version: AVAILABLE_MODELS_CACHE_VERSION,
                 updatedAt: Date.now(),
                 models,
             };
-            const tempPath = `${AVAILABLE_MODELS_CACHE_FILE}.tmp`;
-            await fs.writeFile(tempPath, JSON.stringify(record, null, 2), 'utf8');
-            await fs.rename(tempPath, AVAILABLE_MODELS_CACHE_FILE);
+            await writePrivateFileAtomic(AVAILABLE_MODELS_CACHE_FILE, JSON.stringify(record, null, 2));
         } catch (error) {
             logger.debug(`[TriggerService] Failed to write available models cache: ${error instanceof Error ? error.message : String(error)}`);
         }

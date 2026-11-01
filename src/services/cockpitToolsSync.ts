@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { cockpitToolsWs, AccountTokenInfo } from './cockpitToolsWs';
+import { cockpitToolsWs, AccountTokenInfo, AccountInfo } from './cockpitToolsWs';
 import { credentialStorage } from '../auto_trigger/credential_storage';
 import { oauthService } from '../auto_trigger/oauth_service';
 import { logger } from '../shared/log_service';
@@ -29,7 +29,17 @@ function toIsoFromUnixSeconds(seconds?: number): string {
     return new Date(seconds * 1000).toISOString();
 }
 
-async function fetchRemoteAccounts(): Promise<AccountTokenInfo[]> {
+/**
+ * 拉取远端账号列表（不含 token）。
+ * 明文 token 属高敏感数据：仅当确认存在"远端有、本地无"的账号时才再拉一次带 token 的清单，
+ * 避免每次同步都把全量 refresh/access token 读进扩展进程内存。
+ */
+async function fetchRemoteAccountList(): Promise<AccountInfo[]> {
+    const response = await cockpitToolsWs.getAccounts();
+    return response.accounts ?? [];
+}
+
+async function fetchRemoteAccountsWithTokens(): Promise<AccountTokenInfo[]> {
     const response = await cockpitToolsWs.getAccountsWithTokens();
     return response.accounts ?? [];
 }
@@ -55,7 +65,7 @@ export async function syncAccountsWithCockpitTools(options?: { force?: boolean; 
 
     try {
         logger.info(`[Sync] Start (reason=${options?.reason ?? 'unknown'})`);
-        let remoteAccounts = await fetchRemoteAccounts();
+        let remoteAccounts: AccountInfo[] = await fetchRemoteAccountList();
         let remoteEmails = remoteAccounts.map(acc => acc.email);
         let remoteSet = new Set(remoteEmails);
 
@@ -107,34 +117,41 @@ export async function syncAccountsWithCockpitTools(options?: { force?: boolean; 
         }
 
         if (pushedAny) {
-            remoteAccounts = await fetchRemoteAccounts();
+            remoteAccounts = await fetchRemoteAccountList();
             remoteEmails = remoteAccounts.map(acc => acc.email);
             remoteSet = new Set(remoteEmails);
         }
 
-        // 导入远端存在但本地不存在的账号
-        for (const account of remoteAccounts) {
-            if (localSet.has(account.email)) {
-                continue;
-            }
-            if (!account.refresh_token) {
-                logger.info(`[Sync] Skip import (missing refresh_token): ${account.email}`);
-                continue;
-            }
+        // 导入远端存在但本地不存在的账号：仅此时才拉取一次明文 token 清单
+        const missingEmails = remoteEmails.filter(email => !localSet.has(email) && !!email);
+        if (missingEmails.length === 0) {
+            logger.info('[Sync] No new remote accounts; skipped get_accounts_with_tokens (plaintext tokens not pulled)');
+        } else {
+            const missingSet = new Set(missingEmails);
+            const tokenAccounts = await fetchRemoteAccountsWithTokens();
+            for (const account of tokenAccounts) {
+                if (!missingSet.has(account.email)) {
+                    continue;
+                }
+                if (!account.refresh_token) {
+                    logger.info(`[Sync] Skip import (missing refresh_token): ${account.email}`);
+                    continue;
+                }
 
-            const credential = oauthService.buildCredentialFromTokenData({
-                email: account.email,
-                accessToken: account.access_token || '',
-                refreshToken: account.refresh_token,
-                expiresAt: toIsoFromUnixSeconds(account.expires_at),
-                projectId: account.project_id ?? undefined,
-                isInvalid: account.disabled,
-            });
+                const credential = oauthService.buildCredentialFromTokenData({
+                    email: account.email,
+                    accessToken: account.access_token || '',
+                    refreshToken: account.refresh_token,
+                    expiresAt: toIsoFromUnixSeconds(account.expires_at),
+                    projectId: account.project_id ?? undefined,
+                    isInvalid: account.disabled,
+                });
 
-            await credentialStorage.saveCredentialForAccount(account.email, credential, { skipNotifyTools: true });
-            localSet.add(account.email);
-            localChanged = true;
-            logger.info(`[Sync] Import from Tools: ${account.email}`);
+                await credentialStorage.saveCredentialForAccount(account.email, credential, { skipNotifyTools: true });
+                localSet.add(account.email);
+                localChanged = true;
+                logger.info(`[Sync] Import from Tools: ${account.email}`);
+            }
         }
 
         await credentialStorage.setToolsAccountSnapshot(remoteEmails);
