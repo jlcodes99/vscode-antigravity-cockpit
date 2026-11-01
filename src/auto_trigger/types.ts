@@ -19,6 +19,8 @@ export interface OAuthCredential {
     isInvalid?: boolean;
     /** True if account is forbidden (403 from cloud code) */
     isForbidden?: boolean;
+    /** True if account routes through GCP Terms of Service endpoint */
+    isGcpTos?: boolean;
 }
 
 /**

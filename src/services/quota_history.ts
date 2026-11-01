@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { QuotaSnapshot } from '../shared/types';
 import { logger } from '../shared/log_service';
 import { AUTH_RECOMMENDED_MODEL_IDS } from '../shared/recommended_models';
+import { resolveModelFamily, type ModelFamily } from '../engine/model_family';
 
 export interface QuotaHistoryPoint {
     timestamp: number;
@@ -46,42 +47,12 @@ const HISTORY_MAX_POINTS_PER_MODEL = 5000;
 const HISTORY_ROOT = path.join(os.homedir(), '.antigravity_cockpit', 'cache', 'quota_history');
 const RECOMMENDED_MODEL_ID_SET = new Set(AUTH_RECOMMENDED_MODEL_IDS);
 
-type HistoryGroupMatchInput = {
-    modelIdLower: string;
-    labelText: string;
-};
-
 type HistoryGroupDefinition = {
     groupId: string;
     label: string;
     modelIds: string[];
-    matcher: (input: HistoryGroupMatchInput) => boolean;
+    family: ModelFamily;
 };
-
-function normalizeModelMatchText(value: string | undefined): string {
-    return (value || '')
-        .toLowerCase()
-        .replace(/[_-]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-const isGeminiProTier = ({ modelIdLower, labelText }: HistoryGroupMatchInput): boolean =>
-    /^gemini-\d+(?:\.\d+)?-pro-(high|low)(?:-|$)/.test(modelIdLower) ||
-    /^gemini \d+(?:\.\d+)? pro(?: \((high|low)\)| (high|low))\b/.test(labelText);
-
-const isGeminiFlash = ({ modelIdLower, labelText }: HistoryGroupMatchInput): boolean =>
-    /^gemini-\d+(?:\.\d+)?-flash(?:-|$)/.test(modelIdLower) ||
-    /^gemini \d+(?:\.\d+)? flash\b/.test(labelText);
-
-const isGeminiImage = ({ modelIdLower, labelText }: HistoryGroupMatchInput): boolean =>
-    /^gemini-\d+(?:\.\d+)?-pro-image(?:-|$)/.test(modelIdLower) ||
-    /^gemini \d+(?:\.\d+)? pro image\b/.test(labelText);
-
-const isClaudeFamily = ({ modelIdLower, labelText }: HistoryGroupMatchInput): boolean =>
-    modelIdLower.startsWith('claude-') ||
-    modelIdLower.startsWith('model_claude') ||
-    labelText.startsWith('claude ');
 
 const HISTORY_GROUPS: HistoryGroupDefinition[] = [
     {
@@ -95,7 +66,7 @@ const HISTORY_GROUPS: HistoryGroupDefinition[] = [
             'MODEL_PLACEHOLDER_M35',
             'MODEL_OPENAI_GPT_OSS_120B_MEDIUM',
         ],
-        matcher: isClaudeFamily,
+        family: 'claude',
     },
     {
         groupId: 'g3-pro',
@@ -106,7 +77,7 @@ const HISTORY_GROUPS: HistoryGroupDefinition[] = [
             'MODEL_PLACEHOLDER_M36',
             'MODEL_PLACEHOLDER_M37',
         ],
-        matcher: isGeminiProTier,
+        family: 'gemini_pro',
     },
     {
         groupId: 'g3-flash',
@@ -114,7 +85,7 @@ const HISTORY_GROUPS: HistoryGroupDefinition[] = [
         modelIds: [
             'MODEL_PLACEHOLDER_M18',
         ],
-        matcher: isGeminiFlash,
+        family: 'gemini_flash',
     },
     {
         groupId: 'g3-image',
@@ -122,7 +93,7 @@ const HISTORY_GROUPS: HistoryGroupDefinition[] = [
         modelIds: [
             'MODEL_PLACEHOLDER_M9',
         ],
-        matcher: isGeminiImage,
+        family: 'gemini_image',
     },
 ];
 
@@ -203,12 +174,8 @@ function extractRecommendedGroups(
             if (!model?.modelId) {
                 return false;
             }
-            const input: HistoryGroupMatchInput = {
-                modelIdLower: model.modelId.toLowerCase(),
-                labelText: normalizeModelMatchText(model.label || model.modelId),
-            };
             const exactMatch = group.modelIds.includes(model.modelId);
-            const prefixMatch = group.matcher(input);
+            const prefixMatch = resolveModelFamily(model.modelId, model.label) === group.family;
             if (!exactMatch && !prefixMatch) {
                 return false;
             }
