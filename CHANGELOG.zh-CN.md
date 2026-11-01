@@ -10,6 +10,9 @@
 
 ## [未发布]
 
+### 工程
+- 新增 CI workflow（`.github/workflows/ci.yml`）：PR 与 main 推送强制跑 `tsc --noEmit` + ESLint + Jest + 生产构建；release / Open VSX 发布流水线同样补齐类型检查、Lint 与测试门禁。
+
 ### 安全
 - **减少明文 Token 暴露面**：与 Cockpit Tools 双向同步账号时，改为先拉取不含 Token 的账号列表，仅在确认存在"远端有、本地无"的账号时才拉取一次明文 Token（此前每次同步都全量读取 refresh/access token）。
 - **共享文件强制属主权限**：扩展写入 `~/.antigravity_cockpit` 的缓存与同步设置统一收紧为目录 700 / 文件 600（新增 `src/shared/secure_fs.ts`），此前依赖默认 umask（多为 644），多用户机器上其他用户可读取含邮箱的缓存。

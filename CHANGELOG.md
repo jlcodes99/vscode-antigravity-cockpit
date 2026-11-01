@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - also fixes a label-regex bug where labels ending in parentheses (e.g. `Gemini 4 Pro (High)`) failed family detection due to a `\b` boundary issue (caught by tests).
 - De-duplicated `services/quota_history.ts`: removed four copies of the family regexes in favor of `model_family` (DRY).
 - Added 31 pure-function tests (family 11 + snapshot assembly 10 + quota mapping 10); 58 tests total.
+- Added CI workflow (`.github/workflows/ci.yml`) enforcing `tsc --noEmit` + ESLint + Jest + production build on PRs and main pushes; the release / Open VSX publish pipelines now run the same type-check, lint and test gates.
 - Added `src/engine/model_catalog.ts`: model ordering and new-model adoption extracted as pure functions with 12 unit tests.
 - Enabled `skipLibCheck` in tsconfig to isolate third-party `@types/emscripten` declaration noise.
 
