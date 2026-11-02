@@ -10,11 +10,19 @@
 
 ## [未发布]
 
-### 工程（Webview）
-- **Webview 纳入类型检查**：新增 `tsconfig.webview.json`（checkJs + DOM lib）与 `typecheck:webview` 脚本并接入 CI。约 9k 行原生 JS 从 246 个类型问题收敛到 0：新增有类型的 `webview.globals.d.ts` 声明 hud 注入契约，DOM 胶水层有界收窄（不使用 `any`）。修复真实问题：智能分组提示 `replace('{count}', 数字)` 永不替换、`Date` 算术改用 `getTime()`、输入框赋数字转字符串、带布尔参的 click 监听器包裹调用、删除过期 JSDoc；移除已废弃的 `copy-webview` 脚本和未使用的 `shx` 依赖。
+### 新增
+- **配额耗尽预测（Burn-rate）**：历史图表页基于已采集的 30 天配额历史，取当前配额周期（最后一次重置之后的下降段）做最小二乘线性回归，估算每小时消耗速率与预计耗尽时刻：
+  - 摘要栏显示 `消耗速率: X%/h`，并区分"预计还剩 Yh Zm 耗尽"（⚠️ 重置前耗尽）与"预计可撑到重置（约余 N%）"；
+  - 图表末尾绘制虚线投影，将在重置前耗尽时用错误色；
+  - 预测需 ≥3 个样本、跨度 ≥30 分钟且 R² ≥ 0.4，低置信度不出具耗尽时刻，避免抖动数据误导；
+  - 新增纯函数模块 `src/services/burn_rate.ts` 与 10 个单测（周期切分、脏数据过滤、斜率/R²、重置倒计时回退）。
 
-### 工程
-- 新增 CI workflow（`.github/workflows/ci.yml`）：PR 与 main 推送强制跑 `tsc --noEmit` + ESLint + Jest + 生产构建；release / Open VSX 发布流水线同样补齐类型检查、Lint 与测试门禁。
+### 修复
+- **新模型（如 Gemini-4）无法监控**：授权模式下模型清单以官方 `models` 为单一真相来源，`agentModelSorts` 排序表滞后时，未列入的模型自动追加展示，不再被丢弃。
+- **新模型不显示在卡片列表**：官方上线新模型时自动纳入用户已自定义的可见列表（黑名单模型除外）；首次运行仅建立基线，不改变现有视图。
+- **分组模式下新模型被隐藏**：未分组模型按模型族（Claude / Gemini Pro / Flash / Image）运行时并入已有族组，无法归类的独立成组展示，不再静默隐藏。
+- **内部噪声模型继续隐藏**：兜底追加不会放出 `isInternal` 实验模型（`chat_20706`/`chat_23310`）、Tab 补全预览模型（`M19`/`M28`）、tiered 内部路由别名（`M322`）以及配额与新模型重复的旧 `gemini-2.5-*` 别名；排序表与兜底两条路径共用同一过滤谓词。
+- 修复 `tsc --noEmit` 的 24 个既有类型错误（esbuild 只转译不类型检查导致长期被掩盖），包括 `OAuthCredential.isGcpTos`、`QuotaSnapshot.activeModelId` 字段缺失及未定义符号引用；删除一处永远不会执行的"重新授权"死代码（正式逻辑在 `autoTrigger.reauthorizeAccount` 分支）。
 
 ### 安全
 - **减少明文 Token 暴露面**：与 Cockpit Tools 双向同步账号时，改为先拉取不含 Token 的账号列表，仅在确认存在"远端有、本地无"的账号时才拉取一次明文 Token（此前每次同步都全量读取 refresh/access token）。
@@ -22,20 +30,20 @@
 - **WebSocket 入站指令校验**：`plugin_switch_account` 必须携带非空 `target_email` 且 payload 为对象，`plugin_set_switch_mode` 同样强制对象类型，畸形/伪造消息在 WS 边界直接丢弃（新增 8 个守卫单测）。
 - 新增 [SECURITY.md](SECURITY.md)：记录本地 WS 威胁模型；桌面端仍需实现 Origin 校验与握手共享密钥（`server.json` 写入 `auth_token`）才能阻止浏览器恶意页面/本机进程调用 `get_accounts_with_tokens` 窃取 Token，协议提案见文档。
 
-### 新增
-- **官方新模型（如 Gemini-4）免发版即可监控**：授权配额模式以官方 `models` 清单为单一真相来源，`agentModelSorts` 排序表滞后时未列入的模型自动追加展示，不再被丢弃。
-- 官方上线新模型时自动纳入用户已自定义的可见列表（黑名单模型除外）；首次运行仅建立基线，不改变现有视图。
-- 分组模式下未映射的新模型按模型族（Claude / Gemini Pro / Flash / Image）运行时并入已有族组，无法归类则独立成组，不再被静默隐藏。
-- 新增纯函数模块及单测：`engine/model_catalog.ts`（模型排序与新模型纳入）、`engine/model_family.ts`（版本无关的模型族识别）、`engine/snapshot_builder.ts`（可见过滤/分组/配额签名多数派）、`engine/quota_mapper.ts`（双数据源响应映射）。
-
-### 修复
-- 修复 24 个被 esbuild 只转译不类型检查长期掩盖的 `tsc --noEmit` 错误（`OAuthCredential.isGcpTos`、`QuotaSnapshot.activeModelId` 字段缺失、未定义符号引用），删除一段永不执行的"重新授权"死代码（正式逻辑在 `autoTrigger.reauthorizeAccount` 分支）。
-- 修复模型族 label 正则在括号结尾标签（如 `Gemini 4 Pro (High)`）上因 `\b` 边界不匹配而无法归族的问题；未来 Gemini 新版本可自动归族。
-
 ### 工程
-- reactor.ts 由 2014 行拆解为 1390 行 + 上述四个纯函数模块，核心配额逻辑可脱离 VS Code 单测；`quota_history.ts` 删除 4 组重复的族识别正则（DRY）。
-- tsconfig 开启 `skipLibCheck`，隔离第三方 `@types/emscripten` 声明噪声。
-- 新增 43 个纯函数单测。
+- **Webview 纳入类型检查**：新增 `tsconfig.webview.json`（checkJs + DOM lib）与 `typecheck:webview` 脚本，CI 新增该门禁。9k 行原生 JS 从 246 个类型问题收敛到 0：新增 `webview.globals.d.ts` 声明 hud 注入的 i18n/VS Code API/跨模块句柄真实契约，并对遗留 DOM 胶水层做有界类型收窄（非 `any`，拼错属性名仍报错）。
+- 修复 checkJs 暴露出的真实问题：智能分组提示 `replace('{count}', 数字)` 实际不生效（需字符串）；`Date` 直接做算术改为 `getTime()`；阈值/间隔输入框赋数字未转字符串；`addEventListener('click', 带布尔参函数)` 监听器签名不匹配改为包裹调用；删除一段指向已删除函数的过期 JSDoc。
+- 移除不再使用的 `copy-webview` 脚本与 `shx` 依赖（webview 早已由 esbuild 打包）。
+- **reactor.ts 拆解（2014 → 1390 行）**：抽出四个纯函数模块，核心配额逻辑全部可脱离 VS Code 单测：
+  - `engine/model_family.ts`：模型族识别（Claude / Gemini Pro / Flash / Image）、族组多数票推断、智能分组；
+  - `engine/snapshot_builder.ts`：可见模型过滤、分组映射、配额签名多数派校验、未分组模型兜底成组；
+  - `engine/quota_mapper.ts`：authorized / 本地两条链路的响应映射与官方排序，时间格式化；
+  - 顺带修复 label 正则缺陷：`Gemini 4 Pro (High)` 这类带括号结尾的标签因 `\b` 边界问题无法归族（单测捕获）。
+- `services/quota_history.ts` 去重：删除与模型族识别重复的 4 组正则，统一复用 `model_family`（DRY）。
+- 新增 31 个纯函数单测（模型族 11 + 快照组装 10 + 配额映射 10），全量 58 用例。
+- 新增 CI workflow（`.github/workflows/ci.yml`）：PR 与 main 推送强制跑 `tsc --noEmit` + ESLint + Jest + 生产构建；release / Open VSX 发布流水线同样补齐类型检查、Lint 与测试门禁。
+- 新增 `src/engine/model_catalog.ts`：模型排序与新模型纳入逻辑抽为纯函数并补充单测（12 用例）。
+- tsconfig 开启 `skipLibCheck`（隔离 `@types/emscripten` 第三方声明噪声）。
 
 ## [2.1.52] - 2026-04-19
 

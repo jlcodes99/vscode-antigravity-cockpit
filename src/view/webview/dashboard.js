@@ -72,6 +72,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
         accounts: [],
         models: [],
         points: [],
+        prediction: null,
         page: 1,
         pageSize: 20,
         needsRender: false,

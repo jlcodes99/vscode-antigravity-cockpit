@@ -758,6 +758,7 @@ export class MessageController {
                             modelId: history?.modelId ?? message.modelId ?? null,
                             models: history?.models || [],
                             points: history?.points || [],
+                            prediction: history?.prediction ?? null,
                         },
                     });
                     break;

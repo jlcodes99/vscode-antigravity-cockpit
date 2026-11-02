@@ -10,6 +10,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Burn-rate exhaustion forecast**: on the quota-history tab, the extension regresses the current quota cycle (monotonic decrease since the last reset) via ordinary least squares over the collected 30-day history and estimates hourly burn rate and projected exhaustion time:
+  - the summary footer shows `Burn rate: X%/h`, followed by either a warning (`projected to run out in Yh Zm`, ⚠️ when exhaustion precedes reset) or `lasts until reset (~N%)`;
+  - the chart renders a dashed projection line (error-colored when exhaustion precedes reset);
+  - forecasts require ≥3 samples spanning ≥30 minutes with R² ≥ 0.4; noisy low-confidence data yields no exhaustion timestamp;
+  - new pure module `src/services/burn_rate.ts` with 10 unit tests (cycle slicing, dirty-data filtering, slope/R², countdown fallback).
+
 ### Fixed
 - **New models (e.g. Gemini 4) could not be monitored**: in authorized mode the official `models` map is now the single source of truth — models missing from a stale `agentModelSorts` list are appended automatically instead of being dropped.
 - **New models missing from card list**: newly released models are auto-added to the user's customized visible-model list (blacklisted models excluded); first run only establishes a baseline without changing the current view.

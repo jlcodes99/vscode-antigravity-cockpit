@@ -7,6 +7,7 @@ import { logger } from '../shared/log_service';
 import { AUTH_RECOMMENDED_MODEL_IDS } from '../shared/recommended_models';
 import { ensurePrivateDir } from '../shared/secure_fs';
 import { resolveModelFamily, type ModelFamily } from '../engine/model_family';
+import { predictBurnRate, type BurnRatePrediction } from './burn_rate';
 
 export interface QuotaHistoryPoint {
     timestamp: number;
@@ -41,6 +42,8 @@ export interface QuotaHistoryResult {
     modelId: string | null;
     models: QuotaHistoryModelOption[];
     points: QuotaHistoryPoint[];
+    /** 当前选中模型的 burn-rate 耗尽预测（样本不足时为 null） */
+    prediction: BurnRatePrediction | null;
 }
 
 const HISTORY_DAYS_LIMIT = 30;
@@ -454,6 +457,7 @@ export async function getQuotaHistory(
             modelId: null,
             models: [],
             points: [],
+            prediction: null,
         };
     }
 
@@ -472,11 +476,17 @@ export async function getQuotaHistory(
             .sort((a, b) => a.timestamp - b.timestamp);
     }
 
+    // 预测基于该模型完整的当前周期（不受所选图表时间窗截断影响）
+    const fullPoints = selectedModelId ? record.models[selectedModelId]?.points ?? [] : [];
+    const predictionResult = predictBurnRate(fullPoints);
+    const prediction = predictionResult.projectedExhaustAt ? predictionResult : null;
+
     return {
         email: normalizedEmail,
         rangeDays: normalizedRange,
         modelId: selectedModelId,
         models,
         points,
+        prediction,
     };
 }
