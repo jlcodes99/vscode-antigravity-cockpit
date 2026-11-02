@@ -44,10 +44,43 @@ export interface AuthorizedQuotaResponse {
 }
 
 /**
+ * 判断一个模型条目是否应进入用户可见的监控清单。
+ * 隐藏三类噪声：
+ * - isInternal：内部实验模型（如 chat_20706，无显示名）
+ * - disabled：官方标记不可用
+ * - 静态黑名单：tab 自动补全模型、旧别名（配额与现模型重复）
+ *
+ * @param modelKey models map 的键
+ * @param info 模型条目
+ * @param blacklistIds 需要隐藏的 model 常量 ID 集合（info.model）
+ */
+export function isHiddenAuthorizedModel(
+    modelKey: string,
+    info: AuthorizedModelInfo,
+    blacklistIds?: ReadonlySet<string>,
+): boolean {
+    if (info.disabled || info.isInternal) {
+        return true;
+    }
+    if (blacklistIds && info.model && blacklistIds.has(info.model)) {
+        return true;
+    }
+    // 无 model 字段时退化为按 key 判黑名单（兼容个别异常响应）
+    if (blacklistIds && !info.model && blacklistIds.has(modelKey)) {
+        return true;
+    }
+    return false;
+}
+
+/**
  * 计算模型展示顺序：先按 agentModelSorts 的官方顺序，
  * 再补入排序表遗漏的模型（API 返回顺序），全部去重。
+ * 内部/禁用/黑名单模型在任何路径都不输出。
  */
-export function resolveAuthorizedOrderedModelKeys(data: AuthorizedQuotaResponse): string[] {
+export function resolveAuthorizedOrderedModelKeys(
+    data: AuthorizedQuotaResponse,
+    blacklistIds?: ReadonlySet<string>,
+): string[] {
     const modelMap = data.models;
     if (!modelMap) {
         return [];
@@ -56,28 +89,30 @@ export function resolveAuthorizedOrderedModelKeys(data: AuthorizedQuotaResponse)
     const orderedKeys: string[] = [];
     const added = new Set<string>();
 
+    const accept = (modelKey: string): boolean => {
+        const info = modelMap[modelKey];
+        if (!info || added.has(modelKey)) {
+            return false;
+        }
+        if (isHiddenAuthorizedModel(modelKey, info, blacklistIds)) {
+            return false;
+        }
+        added.add(modelKey);
+        orderedKeys.push(modelKey);
+        return true;
+    };
+
     for (const sort of data.agentModelSorts ?? []) {
         for (const group of sort.groups ?? []) {
             for (const modelIdentifier of group.modelIds ?? []) {
-                if (!Object.prototype.hasOwnProperty.call(modelMap, modelIdentifier)) {
-                    continue;
-                }
-                if (added.has(modelIdentifier)) {
-                    continue;
-                }
-                added.add(modelIdentifier);
-                orderedKeys.push(modelIdentifier);
+                accept(modelIdentifier);
             }
         }
     }
 
     // 兜底：排序表外的模型（官方上线新模型时 sorts 可能滞后）按 API 顺序追加
     for (const modelKey of Object.keys(modelMap)) {
-        if (added.has(modelKey)) {
-            continue;
-        }
-        added.add(modelKey);
-        orderedKeys.push(modelKey);
+        accept(modelKey);
     }
 
     return orderedKeys;

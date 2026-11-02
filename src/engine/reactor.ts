@@ -1000,6 +1000,8 @@ export class ReactorCore {
                 online: t('dashboard.online') || 'Quota available',
             },
             message => logger.warn(message),
+            Date.now(),
+            AUTH_MODEL_BLACKLIST_ID_SET,
         );
         if (models.length === 0) {
             logger.warn('[AuthorizedQuota] No model found from available models response');

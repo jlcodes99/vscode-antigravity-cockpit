@@ -1,6 +1,7 @@
 import {
     resolveAuthorizedOrderedModelKeys,
     computeModelAdoption,
+    isHiddenAuthorizedModel,
     type AuthorizedQuotaResponse,
 } from './model_catalog';
 
@@ -27,6 +28,41 @@ describe('resolveAuthorizedOrderedModelKeys', () => {
             agentModelSorts: [{ groups: [{ modelIds: ['M37', 'M36'] }] }],
         };
         expect(resolveAuthorizedOrderedModelKeys(data)).toEqual(['M37', 'M36', 'GEMINI4_PRO_HIGH']);
+    });
+
+    it('内部实验模型（isInternal，如 chat_20706）即使在排序表外也不输出', () => {
+        const data: AuthorizedQuotaResponse = {
+            models: {
+                ...baseModels,
+                chat_20706: { model: 'MODEL_CHAT_20706', isInternal: true },
+            },
+            agentModelSorts: [{ groups: [{ modelIds: ['M37', 'M36'] }] }],
+        };
+        expect(resolveAuthorizedOrderedModelKeys(data)).toEqual(['M37', 'M36']);
+    });
+
+    it('黑名单模型（tab 补全/旧别名，如 M19、2.5 Pro）不输出，即使在排序表中', () => {
+        const blacklist = new Set(['MODEL_PLACEHOLDER_M19', 'MODEL_GOOGLE_GEMINI_2_5_PRO']);
+        const data: AuthorizedQuotaResponse = {
+            models: {
+                ...baseModels,
+                tab_flash_lite_preview: { model: 'MODEL_PLACEHOLDER_M19' },
+                'gemini-2.5-pro': { model: 'MODEL_GOOGLE_GEMINI_2_5_PRO', displayName: 'Gemini 2.5 Pro' },
+            },
+            agentModelSorts: [{ groups: [{ modelIds: ['M37', 'tab_flash_lite_preview', 'gemini-2.5-pro', 'M36'] }] }],
+        };
+        expect(resolveAuthorizedOrderedModelKeys(data, blacklist)).toEqual(['M37', 'M36']);
+    });
+
+    it('disabled 模型不输出', () => {
+        const data: AuthorizedQuotaResponse = {
+            models: {
+                ...baseModels,
+                RETIRED: { model: 'MODEL_RETIRED', disabled: true },
+            },
+            agentModelSorts: [{ groups: [{ modelIds: ['M37', 'M36'] }] }],
+        };
+        expect(resolveAuthorizedOrderedModelKeys(data)).toEqual(['M37', 'M36']);
     });
 
     it('排序表引用了不存在的 key 时跳过', () => {

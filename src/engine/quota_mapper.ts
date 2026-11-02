@@ -63,21 +63,23 @@ function toPercentage(fraction: number | undefined): number | undefined {
 
 /**
  * authorized 配额接口响应 → 模型列表（按官方排序，排序表外模型追加在末尾）。
+ * @param blacklistIds 需隐藏的 model 常量 ID（内部实验/tab 补全/旧别名）
  */
 export function mapAuthorizedResponseToModels(
     data: AuthorizedQuotaResponse,
     labels: QuotaLabels,
     onWarn?: (message: string) => void,
     now: number = Date.now(),
+    blacklistIds?: ReadonlySet<string>,
 ): ModelQuotaInfo[] {
     const models: ModelQuotaInfo[] = [];
     if (!data.models) {
         return models;
     }
 
-    for (const modelKey of resolveAuthorizedOrderedModelKeys(data)) {
+    for (const modelKey of resolveAuthorizedOrderedModelKeys(data, blacklistIds)) {
         const info = data.models[modelKey];
-        if (!info || info.disabled) {
+        if (!info) {
             continue;
         }
 
