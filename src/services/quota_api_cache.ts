@@ -69,6 +69,11 @@ export function isApiCacheValid(record: QuotaApiCacheRecord | null, ttlMs: numbe
     if (!record || !record.updatedAt) {
         return false;
     }
+    // 不含限额汇总（周限额）的缓存（旧版本或其他窗口写入）视为无效，强制重新请求
+    const payload = record.payload as { quota_summary?: { groups?: unknown[] } } | null | undefined;
+    if (!payload?.quota_summary?.groups?.length) {
+        return false;
+    }
     const age = Date.now() - record.updatedAt;
     return age < ttlMs;
 }

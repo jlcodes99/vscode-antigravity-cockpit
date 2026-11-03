@@ -10,6 +10,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Quota now respects weekly limits**: Per-model `quotaInfo` only reflects a single (5h) window, so a model could show 100% while its weekly limit was exhausted. The extension now also fetches the quota summary (`retrieveUserQuotaSummary`, cached per account) and shows the lowest remaining window together with its reset time. This applies to both the authorized and local quota sources (the local process API returns no weekly data).
+- **Argon tiers share one quota**: Gemini 4 Argon High/Medium/Low now always display the lowest remaining quota (and its reset time) among the three, since the local API may report different windows per tier.
+- **Stale API cache**: Cached quota responses without a quota summary are treated as invalid and refetched.
+
 ## [2.1.52] - 2026-04-19
 
 ### Added

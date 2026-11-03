@@ -268,6 +268,25 @@ export class CloudCodeClient {
         return data;
     }
 
+    /**
+     * 获取限额汇总（各分组的 5h / 周限额）。
+     * fetchAvailableModels 的模型级 quotaInfo 只反映单一窗口，周限额需从此接口获取。
+     */
+    async retrieveUserQuotaSummary(
+        accessToken: string,
+        projectId?: string,
+        options?: CloudCodeRequestOptions,
+    ): Promise<unknown> {
+        const payload = projectId ? { project: projectId } : {};
+        const { data } = await this.requestJson<unknown>(
+            '/v1internal:retrieveUserQuotaSummary',
+            payload,
+            accessToken,
+            options,
+        );
+        return data;
+    }
+
     async requestStream<T>(
         path: string,
         body: object,

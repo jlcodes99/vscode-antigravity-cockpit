@@ -64,10 +64,29 @@ interface AuthorizedModelSort {
     groups?: AuthorizedModelSortGroup[];
 }
 
+interface AuthorizedQuotaBucket {
+    bucketId?: string;
+    remainingFraction?: number;
+    resetTime?: string;
+    window?: string;
+}
+
+interface AuthorizedQuotaSummaryGroup {
+    displayName?: string;
+    buckets?: AuthorizedQuotaBucket[];
+}
+
+interface AuthorizedQuotaSummary {
+    groups?: AuthorizedQuotaSummaryGroup[];
+}
+
 interface AuthorizedQuotaResponse {
     models?: Record<string, AuthorizedModelInfo>;
     agentModelSorts?: AuthorizedModelSort[];
+    quota_summary?: AuthorizedQuotaSummary;
 }
+
+type AuthorizedQuotaGroupKey = 'argon' | 'third_party' | 'gemini';
 
 export interface AccountQuotaFetchResult {
     snapshot: QuotaSnapshot;
@@ -237,6 +256,8 @@ export class ReactorCore {
     private lastLocalModels?: ModelQuotaInfo[];
     /** 最近一次从本地进程获取的账户邮箱 */
     private lastLocalEmail?: string;
+    /** 云端接口返回的限额汇总（含周限额），按账户缓存，用于补全本地接口缺失的周限额 */
+    private readonly authorizedQuotaSummaries = new Map<string, AuthorizedQuotaSummary>();
     /** 最近一次扫描本地进程连接的时间戳 */
     private lastLocalRescanAt: number = 0;
     /** 本地进程重扫描回调（用于账号切换或进程重启后重连新端口） */
@@ -1208,7 +1229,10 @@ export class ReactorCore {
             previousCache = await readQuotaApiCache('authorized', email);
         }
 
-        if (email && !forceRefresh && isApiCacheValid(previousCache)) {
+        // 旧缓存（升级前写入）不含限额汇总（周限额），视为失效并重新请求
+        const cachedPayload = previousCache?.payload as AuthorizedQuotaResponse | undefined;
+        const cacheHasQuotaSummary = !!cachedPayload?.quota_summary?.groups?.length;
+        if (email && !forceRefresh && cacheHasQuotaSummary && isApiCacheValid(previousCache)) {
             try {
                 await this.ensureLocalTelemetryForEmail(email);
                 return {
@@ -1231,6 +1255,31 @@ export class ReactorCore {
                 route: { isGcpTos },
             },
         ) as AuthorizedQuotaResponse;
+
+        // fetchAvailableModels 不含周限额，补充请求限额汇总（失败不影响主流程）
+        if (!data.quota_summary?.groups?.length) {
+            try {
+                const summaryResponse = await cloudCodeClient.retrieveUserQuotaSummary(
+                    accessToken,
+                    projectId,
+                    { logLabel: 'AuthorizedQuotaSummary', route: { isGcpTos }, maxAttempts: 1 },
+                );
+                const summary = this.findQuotaSummary(summaryResponse)
+                    ?? (Array.isArray((summaryResponse as AuthorizedQuotaSummary | undefined)?.groups)
+                        ? summaryResponse as AuthorizedQuotaSummary
+                        : undefined);
+                if (summary) {
+                    data.quota_summary = summary;
+                } else {
+                    const keys = summaryResponse && typeof summaryResponse === 'object'
+                        ? Object.keys(summaryResponse).join(', ')
+                        : typeof summaryResponse;
+                    logger.warn(`[AuthorizedQuota] Quota summary response has unexpected shape (keys: ${keys})`);
+                }
+            } catch (error) {
+                logger.warn(`[AuthorizedQuota] Failed to fetch quota summary: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }
 
         const models = this.buildModelsFromAuthorizedResponse(data, email);
 
@@ -1272,6 +1321,11 @@ export class ReactorCore {
             return models;
         }
 
+        // 缓存该账户的限额汇总（含周限额），供本地模式补全；缓存文件与实时请求都会经过这里
+        if (targetEmail && data.quota_summary?.groups?.length) {
+            this.authorizedQuotaSummaries.set(targetEmail.trim().toLowerCase(), data.quota_summary);
+        }
+
         const orderedKeys = this.resolveAuthorizedOrderedModelKeys(data);
         for (const modelKey of orderedKeys) {
             const info = data.models[modelKey];
@@ -1284,21 +1338,30 @@ export class ReactorCore {
 
             const quotaInfo = info.quotaInfo;
             const rawRemainingFraction = quotaInfo?.remainingFraction;
-            const remainingFraction = typeof rawRemainingFraction === 'number'
+            let remainingFraction = typeof rawRemainingFraction === 'number'
                 && rawRemainingFraction >= 0
                 && rawRemainingFraction <= 1
                 ? rawRemainingFraction
                 : undefined;
+            let effectiveResetTime = quotaInfo?.resetTime;
+
+            // 模型自带的 quotaInfo 通常只反映 5h 窗口；周限额在 quota_summary 中，
+            // 实际可用额度取各窗口中最低者（如 Argon 周限额耗尽但 5h 仍为 100%）。
+            const limiting = this.resolveLimitingBucket(data.quota_summary, modelKey, info, remainingFraction);
+            if (limiting) {
+                remainingFraction = limiting.remainingFraction;
+                effectiveResetTime = limiting.resetTime ?? effectiveResetTime;
+            }
 
             let resetTime = new Date(0);
             let resetTimeValid = false;
-            if (quotaInfo?.resetTime) {
-                const parsed = new Date(quotaInfo.resetTime);
+            if (effectiveResetTime) {
+                const parsed = new Date(effectiveResetTime);
                 if (!Number.isNaN(parsed.getTime())) {
                     resetTime = parsed;
                     resetTimeValid = parsed.getTime() > now;
                 } else {
-                    logger.warn(`[AuthorizedQuota] Invalid resetTime for model ${modelKey}: ${quotaInfo.resetTime}`);
+                    logger.warn(`[AuthorizedQuota] Invalid resetTime for model ${modelKey}: ${effectiveResetTime}`);
                 }
             }
 
@@ -1335,8 +1398,139 @@ export class ReactorCore {
             }
         }
 
+        this.harmonizeSharedArgonQuota(models);
+
         this.logModelList('authorized', models);
         return models;
+    }
+
+    /**
+     * Gemini 4 Argon 的各档位（High/Medium/Low）共享同一份周限额。
+     * 各接口可能给不同档位返回不同窗口的数据（如 High 返回 5h、Medium/Low 返回周限额），
+     * 因此统一取剩余比例最低者，并同步其重置时间。
+     */
+    private harmonizeSharedArgonQuota(models: ModelQuotaInfo[]): void {
+        const argonModels = models.filter(m => resolveAutoGroupFamily(m.modelId, m.label) === 'gemini_argon');
+        if (argonModels.length < 2) {
+            return;
+        }
+        let limiting: ModelQuotaInfo | undefined;
+        for (const model of argonModels) {
+            if (typeof model.remainingFraction !== 'number') {
+                continue;
+            }
+            if (!limiting || model.remainingFraction < (limiting.remainingFraction as number)) {
+                limiting = model;
+            }
+        }
+        if (!limiting) {
+            return;
+        }
+        for (const model of argonModels) {
+            if (model === limiting) {
+                continue;
+            }
+            model.remainingFraction = limiting.remainingFraction;
+            model.remainingPercentage = limiting.remainingPercentage;
+            model.isExhausted = limiting.isExhausted;
+            model.resetTime = limiting.resetTime;
+            model.resetTimeDisplay = limiting.resetTimeDisplay;
+            model.timeUntilReset = limiting.timeUntilReset;
+            model.timeUntilResetFormatted = limiting.timeUntilResetFormatted;
+            model.resetTimeValid = limiting.resetTimeValid;
+        }
+    }
+
+    /** 在响应中递归查找 quota_summary / quotaSummary（兼容 snake_case 与 camelCase） */
+    private findQuotaSummary(root: unknown, depth = 0): AuthorizedQuotaSummary | undefined {
+        if (!root || typeof root !== 'object' || depth > 6) {
+            return undefined;
+        }
+        const record = root as Record<string, unknown>;
+        for (const key of ['quota_summary', 'quotaSummary']) {
+            const candidate = record[key] as AuthorizedQuotaSummary | undefined;
+            if (candidate && Array.isArray(candidate.groups)) {
+                return candidate;
+            }
+        }
+        for (const value of Object.values(record)) {
+            const found = this.findQuotaSummary(value, depth + 1);
+            if (found) {
+                return found;
+            }
+        }
+        return undefined;
+    }
+
+    private resolveAuthorizedGroupKey(modelKey: string, info: AuthorizedModelInfo): AuthorizedQuotaGroupKey | null {
+        const modelId = info.model || modelKey;
+        const label = info.displayName || modelKey;
+        if (resolveAutoGroupFamily(modelKey, label) === 'gemini_argon' || resolveAutoGroupFamily(modelId, label) === 'gemini_argon') {
+            return 'argon';
+        }
+        const text = `${modelKey} ${label}`.toLowerCase();
+        if (/claude|gpt/.test(text)) {
+            return 'third_party';
+        }
+        if (/gemini/.test(text)) {
+            return 'gemini';
+        }
+        return null;
+    }
+
+    private resolveBucketGroupKey(group: AuthorizedQuotaSummaryGroup): AuthorizedQuotaGroupKey | null {
+        const ids = (group.buckets ?? []).map(b => (b.bucketId || '').toLowerCase());
+        if (ids.some(id => id.includes('argon'))) {
+            return 'argon';
+        }
+        if (ids.some(id => id.startsWith('3p'))) {
+            return 'third_party';
+        }
+        if (ids.some(id => id.startsWith('gemini'))) {
+            return 'gemini';
+        }
+        return null;
+    }
+
+    /**
+     * 在模型所属分组的所有限额窗口（5h / weekly）中找出剩余最少者。
+     * 若该窗口比模型自身配额更紧张，返回其剩余比例与重置时间；否则返回 null。
+     */
+    private resolveLimitingBucket(
+        summary: AuthorizedQuotaSummary | undefined,
+        modelKey: string,
+        info: AuthorizedModelInfo,
+        modelFraction: number | undefined,
+    ): { remainingFraction: number; resetTime?: string } | null {
+        if (!summary?.groups?.length || !info.quotaInfo) {
+            return null;
+        }
+        const groupKey = this.resolveAuthorizedGroupKey(modelKey, info);
+        if (!groupKey) {
+            return null;
+        }
+        const group = summary.groups.find(g => this.resolveBucketGroupKey(g) === groupKey);
+        if (!group?.buckets?.length) {
+            return null;
+        }
+
+        let best: { remainingFraction: number; resetTime?: string } | null = null;
+        let min = modelFraction ?? 1;
+        for (const bucket of group.buckets) {
+            const raw = bucket.remainingFraction;
+            // protobuf JSON 会省略 0 值：有重置时间但缺少比例视为已耗尽
+            const fraction = typeof raw === 'number'
+                ? raw
+                : (bucket.resetTime ? 0 : undefined);
+            if (fraction === undefined || fraction < 0 || fraction > 1) {
+                continue;
+            }
+            if (fraction < min) {
+                min = fraction;
+                best = { remainingFraction: fraction, resetTime: bucket.resetTime };
+            }
+        }
+        return best;
     }
 
     private resolveAuthorizedOrderedModelKeys(data: AuthorizedQuotaResponse): string[] {
@@ -1631,29 +1825,52 @@ export class ReactorCore {
             }
         }
 
+        // 本地接口不返回周限额，回退到该账户最近一次云端接口缓存的限额汇总
+        const localQuotaSummary = this.findQuotaSummary(status)
+            ?? (status.email ? this.authorizedQuotaSummaries.get(status.email.trim().toLowerCase()) : undefined);
+        if (!localQuotaSummary) {
+            logger.debug('[LocalQuota] No quota summary available (local response has none and no cloud cache yet)');
+        }
+
         const models: ModelQuotaInfo[] = configs
             .filter((m): m is ClientModelConfig & { quotaInfo: NonNullable<ClientModelConfig['quotaInfo']> } => 
                 !!m.quotaInfo,
             )
             .map((m) => {
                 const now = new Date();
-                let reset = new Date(m.quotaInfo.resetTime);
+                let fraction = m.quotaInfo.remainingFraction;
+                let resetTimeText: string | undefined = m.quotaInfo.resetTime;
+
+                // 本地接口的模型配额同样只代表 5h 窗口，需结合周限额取最小值
+                const modelId = m.modelOrAlias?.model || 'unknown';
+                const limiting = this.resolveLimitingBucket(
+                    localQuotaSummary,
+                    modelId,
+                    { model: modelId, displayName: m.label, quotaInfo: m.quotaInfo },
+                    typeof fraction === 'number' ? fraction : undefined,
+                );
+                if (limiting) {
+                    fraction = limiting.remainingFraction;
+                    resetTimeText = limiting.resetTime ?? resetTimeText;
+                }
+
+                let reset = new Date(resetTimeText as string);
                 let resetTimeValid = true;
                 if (Number.isNaN(reset.getTime())) {
                     reset = new Date(now.getTime() + 24 * 60 * 60 * 1000);
                     resetTimeValid = false;
-                    logger.warn(`[ReactorCore] Invalid resetTime for model ${m.label}: ${m.quotaInfo.resetTime}`);
+                    logger.warn(`[ReactorCore] Invalid resetTime for model ${m.label}: ${resetTimeText}`);
                 }
                 const delta = reset.getTime() - now.getTime();
 
                 return {
                     label: m.label,
-                    modelId: m.modelOrAlias?.model || 'unknown',
-                    remainingFraction: m.quotaInfo.remainingFraction,
-                    remainingPercentage: m.quotaInfo.remainingFraction !== undefined 
-                        ? m.quotaInfo.remainingFraction * 100 
+                    modelId,
+                    remainingFraction: fraction,
+                    remainingPercentage: fraction !== undefined 
+                        ? fraction * 100 
                         : undefined,
-                    isExhausted: m.quotaInfo.remainingFraction === 0,
+                    isExhausted: fraction === 0,
                     resetTime: reset,
                     resetTimeDisplay: resetTimeValid ? this.formatIso(reset) : (t('common.unknown') || 'Unknown'),
                     timeUntilReset: delta,
@@ -1666,6 +1883,8 @@ export class ReactorCore {
                     supportedMimeTypes: m.supportedMimeTypes,
                 };
             });
+
+        this.harmonizeSharedArgonQuota(models);
 
         // 排序：优先使用 clientModelSorts，否则按 label 字母排序
         models.sort((a, b) => {
