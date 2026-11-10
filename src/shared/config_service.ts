@@ -109,10 +109,8 @@ class ConfigService {
         }
         const stateKey = this.buildStateKey(CONFIG_KEYS.QUOTA_SOURCE);
         const current = this.globalState.get<string>(stateKey);
-        if (current !== 'authorized') {
-            logger.info(`[ConfigService] Forcing quota source to authorized (was: ${JSON.stringify(current)})`);
-            await this.globalState.update(stateKey, 'authorized');
-            this.notifyListeners();
+        if (!current) {
+            await this.globalState.update(stateKey, 'local');
         }
     }
 
@@ -140,7 +138,7 @@ class ConfigService {
             groupMappings: this.getConfigStateValue(CONFIG_KEYS.GROUP_MAPPINGS, {}),
             warningThreshold: config.get<number>(CONFIG_KEYS.WARNING_THRESHOLD, QUOTA_THRESHOLDS.WARNING_DEFAULT),
             criticalThreshold: config.get<number>(CONFIG_KEYS.CRITICAL_THRESHOLD, QUOTA_THRESHOLDS.CRITICAL_DEFAULT),
-            quotaSource: 'authorized',
+            quotaSource: config.get<string>(CONFIG_KEYS.QUOTA_SOURCE, 'local') as 'local' | 'authorized',
             displayMode: config.get<string>(CONFIG_KEYS.DISPLAY_MODE, DISPLAY_MODE.WEBVIEW),
             profileHidden: config.get<boolean>(CONFIG_KEYS.PROFILE_HIDDEN, false),
             dataMasked: config.get<boolean>(CONFIG_KEYS.DATA_MASKED, false),

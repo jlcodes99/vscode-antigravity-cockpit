@@ -231,16 +231,16 @@
         },
         "agCockpit.quotaSource": {
           "type": "string",
-          "default": "authorized",
+          "default": "local",
           "enum": [
             "local",
             "authorized"
           ],
           "enumDescriptions": [
-            "Local process",
-            "Authorized account (default)"
+            "Local process (default)",
+            "Authorized account"
           ],
-          "description": "Quota source. Use authorized account to fetch quota without local process."
+          "description": "Quota source. Use local process or authorized account."
         },
         "agCockpit.displayMode": {
           "type": "string",

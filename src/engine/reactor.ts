@@ -1566,8 +1566,23 @@ export class ReactorCore {
             return a.label.localeCompare(b.label);
         });
 
-        this.logModelList('local', models);
-        return this.buildSnapshot(models, promptCredits, userInfo);
+        // 合并共享同一配额池的模型变体（例如 High/Medium/Low）
+        const seen = new Map<string, boolean>();
+        const mergedModels: ModelQuotaInfo[] = [];
+        for (const item of models) {
+            const baseLabel = item.label.replace(/\s*\((?:High|Medium|Low)\)/i, '').trim();
+            const key = `${baseLabel}_${item.remainingPercentage}_${item.resetTimeDisplay}`;
+            if (!seen.has(key)) {
+                seen.set(key, true);
+                mergedModels.push({
+                    ...item,
+                    label: baseLabel,
+                });
+            }
+        }
+
+        this.logModelList('local', mergedModels);
+        return this.buildSnapshot(mergedModels, promptCredits, userInfo);
     }
 
     private logModelList(source: 'local' | 'authorized', models: ModelQuotaInfo[]): void {

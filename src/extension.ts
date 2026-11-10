@@ -163,6 +163,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     statusBar = new StatusBarController(context);
 
     const syncStatusBarFromAccountsCache = (): void => {
+        // 仅在 authorized 模式下从账号云端缓存同步状态栏，避免覆盖本地 local 进程的实时数据
+        if (configService.getConfig().quotaSource !== 'authorized') {
+            return;
+        }
         const currentEmail = accountsRefreshService.getCurrentEmail();
         if (!currentEmail) {
             return;
