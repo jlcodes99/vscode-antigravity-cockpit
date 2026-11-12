@@ -10,6 +10,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **New models (e.g. Gemini 4) could not be monitored**: in authorized mode the official `models` map is now the single source of truth — models missing from a stale `agentModelSorts` list are appended automatically instead of being dropped.
+- **New models missing from card list**: newly released models are auto-added to the user's customized visible-model list (blacklisted models excluded); first run only establishes a baseline without changing the current view.
+- **New models hidden in grouped mode**: ungrouped models now join an existing family group (Claude / Gemini Pro / Flash / Image) at runtime, or render as a solo group when no family matches, instead of being silently hidden.
+- **Internal noise stays hidden**: the fallback no longer surfaces `isInternal` experiment models (`chat_20706`/`chat_23310`), tab-completion preview models (`M19`/`M28`), the tiered routing alias (`M322`) or legacy `gemini-2.5-*` aliases whose quota duplicates newer entries (shared predicate on both the sorts and fallback paths).
+- Fixed 24 pre-existing `tsc --noEmit` errors masked by esbuild's transpile-only pipeline (missing `OAuthCredential.isGcpTos` / `QuotaSnapshot.activeModelId` fields, undefined symbol references) and removed an unreachable duplicate "reauthorize account" dead block (the live handler is the `autoTrigger.reauthorizeAccount` case).
+
+- **Webview is now type-checked**: added `tsconfig.webview.json` (checkJs + DOM lib) and a `typecheck:webview` script, wired into CI. The ~9k lines of plain JS went from 246 type issues to 0. Added `webview.globals.d.ts` declaring the real contracts injected by `hud.ts` (i18n/VS Code API/cross-module handles) plus a bounded DOM glue-layer narrowing (no `any` — typos still fail); fixed genuine issues checkJs exposed: smart-grouping toast called `replace('{count}', number)` (never substituted), `Date` arithmetic now uses `getTime()`, numeric values assigned to inputs are stringified, click listeners with boolean parameters are wrapped, and a stale JSDoc block pointing at a deleted function was removed. Removed the unused `copy-webview` script and `shx` dependency (webview is bundled by esbuild).
+- **Split reactor.ts god object (2014 → 1390 lines)** into four pure-function modules, making the core quota logic testable without VS Code:
+  - `engine/model_family.ts`: family detection (Claude / Gemini Pro / Flash / Image), family-group majority vote, smart grouping;
+  - `engine/snapshot_builder.ts`: visible-model filtering, group mappings, quota-signature majority check, fallback grouping for ungrouped models;
+  - `engine/quota_mapper.ts`: authorized/local response mapping and official ordering, time formatting;
+  - also fixes a label-regex bug where labels ending in parentheses (e.g. `Gemini 4 Pro (High)`) failed family detection due to a `\b` boundary issue (caught by tests).
+- De-duplicated `services/quota_history.ts`: removed four copies of the family regexes in favor of `model_family` (DRY).
+- Added 31 pure-function tests (family 11 + snapshot assembly 10 + quota mapping 10); 58 tests total.
+- Added `src/engine/model_catalog.ts`: model ordering and new-model adoption extracted as pure functions with 12 unit tests.
+- Enabled `skipLibCheck` in tsconfig to isolate third-party `@types/emscripten` declaration noise.
+
 ## [2.1.52] - 2026-04-19
 
 ### Added

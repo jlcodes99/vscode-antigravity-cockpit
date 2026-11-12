@@ -392,7 +392,7 @@ export async function ensureLocalCredentialImported(
         await credentialStorage.saveCredential(credential);
         logger.info(`[LocalAuth] resolved account: ${credential.email}`);
         logger.info(`[LocalAuth] Auto-imported credential for ${credential.email}`);
-        return { email: credential.email };
+        return { email: credential.email ?? '' };
     } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
         logger.debug(`[LocalAuth] Failed to import local credential: ${err.message}`);

@@ -1208,7 +1208,12 @@ export class MessageController {
                                         // 显式断言 email 为 string | undefined
                                         const emailArg = typeof item.email === 'string' ? item.email : undefined;
                                         const credential = await oauthService.buildCredentialFromRefreshToken(refreshToken, emailArg);
-                                        await credentialStorage.saveCredentialForAccount(credential.email, credential);
+                                        const accountEmail = credential.email;
+                                        if (!accountEmail) {
+                                            errors++;
+                                            continue;
+                                        }
+                                        await credentialStorage.saveCredentialForAccount(accountEmail, credential);
                                         count++;
                                     } catch (error) {
                                         const err = error instanceof Error ? error : new Error(String(error));
@@ -1280,31 +1285,6 @@ export class MessageController {
                                 message: t('accountsOverview.exportSuccess', { count: exportData.length }) || `Successfully exported ${exportData.length} accounts to clipboard.`, 
                             },
                         });
-                    }
-                    break;
-
-                    // 重新授权指定账号（先删除再重新授权）
-                    if (message.email) {
-                        logger.info(`User reauthorizing account: ${message.email}`);
-                        try {
-                            // 重新走授权流程，会覆盖该账号的 token
-                            await autoTriggerController.reauthorizeAccount(message.email);
-                            const state = await autoTriggerController.getState();
-                            this.hud.sendMessage({
-                                type: 'autoTriggerState',
-                                data: state,
-                            });
-                            if (configService.getConfig().quotaSource === 'authorized') {
-                                this.reactor.syncTelemetry();
-                            }
-                            vscode.window.showInformationMessage(t('autoTrigger.reauthorizeSuccess'));
-                        } catch (error) {
-                            const err = error instanceof Error ? error : new Error(String(error));
-                            logger.error(`Reauthorize account failed: ${err.message}`);
-                            vscode.window.showErrorMessage(`Reauthorize failed: ${err.message}`);
-                        }
-                    } else {
-                        logger.warn('reauthorizeAccount missing email');
                     }
                     break;
 

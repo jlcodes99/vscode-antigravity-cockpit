@@ -27,4 +27,8 @@ export const AUTH_MODEL_BLACKLIST_IDS = [
     'MODEL_GOOGLE_GEMINI_2_5_FLASH_LITE',
     'MODEL_GOOGLE_GEMINI_2_5_PRO',
     'MODEL_PLACEHOLDER_M19',
+    // Tab 自动补全模型（非聊天模型，监控配额无用户意义）
+    'MODEL_PLACEHOLDER_M28',
+    // 3.8 Flash 的内部路由别名（tiered），无显示名，实际监控走 high/medium/low 三档
+    'MODEL_PLACEHOLDER_M322',
 ];

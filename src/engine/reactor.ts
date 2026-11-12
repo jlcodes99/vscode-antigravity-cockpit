@@ -5,12 +5,11 @@
 
 import * as https from 'https';
 import { 
-    QuotaSnapshot, 
-    ModelQuotaInfo, 
-    PromptCreditsInfo, 
+    QuotaSnapshot,
+    ModelQuotaInfo,
+    PromptCreditsInfo,
     ServerUserStatusResponse,
     ClientModelConfig,
-    QuotaGroup,
     ScanDiagnostics,
     UserInfo,
 } from '../shared/types';
@@ -29,155 +28,32 @@ import {
     isApiCacheValid,
     type QuotaApiCacheRecord,
 } from '../services/quota_api_cache';
+import { AUTH_MODEL_BLACKLIST_IDS } from '../shared/recommended_models';
+import {
+    computeModelAdoption,
+    type AuthorizedQuotaResponse,
+    type AuthorizedModelInfo,
+} from './model_catalog';
+import {
+    resolveModelFamily,
+    buildFamilyGroupMap,
+    calculateSmartGrouping,
+    type ModelFamily as AutoGroupFamily,
+} from './model_family';
+import { assembleSnapshotModels } from './snapshot_builder';
+import { mapAuthorizedResponseToModels, mapLocalConfigsToModels } from './quota_mapper';
 
-
-interface AuthorizedQuotaInfo {
-    remainingFraction?: number;
-    resetTime?: string;
-}
-
-interface AuthorizedModelInfo {
-    displayName?: string;
-    model?: string;
-    disabled?: boolean;
-    quotaInfo?: AuthorizedQuotaInfo;
-    // 模型能力字段
-    supportsImages?: boolean;
-    supportsVideo?: boolean;
-    supportsThinking?: boolean;
-    thinkingBudget?: number;
-    minThinkingBudget?: number;
-    maxTokens?: number;
-    maxOutputTokens?: number;
-    recommended?: boolean;
-    tagTitle?: string;
-    supportedMimeTypes?: Record<string, boolean>;
-    isInternal?: boolean;
-}
-
-interface AuthorizedModelSortGroup {
-    modelIds?: string[];
-}
-
-interface AuthorizedModelSort {
-    displayName?: string;
-    groups?: AuthorizedModelSortGroup[];
-}
-
-interface AuthorizedQuotaResponse {
-    models?: Record<string, AuthorizedModelInfo>;
-    agentModelSorts?: AuthorizedModelSort[];
-}
+export type { AuthorizedQuotaResponse, AuthorizedModelInfo };
 
 export interface AccountQuotaFetchResult {
     snapshot: QuotaSnapshot;
     fromApiCacheFile: boolean;
 }
 
-const AUTHORIZED_EXTRA_IMAGE_MODEL_KEY = 'gemini-3-pro-image';
-const AUTHORIZED_EXTRA_IMAGE_MODEL_ID = 'MODEL_PLACEHOLDER_M9';
-type AutoGroupFamily = 'claude' | 'gemini_pro' | 'gemini_flash' | 'gemini_image';
+const AUTH_MODEL_BLACKLIST_ID_SET = new Set(AUTH_MODEL_BLACKLIST_IDS);
 
-const AUTO_GROUP_GEMINI_PRO_ID_PATTERN = /^gemini-\d+(?:\.\d+)?-pro-(high|low)(?:-|$)/;
-const AUTO_GROUP_GEMINI_FLASH_ID_PATTERN = /^gemini-\d+(?:\.\d+)?-flash(?:-|$)/;
-const AUTO_GROUP_GEMINI_IMAGE_ID_PATTERN = /^gemini-\d+(?:\.\d+)?-pro-image(?:-|$)/;
-
-const AUTO_GROUP_GEMINI_PRO_LABEL_PATTERN = /^gemini \d+(?:\.\d+)? pro(?: \((high|low)\)| (high|low))\b/;
-const AUTO_GROUP_GEMINI_FLASH_LABEL_PATTERN = /^gemini \d+(?:\.\d+)? flash\b/;
-const AUTO_GROUP_GEMINI_IMAGE_LABEL_PATTERN = /^gemini \d+(?:\.\d+)? pro image\b/;
-
-const AUTO_GROUP_CLAUDE_ID_SET = new Set(
-    [
-        'MODEL_CLAUDE_4_5_SONNET',
-        'MODEL_CLAUDE_4_5_SONNET_THINKING',
-        'MODEL_PLACEHOLDER_M12',
-        'MODEL_PLACEHOLDER_M26',
-        'MODEL_PLACEHOLDER_M35',
-        'MODEL_OPENAI_GPT_OSS_120B_MEDIUM',
-    ].map(id => id.toLowerCase()),
-);
-
-const AUTO_GROUP_GEMINI_PRO_ID_SET = new Set(
-    [
-        'MODEL_PLACEHOLDER_M7',
-        'MODEL_PLACEHOLDER_M8',
-        'MODEL_PLACEHOLDER_M36',
-        'MODEL_PLACEHOLDER_M37',
-    ].map(id => id.toLowerCase()),
-);
-
-const AUTO_GROUP_GEMINI_FLASH_ID_SET = new Set(
-    [
-        'MODEL_PLACEHOLDER_M18',
-    ].map(id => id.toLowerCase()),
-);
-
-const AUTO_GROUP_GEMINI_IMAGE_ID_SET = new Set(
-    [
-        'MODEL_PLACEHOLDER_M9',
-    ].map(id => id.toLowerCase()),
-);
-
-const AUTO_GROUP_FAMILY_DISPLAY_NAMES: Record<AutoGroupFamily, string> = {
-    claude: 'Claude',
-    gemini_pro: 'Gemini Pro',
-    gemini_flash: 'Gemini Flash',
-    gemini_image: 'Gemini Image',
-};
-
-const AUTO_GROUP_FAMILY_ORDER: AutoGroupFamily[] = ['claude', 'gemini_pro', 'gemini_flash', 'gemini_image'];
-
-function normalizeAutoGroupMatchText(value: string | undefined): string {
-    return (value || '')
-        .toLowerCase()
-        .replace(/[_-]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-}
-
-function resolveAutoGroupFamily(modelId: string, label?: string): AutoGroupFamily | null {
-    const normalizedId = modelId.trim().toLowerCase();
-    if (!normalizedId) {
-        return null;
-    }
-    const normalizedLabel = normalizeAutoGroupMatchText(label || modelId);
-
-    if (
-        AUTO_GROUP_GEMINI_IMAGE_ID_SET.has(normalizedId)
-        || AUTO_GROUP_GEMINI_IMAGE_ID_PATTERN.test(normalizedId)
-        || AUTO_GROUP_GEMINI_IMAGE_LABEL_PATTERN.test(normalizedLabel)
-    ) {
-        return 'gemini_image';
-    }
-
-    if (
-        AUTO_GROUP_GEMINI_PRO_ID_SET.has(normalizedId)
-        || AUTO_GROUP_GEMINI_PRO_ID_PATTERN.test(normalizedId)
-        || AUTO_GROUP_GEMINI_PRO_LABEL_PATTERN.test(normalizedLabel)
-    ) {
-        return 'gemini_pro';
-    }
-
-    if (
-        AUTO_GROUP_GEMINI_FLASH_ID_SET.has(normalizedId)
-        || AUTO_GROUP_GEMINI_FLASH_ID_PATTERN.test(normalizedId)
-        || AUTO_GROUP_GEMINI_FLASH_LABEL_PATTERN.test(normalizedLabel)
-    ) {
-        return 'gemini_flash';
-    }
-
-    if (
-        AUTO_GROUP_CLAUDE_ID_SET.has(normalizedId)
-        || normalizedId.startsWith('claude-')
-        || normalizedId.startsWith('model_claude')
-        || normalizedLabel.startsWith('claude ')
-    ) {
-        return 'claude';
-    }
-
-    return null;
-}
-
+/** globalState key：已见过的模型 ID，用于识别官方新上线的模型 */
+const KNOWN_MODEL_IDS_STATE_KEY = 'knownModelIds';
 
 /**
  * 反应堆核心类
@@ -946,48 +822,11 @@ export class ReactorCore {
     }
 
     private resolveAutoGroupFamily(modelId: string, label?: string): AutoGroupFamily | null {
-        return resolveAutoGroupFamily(modelId, label);
+        return resolveModelFamily(modelId, label);
     }
 
     private buildAutoFamilyGroupMap(groupMappings: Record<string, string>): Partial<Record<AutoGroupFamily, string>> {
-        const familyStats = new Map<AutoGroupFamily, Map<string, number>>();
-
-        for (const [modelId, groupId] of Object.entries(groupMappings)) {
-            if (!groupId) {
-                continue;
-            }
-            const family = this.resolveAutoGroupFamily(modelId);
-            if (!family) {
-                continue;
-            }
-            let groupCounter = familyStats.get(family);
-            if (!groupCounter) {
-                groupCounter = new Map<string, number>();
-                familyStats.set(family, groupCounter);
-            }
-            groupCounter.set(groupId, (groupCounter.get(groupId) || 0) + 1);
-        }
-
-        const familyGroupMap: Partial<Record<AutoGroupFamily, string>> = {};
-        for (const family of ['claude', 'gemini_pro', 'gemini_flash', 'gemini_image'] as AutoGroupFamily[]) {
-            const groupCounter = familyStats.get(family);
-            if (!groupCounter || groupCounter.size === 0) {
-                continue;
-            }
-            let selectedGroupId: string | null = null;
-            let maxCount = -1;
-            for (const [groupId, count] of groupCounter.entries()) {
-                if (count > maxCount) {
-                    selectedGroupId = groupId;
-                    maxCount = count;
-                }
-            }
-            if (selectedGroupId) {
-                familyGroupMap[family] = selectedGroupId;
-            }
-        }
-
-        return familyGroupMap;
+        return buildFamilyGroupMap(groupMappings, modelId => this.resolveAutoGroupFamily(modelId));
     }
 
     private getNewModelsComparedToCache(
@@ -1154,145 +993,23 @@ export class ReactorCore {
     }
 
     private buildModelsFromAuthorizedResponse(data: AuthorizedQuotaResponse): ModelQuotaInfo[] {
-        const models: ModelQuotaInfo[] = [];
-        const now = Date.now();
-
-        if (!data.models) {
-            return models;
+        const models = mapAuthorizedResponseToModels(
+            data,
+            {
+                unknown: t('common.unknown') || 'Unknown',
+                online: t('dashboard.online') || 'Quota available',
+            },
+            message => logger.warn(message),
+            Date.now(),
+            AUTH_MODEL_BLACKLIST_ID_SET,
+        );
+        if (models.length === 0) {
+            logger.warn('[AuthorizedQuota] No model found from available models response');
         }
-
-        const orderedKeys = this.resolveAuthorizedOrderedModelKeys(data);
-        for (const modelKey of orderedKeys) {
-            const info = data.models[modelKey];
-            if (!info) {
-                continue;
-            }
-            if (info.disabled) {
-                continue;
-            }
-
-            const quotaInfo = info.quotaInfo;
-            const rawRemainingFraction = quotaInfo?.remainingFraction;
-            const remainingFraction = typeof rawRemainingFraction === 'number'
-                && rawRemainingFraction >= 0
-                && rawRemainingFraction <= 1
-                ? rawRemainingFraction
-                : undefined;
-
-            let resetTime = new Date(0);
-            let resetTimeValid = false;
-            if (quotaInfo?.resetTime) {
-                const parsed = new Date(quotaInfo.resetTime);
-                if (!Number.isNaN(parsed.getTime())) {
-                    resetTime = parsed;
-                    resetTimeValid = parsed.getTime() > now;
-                } else {
-                    logger.warn(`[AuthorizedQuota] Invalid resetTime for model ${modelKey}: ${quotaInfo.resetTime}`);
-                }
-            }
-
-            const timeUntilReset = resetTimeValid ? Math.max(0, resetTime.getTime() - now) : 0;
-            const modelId = info.model || modelKey;
-            const label = info.displayName?.trim() || modelKey;
-
-            models.push({
-                label,
-                modelId,
-                remainingFraction,
-                remainingPercentage: remainingFraction !== undefined ? remainingFraction * 100 : undefined,
-                isExhausted: remainingFraction === 0,
-                resetTime,
-                resetTimeDisplay: resetTimeValid ? this.formatIso(resetTime) : (t('common.unknown') || 'Unknown'),
-                timeUntilReset,
-                timeUntilResetFormatted: resetTimeValid ? this.formatDelta(timeUntilReset) : (t('dashboard.online') || 'Quota available'),
-                resetTimeValid,
-                supportsImages: info.supportsImages,
-                isRecommended: info.recommended,
-                tagTitle: info.tagTitle,
-                supportedMimeTypes: info.supportedMimeTypes,
-            });
-        }
-
         this.logModelList('authorized', models);
         return models;
     }
 
-    private resolveAuthorizedOrderedModelKeys(data: AuthorizedQuotaResponse): string[] {
-        if (!data.models) {
-            return [];
-        }
-
-        const orderedKeys: string[] = [];
-        const added = new Set<string>();
-
-        for (const sort of data.agentModelSorts ?? []) {
-            for (const group of sort.groups ?? []) {
-                for (const modelIdentifier of group.modelIds ?? []) {
-                    if (!Object.prototype.hasOwnProperty.call(data.models, modelIdentifier)) {
-                        logger.debug(`[AuthorizedQuota] Model ${modelIdentifier} not found in available models`);
-                        continue;
-                    }
-                    if (added.has(modelIdentifier)) {
-                        continue;
-                    }
-                    added.add(modelIdentifier);
-                    orderedKeys.push(modelIdentifier);
-                }
-            }
-        }
-
-        // 在官方列表基础上补入 Gemini 3 Pro Image（若接口返回且未包含）
-        this.pushAuthorizedModelKeyIfExists(
-            data.models,
-            AUTHORIZED_EXTRA_IMAGE_MODEL_KEY,
-            added,
-            orderedKeys,
-        );
-        this.pushAuthorizedModelKeyByModelIdIfExists(
-            data.models,
-            AUTHORIZED_EXTRA_IMAGE_MODEL_ID,
-            added,
-            orderedKeys,
-        );
-
-        if (orderedKeys.length === 0) {
-            logger.warn('[AuthorizedQuota] No model found from available models response');
-        }
-
-        return orderedKeys;
-    }
-
-    private pushAuthorizedModelKeyIfExists(
-        modelMap: Record<string, AuthorizedModelInfo>,
-        modelKey: string,
-        added: Set<string>,
-        orderedKeys: string[],
-    ): void {
-        if (!Object.prototype.hasOwnProperty.call(modelMap, modelKey) || added.has(modelKey)) {
-            return;
-        }
-        added.add(modelKey);
-        orderedKeys.push(modelKey);
-    }
-
-    private pushAuthorizedModelKeyByModelIdIfExists(
-        modelMap: Record<string, AuthorizedModelInfo>,
-        modelId: string,
-        added: Set<string>,
-        orderedKeys: string[],
-    ): void {
-        for (const [modelKey, info] of Object.entries(modelMap)) {
-            if (added.has(modelKey)) {
-                continue;
-            }
-            if ((info.model ?? '').trim() !== modelId) {
-                continue;
-            }
-            added.add(modelKey);
-            orderedKeys.push(modelKey);
-            return;
-        }
-    }
     /**
      * 检查配额重置并触发自动唤醒
      * 现在 AutoTriggerController 会自行遍历所有选中账号并获取配额
@@ -1496,75 +1213,15 @@ export class ReactorCore {
         const configs: ClientModelConfig[] = status.cascadeModelConfigData?.clientModelConfigs || [];
         const modelSorts = status.cascadeModelConfigData?.clientModelSorts || [];
 
-        // 构建排序顺序映射（从 clientModelSorts 获取）
-        const sortOrderMap = new Map<string, number>();
-        if (modelSorts.length > 0) {
-            // 使用第一个排序配置（通常是 "Recommended"）
-            const primarySort = modelSorts[0];
-            let index = 0;
-            for (const group of primarySort.groups) {
-                for (const label of group.modelLabels) {
-                    sortOrderMap.set(label, index++);
-                }
-            }
-        }
-
-        const models: ModelQuotaInfo[] = configs
-            .filter((m): m is ClientModelConfig & { quotaInfo: NonNullable<ClientModelConfig['quotaInfo']> } => 
-                !!m.quotaInfo,
-            )
-            .map((m) => {
-                const now = new Date();
-                let reset = new Date(m.quotaInfo.resetTime);
-                let resetTimeValid = true;
-                if (Number.isNaN(reset.getTime())) {
-                    reset = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-                    resetTimeValid = false;
-                    logger.warn(`[ReactorCore] Invalid resetTime for model ${m.label}: ${m.quotaInfo.resetTime}`);
-                }
-                const delta = reset.getTime() - now.getTime();
-
-                return {
-                    label: m.label,
-                    modelId: m.modelOrAlias?.model || 'unknown',
-                    remainingFraction: m.quotaInfo.remainingFraction,
-                    remainingPercentage: m.quotaInfo.remainingFraction !== undefined 
-                        ? m.quotaInfo.remainingFraction * 100 
-                        : undefined,
-                    isExhausted: m.quotaInfo.remainingFraction === 0,
-                    resetTime: reset,
-                    resetTimeDisplay: resetTimeValid ? this.formatIso(reset) : (t('common.unknown') || 'Unknown'),
-                    timeUntilReset: delta,
-                    timeUntilResetFormatted: resetTimeValid ? this.formatDelta(delta) : (t('common.unknown') || 'Unknown'),
-                    resetTimeValid,
-                    // 模型能力字段
-                    supportsImages: m.supportsImages,
-                    isRecommended: m.isRecommended,
-                    tagTitle: m.tagTitle,
-                    supportedMimeTypes: m.supportedMimeTypes,
-                };
-            });
-
-        // 排序：优先使用 clientModelSorts，否则按 label 字母排序
-        models.sort((a, b) => {
-            const indexA = sortOrderMap.get(a.label);
-            const indexB = sortOrderMap.get(b.label);
-
-            // 两个都在排序列表中，按排序列表顺序
-            if (indexA !== undefined && indexB !== undefined) {
-                return indexA - indexB;
-            }
-            // 只有 a 在排序列表中，a 排前面
-            if (indexA !== undefined) {
-                return -1;
-            }
-            // 只有 b 在排序列表中，b 排前面
-            if (indexB !== undefined) {
-                return 1;
-            }
-            // 都不在排序列表中，按 label 字母排序
-            return a.label.localeCompare(b.label);
-        });
+        const models = mapLocalConfigsToModels(
+            configs,
+            modelSorts,
+            {
+                unknown: t('common.unknown') || 'Unknown',
+                online: t('dashboard.online') || 'Quota available',
+            },
+            message => logger.warn(message),
+        );
 
         this.logModelList('local', models);
         return this.buildSnapshot(models, promptCredits, userInfo);
@@ -1605,209 +1262,49 @@ export class ReactorCore {
         const config = configService.getConfig();
         const allModels = [...models];
 
-        const visibleModels = config.visibleModels ?? [];
-        if (visibleModels.length > 0) {
-            const visibleSet = new Set(visibleModels);
-            const filteredModels = models.filter(model => visibleSet.has(model.modelId));
-            
-            // 安全检查：如果过滤后为空但原始列表不为空，可能是配置问题
-            if (filteredModels.length === 0 && models.length > 0) {
-                logger.warn('[buildSnapshot] Visible models filter resulted in empty list. ' +
-                    `Original: ${models.length}, Visible config: ${visibleModels.length}. ` +
-                    'Showing all recommended models instead.');
-                // 不应用 visibleModels 过滤，但保留推荐模型过滤
-                void configService.updateVisibleModels([]);
-            } else {
-                models = filteredModels;
-            }
+        // 官方上线新模型时（如 Gemini-4），自动将其纳入用户已自定义的可见列表
+        const adoptedVisibleModels = this.adoptNewlyDiscoveredModels(allModels);
+
+        const assembly = assembleSnapshotModels(allModels, {
+            groupingEnabled: config.groupingEnabled,
+            groupMappings: config.groupMappings,
+            groupingCustomNames: config.groupingCustomNames,
+            visibleModels: adoptedVisibleModels ?? config.visibleModels ?? [],
+        });
+
+        if (assembly.resetVisibleModels) {
+            logger.warn('[buildSnapshot] Visible models filter resulted in empty list. '
+                + `Original: ${allModels.length}, resetting visible list to show all models.`);
+            void configService.updateVisibleModels([]);
         }
 
-        // 分组逻辑：使用存储的 groupMappings 进行分组
-        let groups: QuotaGroup[] | undefined;
-        
-        if (config.groupingEnabled) {
-            const groupMap = new Map<string, ModelQuotaInfo[]>();
-            const savedMappings = config.groupMappings;
-            const hasSavedMappings = Object.keys(savedMappings).length > 0;
-            
-            if (hasSavedMappings) {
-                // 使用存储的分组映射
-                for (const model of models) {
-                    const groupId = savedMappings[model.modelId];
-                    if (groupId) {
-                        if (!groupMap.has(groupId)) {
-                            groupMap.set(groupId, []);
-                        }
-                        groupMap.get(groupId)!.push(model);
-                    }
-                }
-                
-                // 自动分组检查：检查每个分组内模型的配额是否一致
-                // 如果不一致，只将不一致的模型移出分组（保留用户自定义设置）
-                const modelsToRemove: string[] = [];
-                
-                for (const [groupId, groupModels] of groupMap) {
-                    if (groupModels.length <= 1) {
-                        continue; // 单模型组无需检查
-                    }
-                    
-                    // 检查组内所有模型的配额签名（remainingFraction + resetTime）是否一致
-                    // 使用多数派原则：找出最常见的配额签名，将不符合的模型移除
-                    const signatureCount = new Map<string, { count: number; fraction: number; resetTime: number }>();
-                    
-                    for (const model of groupModels) {
-                        const fraction = model.remainingFraction ?? 0;
-                        const resetTime = model.resetTime.getTime();
-                        const signature = `${fraction.toFixed(6)}_${resetTime}`;
-                        
-                        if (!signatureCount.has(signature)) {
-                            signatureCount.set(signature, { count: 0, fraction, resetTime });
-                        }
-                        signatureCount.get(signature)!.count++;
-                    }
-                    
-                    // 找出最常见的签名（多数派）
-                    let majoritySignature = '';
-                    let maxCount = 0;
-                    for (const [sig, data] of signatureCount) {
-                        if (data.count > maxCount) {
-                            maxCount = data.count;
-                            majoritySignature = sig;
-                        }
-                    }
-                    
-                    // 标记不符合多数派的模型移出分组
-                    for (const model of groupModels) {
-                        const fraction = model.remainingFraction ?? 0;
-                        const resetTime = model.resetTime.getTime();
-                        const signature = `${fraction.toFixed(6)}_${resetTime}`;
-                        
-                        if (signature !== majoritySignature) {
-                            logger.info(`[GroupCheck] Removing model "${model.label}" from group "${groupId}" due to quota mismatch`);
-                            modelsToRemove.push(model.modelId);
-                        }
-                    }
-                }
-                
-                // 更新 groupMappings，移除不一致的模型
-                if (modelsToRemove.length > 0) {
-                    const newMappings = { ...savedMappings };
-                    for (const modelId of modelsToRemove) {
-                        delete newMappings[modelId];
-                    }
-                    
-                    configService.updateGroupMappings(newMappings).catch(err => {
-                        logger.warn(`Failed to save updated groupMappings: ${err}`);
-                    });
-                    
-                    // 从 groupMap 中移除这些模型（未分组模型在分组视图中隐藏）
-                    for (const modelId of modelsToRemove) {
-                        for (const [_gid, gModels] of groupMap) {
-                            const idx = gModels.findIndex(m => m.modelId === modelId);
-                            if (idx !== -1) {
-                                gModels.splice(idx, 1);
-                                break;
-                            }
-                        }
-                    }
-                    
-                    // 清理空的分组
-                    for (const [gid, gModels] of groupMap) {
-                        if (gModels.length === 0) {
-                            groupMap.delete(gid);
-                        }
-                    }
-                    
-                    logger.info(`[GroupCheck] Removed ${modelsToRemove.length} models from groups due to quota mismatch (hidden in grouped view)`);
-                }
-            } else {
-                // 没有存储映射时，不展示未分组模型
-                logger.debug('Grouping enabled but no saved mappings; ungrouped models are hidden');
+        if (assembly.removedMappingIds.length > 0) {
+            const newMappings = { ...config.groupMappings };
+            for (const modelId of assembly.removedMappingIds) {
+                delete newMappings[modelId];
+                logger.info(`[GroupCheck] Removing model "${modelId}" from its group due to quota mismatch`);
             }
-            
-            // 转换为 QuotaGroup 数组
-            groups = [];
-            let groupIndex = 1;
-            
-            for (const [groupId, groupModels] of groupMap) {
-                // 锚点共识：查找组内模型的自定义名称
-                let groupName = '';
-                const customNames = config.groupingCustomNames;
-                
-                // 统计每个自定义名称的投票数
-                const nameVotes = new Map<string, number>();
-                for (const model of groupModels) {
-                    const customName = customNames[model.modelId];
-                    if (customName) {
-                        nameVotes.set(customName, (nameVotes.get(customName) || 0) + 1);
-                    }
-                }
-                
-                // 选择投票数最多的名称
-                if (nameVotes.size > 0) {
-                    let maxVotes = 0;
-                    for (const [name, votes] of nameVotes) {
-                        if (votes > maxVotes) {
-                            maxVotes = votes;
-                            groupName = name;
-                        }
-                    }
-                }
-                
-                // 如果没有自定义名称，使用默认名称
-                if (!groupName) {
-                    if (groupModels.length === 1) {
-                        groupName = groupModels[0].label;
-                    } else {
-                        groupName = `Group ${groupIndex}`;
-                    }
-                }
-                
-                const firstModel = groupModels[0];
-                // 计算组内所有模型的平均/最低配额
-                const minPercentage = Math.min(...groupModels.map(m => m.remainingPercentage ?? 0));
-                
-                groups.push({
-                    groupId,
-                    groupName,
-                    models: groupModels,
-                    remainingPercentage: minPercentage,
-                    resetTime: firstModel.resetTime,
-                    resetTimeDisplay: firstModel.resetTimeDisplay,
-                    timeUntilResetFormatted: firstModel.timeUntilResetFormatted,
-                    isExhausted: groupModels.some(m => m.isExhausted),
-                });
-                
-                groupIndex++;
-            }
-            
-            // 按组内模型在原始列表中的最小索引排序，保持相对顺序
-            const modelIndexMap = new Map<string, number>();
-            models.forEach((m, i) => modelIndexMap.set(m.modelId, i));
-
-            groups.sort((a, b) => {
-                // 获取 A 组中最靠前的模型索引
-                const minIndexA = Math.min(...a.models.map(m => modelIndexMap.get(m.modelId) ?? 99999));
-                // 获取 B 组中最靠前的模型索引
-                const minIndexB = Math.min(...b.models.map(m => modelIndexMap.get(m.modelId) ?? 99999));
-                return minIndexA - minIndexB;
+            configService.updateGroupMappings(newMappings).catch((err: unknown) => {
+                logger.warn(`Failed to save updated groupMappings: ${String(err)}`);
             });
-            
-            logger.debug(`Grouping enabled: ${groups.length} groups created (saved mappings: ${hasSavedMappings})`);
+            logger.info(`[GroupCheck] Removed ${assembly.removedMappingIds.length} models from groups due to quota mismatch`);
+        }
+
+        if (config.groupingEnabled) {
+            logger.debug(`Grouping enabled: ${assembly.groups?.length ?? 0} groups created`);
         }
 
         // 将配额中的模型常量传递给 AutoTriggerController，用于过滤可触发模型
-        const quotaModelConstants = models.map(m => m.modelId);
-        autoTriggerController.setQuotaModels(quotaModelConstants);
+        autoTriggerController.setQuotaModels(assembly.models.map(m => m.modelId));
 
         return {
             timestamp: new Date(),
             availableAICredits,
             promptCredits,
             userInfo,
-            models,
+            models: assembly.models,
             allModels,
-            groups,
+            groups: assembly.groups,
             isConnected: true,
         };
     }
@@ -1826,123 +1323,37 @@ export class ReactorCore {
         return snapshot;
     }
 
-    private getAuthorizedDefaultVisibleIds(models: ModelQuotaInfo[]): string[] {
-        return models
-            .filter(model => !AUTH_MODEL_BLACKLIST_ID_SET.has(model.modelId))
-            .map(model => model.modelId);
-    }
-
-    private getAuthorizedRecommendedRank(model: ModelQuotaInfo): number {
-        const idRank = AUTH_RECOMMENDED_ID_RANK.get(model.modelId);
-        if (idRank !== undefined) {
-            return idRank;
-        }
-        const labelRank = AUTH_RECOMMENDED_LABEL_RANK.get(model.label);
-        if (labelRank !== undefined) {
-            return labelRank;
-        }
-        const normalizedId = normalizeRecommendedKey(model.modelId);
-        const normalizedLabel = normalizeRecommendedKey(model.label);
-        return Math.min(
-            AUTH_RECOMMENDED_ID_KEY_RANK.get(normalizedId) ?? Number.MAX_SAFE_INTEGER,
-            AUTH_RECOMMENDED_LABEL_KEY_RANK.get(normalizedLabel) ?? Number.MAX_SAFE_INTEGER,
-        );
-    }
-
-    private getAuthorizedRecommendedRankFromRaw(modelKey: string, info: AuthorizedModelInfo): number {
-        const modelId = info.model || modelKey;
-        const label = info.displayName?.trim() || modelKey;
-
-        const idRank = AUTH_RECOMMENDED_ID_RANK.get(modelId);
-        if (idRank !== undefined) {
-            return idRank;
-        }
-        const labelRank = AUTH_RECOMMENDED_LABEL_RANK.get(label);
-        if (labelRank !== undefined) {
-            return labelRank;
-        }
-
-        const normalizedId = normalizeRecommendedKey(modelId);
-        const normalizedLabel = normalizeRecommendedKey(label);
-        return Math.min(
-            AUTH_RECOMMENDED_ID_KEY_RANK.get(normalizedId) ?? Number.MAX_SAFE_INTEGER,
-            AUTH_RECOMMENDED_LABEL_KEY_RANK.get(normalizedLabel) ?? Number.MAX_SAFE_INTEGER,
-        );
-    }
-
-    private async ensureAuthorizedVisibleModels(models: ModelQuotaInfo[]): Promise<void> {
-        const config = configService.getConfig();
-        if (config.quotaSource !== 'authorized') {
-            return;
-        }
-
-        const initialized = configService.getStateFlag('visibleModelsInitializedAuthorized', false);
-        if (config.visibleModels.length > 0) {
-            if (!initialized) {
-                await configService.setStateFlag('visibleModelsInitializedAuthorized', true);
-            }
-            return;
-        }
-
-        if (initialized || models.length === 0) {
-            return;
-        }
-
-        const allowedIds = this.getAuthorizedDefaultVisibleIds(models);
-        const defaultVisible = allowedIds.length > 0
-            ? allowedIds
-            : models.map(model => model.modelId);
-        await configService.updateVisibleModels(defaultVisible);
-        await configService.setStateFlag('visibleModelsInitializedAuthorized', true);
-    }
-
     /**
-     * 格式化日期（自动国际化）
+     * 识别官方新上线模型并自动纳入可见列表（API 模型清单更新无需等插件发版）。
+     * @returns 合并后的可见模型 ID 列表；无需变更时返回 null
      */
-    private formatIso(d: Date): string {
-        const dateStr = d.toLocaleDateString(undefined, {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
+    private adoptNewlyDiscoveredModels(allModels: ModelQuotaInfo[]): string[] | null {
+        const currentIds = allModels.map(model => model.modelId);
+        const stored = configService.getStateValue<string[]>(KNOWN_MODEL_IDS_STATE_KEY);
+        const result = computeModelAdoption({
+            currentIds,
+            storedIds: Array.isArray(stored) ? stored : undefined,
+            visibleIds: configService.getConfig().visibleModels ?? [],
+            blacklist: AUTH_MODEL_BLACKLIST_ID_SET,
         });
-        const timeStr = d.toLocaleTimeString(undefined, {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-        });
-        return `${dateStr} ${timeStr}`;
+
+        if (stored === undefined || result.newIds.length > 0) {
+            void configService.setStateValue(KNOWN_MODEL_IDS_STATE_KEY, result.nextKnownIds);
+        }
+        if (result.newIds.length === 0) {
+            return null;
+        }
+
+        logger.info(`[ModelAdoption] Detected ${result.newIds.length} new model(s) from API: ${result.newIds.join(', ')}`);
+        if (!result.mergedVisibleIds) {
+            return null;
+        }
+
+        void configService.updateVisibleModels(result.mergedVisibleIds);
+        logger.info(`[ModelAdoption] Auto-visible new model(s): ${result.newIds.join(', ')}`);
+        return result.mergedVisibleIds;
     }
 
-    /**
-     * 格式化时间差
-     * - < 60分钟: 显示 Xm
-     * - < 24小时: 显示 Xh Ym
-     * - >= 24小时: 显示 Xd Yh Zm
-     */
-    private formatDelta(ms: number): string {
-        if (ms <= 0) {
-            return t('dashboard.online');
-        }
-        const totalMinutes = Math.ceil(ms / 60000);
-        
-        // 小于 60 分钟：只显示分钟
-        if (totalMinutes < 60) {
-            return `${totalMinutes}m`;
-        }
-        
-        const totalHours = Math.floor(totalMinutes / 60);
-        const remainingMinutes = totalMinutes % 60;
-        
-        // 小于 24 小时：显示小时和分钟
-        if (totalHours < 24) {
-            return `${totalHours}h ${remainingMinutes}m`;
-        }
-        
-        // >= 24 小时：显示天、小时、分钟
-        const days = Math.floor(totalHours / 24);
-        const remainingHours = totalHours % 24;
-        return `${days}d ${remainingHours}h ${remainingMinutes}m`;
-    }
 
     /**
      * 创建离线状态的快照
@@ -1963,41 +1374,7 @@ export class ReactorCore {
         groupMappings: Record<string, string>;
         groupNames: Record<string, string>;
     } {
-        const familyBuckets = new Map<AutoGroupFamily, string[]>();
-        for (const model of models) {
-            const family = resolveAutoGroupFamily(model.modelId, model.label);
-            if (!family) {
-                continue;
-            }
-            if (!familyBuckets.has(family)) {
-                familyBuckets.set(family, []);
-            }
-            familyBuckets.get(family)!.push(model.modelId);
-        }
-
-        const groupMappings: Record<string, string> = {};
-        const groupNames: Record<string, string> = {};
-
-        for (const family of AUTO_GROUP_FAMILY_ORDER) {
-            const modelIds = familyBuckets.get(family);
-            if (!modelIds || modelIds.length === 0) {
-                continue;
-            }
-
-            const uniqueModelIds = Array.from(new Set(modelIds));
-            const stableGroupId = uniqueModelIds.sort().join('_');
-            const groupName = AUTO_GROUP_FAMILY_DISPLAY_NAMES[family];
-
-            for (const modelId of uniqueModelIds) {
-                groupMappings[modelId] = stableGroupId;
-                groupNames[modelId] = groupName;
-            }
-        }
-
-        return {
-            groupMappings,
-            groupNames,
-        };
+        return calculateSmartGrouping(models);
     }
 
     /**
@@ -2005,7 +1382,7 @@ export class ReactorCore {
      * 返回 modelId -> groupId 的映射
      */
     static calculateGroupMappings(models: ModelQuotaInfo[]): Record<string, string> {
-        return this.calculateSmartGrouping(models).groupMappings;
+        return calculateSmartGrouping(models).groupMappings;
     }
 }
 

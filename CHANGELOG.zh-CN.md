@@ -10,6 +10,21 @@
 
 ## [未发布]
 
+### 新增
+- **官方新模型（如 Gemini-4）免发版即可监控**：授权配额模式以官方 `models` 清单为单一真相来源，`agentModelSorts` 排序表滞后时未列入的模型自动追加展示，不再被丢弃。
+- 官方上线新模型时自动纳入用户已自定义的可见列表（黑名单模型除外）；首次运行仅建立基线，不改变现有视图。
+- 分组模式下未映射的新模型按模型族（Claude / Gemini Pro / Flash / Image）运行时并入已有族组，无法归类则独立成组，不再被静默隐藏。
+- 新增纯函数模块及单测：`engine/model_catalog.ts`（模型排序与新模型纳入）、`engine/model_family.ts`（版本无关的模型族识别）、`engine/snapshot_builder.ts`（可见过滤/分组/配额签名多数派）、`engine/quota_mapper.ts`（双数据源响应映射）。
+
+### 修复
+- 修复 24 个被 esbuild 只转译不类型检查长期掩盖的 `tsc --noEmit` 错误（`OAuthCredential.isGcpTos`、`QuotaSnapshot.activeModelId` 字段缺失、未定义符号引用），删除一段永不执行的"重新授权"死代码（正式逻辑在 `autoTrigger.reauthorizeAccount` 分支）。
+- 修复模型族 label 正则在括号结尾标签（如 `Gemini 4 Pro (High)`）上因 `\b` 边界不匹配而无法归族的问题；未来 Gemini 新版本可自动归族。
+
+### 工程
+- reactor.ts 由 2014 行拆解为 1390 行 + 上述四个纯函数模块，核心配额逻辑可脱离 VS Code 单测；`quota_history.ts` 删除 4 组重复的族识别正则（DRY）。
+- tsconfig 开启 `skipLibCheck`，隔离第三方 `@types/emscripten` 声明噪声。
+- 新增 43 个纯函数单测。
+
 ## [2.1.52] - 2026-04-19
 
 ### 新增
