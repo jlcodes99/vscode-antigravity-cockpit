@@ -2,15 +2,34 @@
 import * as vscode from 'vscode';
 import { CockpitConfig } from '../shared/config_service';
 import { t } from '../shared/i18n';
-import { QuotaSnapshot } from '../shared/types';
+import { ModelQuotaInfo, QuotaGroup, QuotaSnapshot } from '../shared/types';
 import { STATUS_BAR_FORMAT, QUOTA_THRESHOLDS } from '../shared/constants';
 import { autoTriggerController } from '../auto_trigger/controller';
 
 const CREDITS_LABEL = 'Credits';
 
+function getCompactQuotaGroupName(groupName: string): string {
+    const normalized = groupName.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (normalized.includes('gemini') && !normalized.includes('argon')) {
+        return 'Gemini';
+    }
+    if (normalized.includes('claude')) {
+        return 'Claude';
+    }
+    return groupName;
+}
+
+function getConfiguredGroupName(group: QuotaGroup, config: CockpitConfig): string {
+    const customNames = config.groupingCustomNames ?? {};
+    const customName = customNames[group.groupId]
+        || group.models
+            .map(model => customNames[model.modelId])
+            .find(name => typeof name === 'string' && name.trim());
+    return customName || getCompactQuotaGroupName(group.groupName);
+}
+
 export class StatusBarController {
     private statusBarItem: vscode.StatusBarItem;
-    private lastKnownCreditsAvailable?: number;
 
     constructor(context: vscode.ExtensionContext) {
         this.statusBarItem = vscode.window.createStatusBarItem(
@@ -26,7 +45,7 @@ export class StatusBarController {
     }
 
     public update(snapshot: QuotaSnapshot, config: CockpitConfig): void {
-        const creditsText = this.formatCreditsStatusText(snapshot);
+        const creditsText = config.showPromptCredits ? this.formatCreditsStatusText(snapshot) : '';
 
         // 仅图标模式：直接显示 🚀
         if (config.statusBarFormat === STATUS_BAR_FORMAT.ICON) {
@@ -39,90 +58,47 @@ export class StatusBarController {
         const statusTextParts: string[] = creditsText ? [creditsText] : [];
         let minPercentage = 100;
 
-        // 检查是否启用分组显示
-        if (config.groupingEnabled && config.groupingShowInStatusBar && snapshot.groups && snapshot.groups.length > 0) {
-            // 获取置顶的分组
-            const monitoredGroups = snapshot.groups.filter(g =>
-                config.pinnedGroups.includes(g.groupId),
+        if (config.groupingShowInStatusBar !== false && snapshot.groups && snapshot.groups.length > 0) {
+            const monitoredGroups = snapshot.groups.filter(group =>
+                (config.pinnedGroups ?? []).includes(group.groupId),
             );
 
-            if (monitoredGroups.length > 0) {
-                // 对置顶分组按 config.groupOrder 排序
-                if (config.groupOrder.length > 0) {
-                    monitoredGroups.sort((a, b) => {
-                        const idxA = config.groupOrder.indexOf(a.groupId);
-                        const idxB = config.groupOrder.indexOf(b.groupId);
-                        // 如果都在排序列表中，按列表顺序
-                        if (idxA !== -1 && idxB !== -1) { return idxA - idxB; }
-                        // 如果一个在列表一个不在，在列表的优先
-                        if (idxA !== -1) { return -1; }
-                        if (idxB !== -1) { return 1; }
-                        // 都不在，保持原序
-                        return 0;
-                    });
-                }
-
-                // 显示置顶分组
-                monitoredGroups.forEach(g => {
-                    const pct = g.remainingPercentage;
-                    const text = this.formatStatusBarText(g.groupName, pct, config.statusBarFormat, config);
-                    if (text) { statusTextParts.push(text); }
-                    if (pct < minPercentage) {
-                        minPercentage = pct;
-                    }
+            if (monitoredGroups.length > 0 && (config.groupOrder ?? []).length > 0) {
+                monitoredGroups.sort((a, b) => {
+                    const idxA = config.groupOrder?.indexOf(a.groupId) ?? -1;
+                    const idxB = config.groupOrder?.indexOf(b.groupId) ?? -1;
+                    if (idxA !== -1 && idxB !== -1) { return idxA - idxB; }
+                    if (idxA !== -1) { return -1; }
+                    if (idxB !== -1) { return 1; }
+                    return 0;
                 });
-            } else {
-                // 显示最低配额分组
-                let lowestPct = 100;
-                let lowestGroup = snapshot.groups[0];
-
-                snapshot.groups.forEach(g => {
-                    const pct = g.remainingPercentage;
-                    if (pct < lowestPct) {
-                        lowestPct = pct;
-                        lowestGroup = g;
-                    }
-                });
-
-                if (lowestGroup) {
-                    const text = this.formatStatusBarText(lowestGroup.groupName, lowestPct, config.statusBarFormat, config);
-                    if (text) {
-                        statusTextParts.push(text);
-                    } else {
-                        // 仅状态球或仅数字模式时，显示最低的
-                        const dot = this.getStatusIcon(lowestPct, config);
-                        statusTextParts.push(config.statusBarFormat === STATUS_BAR_FORMAT.DOT ? dot : `${Math.floor(lowestPct)}%`);
-                    }
-                    minPercentage = lowestPct;
-                }
             }
+
+            const groupsToShow = monitoredGroups.length > 0
+                ? monitoredGroups
+                : [snapshot.groups.reduce((lowest, group) => (
+                    group.remainingPercentage < lowest.remainingPercentage ? group : lowest
+                ), snapshot.groups[0])];
+
+            groupsToShow.forEach(group => {
+                const pct = group.remainingPercentage;
+                const text = this.formatStatusBarText(
+                    getConfiguredGroupName(group, config),
+                    pct,
+                    config.statusBarFormat,
+                    config,
+                );
+                if (text) { statusTextParts.push(text); }
+                if (pct < minPercentage) {
+                    minPercentage = pct;
+                }
+            });
         } else {
-            // 原始逻辑：显示模型
-            // 获取置顶的模型
-            const monitoredModels = snapshot.models.filter(m =>
-                config.pinnedModels.some(p =>
-                    p.toLowerCase() === m.modelId.toLowerCase() ||
-                    p.toLowerCase() === m.label.toLowerCase(),
-                ),
-            );
+            const monitoredModels = this.getPinnedModels(snapshot, config);
 
             if (monitoredModels.length > 0) {
-                // 对置顶模型按 config.modelOrder 排序
-                if (config.modelOrder.length > 0) {
-                    monitoredModels.sort((a, b) => {
-                        const idxA = config.modelOrder.indexOf(a.modelId);
-                        const idxB = config.modelOrder.indexOf(b.modelId);
-                        if (idxA !== -1 && idxB !== -1) { return idxA - idxB; }
-                        if (idxA !== -1) { return -1; }
-                        if (idxB !== -1) { return 1; }
-                        return 0;
-                    });
-                }
-
-                // 显示置顶模型
                 monitoredModels.forEach(m => {
                     const pct = m.remainingPercentage ?? 0;
-                    // 使用自定义名称（如果存在）
                     const displayName = config.modelCustomNames?.[m.modelId] || m.label;
                     const text = this.formatStatusBarText(displayName, pct, config.statusBarFormat, config);
                     if (text) { statusTextParts.push(text); }
@@ -131,7 +107,6 @@ export class StatusBarController {
                     }
                 });
             } else {
-                // 显示最低配额模型
                 let lowestPct = 100;
                 let lowestModel = snapshot.models[0];
 
@@ -144,13 +119,11 @@ export class StatusBarController {
                 });
 
                 if (lowestModel) {
-                    // 使用自定义名称（如果存在）
                     const displayName = config.modelCustomNames?.[lowestModel.modelId] || lowestModel.label;
                     const text = this.formatStatusBarText(displayName, lowestPct, config.statusBarFormat, config);
                     if (text) {
                         statusTextParts.push(text);
                     } else {
-                        // 仅状态球或仅数字模式时，显示最低的
                         const dot = this.getStatusIcon(lowestPct, config);
                         statusTextParts.push(config.statusBarFormat === STATUS_BAR_FORMAT.DOT ? dot : `${Math.floor(lowestPct)}%`);
                     }
@@ -173,6 +146,29 @@ export class StatusBarController {
         this.statusBarItem.tooltip = this.generateQuotaTooltip(snapshot, config);
     }
 
+    private getPinnedModels(snapshot: QuotaSnapshot, config: CockpitConfig): ModelQuotaInfo[] {
+        const pinnedModels = config.pinnedModels ?? [];
+        const monitoredModels = snapshot.models.filter(m =>
+            pinnedModels.some(p =>
+                p.toLowerCase() === m.modelId.toLowerCase() ||
+                p.toLowerCase() === m.label.toLowerCase(),
+            ),
+        );
+
+        if (config.modelOrder.length > 0) {
+            monitoredModels.sort((a, b) => {
+                const idxA = config.modelOrder.indexOf(a.modelId);
+                const idxB = config.modelOrder.indexOf(b.modelId);
+                if (idxA !== -1 && idxB !== -1) { return idxA - idxB; }
+                if (idxA !== -1) { return -1; }
+                if (idxB !== -1) { return 1; }
+                return 0;
+            });
+        }
+
+        return monitoredModels;
+    }
+
     public setLoading(text?: string): void {
         this.statusBarItem.text = `$(sync~spin) ${text || t('statusBar.connecting')}`;
         this.statusBarItem.backgroundColor = undefined;
@@ -189,11 +185,8 @@ export class StatusBarController {
         this.statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
     }
 
-    public setReady(): void {
-        const available = Number.isFinite(this.lastKnownCreditsAvailable)
-            ? this.formatCreditsNumber(Number(this.lastKnownCreditsAvailable))
-            : '--';
-        this.statusBarItem.text = `$(rocket) ${CREDITS_LABEL}: ${available}`;
+    public setReady(showCredits: boolean): void {
+        this.statusBarItem.text = showCredits ? `$(rocket) ${CREDITS_LABEL}: --` : '$(rocket)';
         this.statusBarItem.backgroundColor = undefined;
     }
 
@@ -211,25 +204,20 @@ export class StatusBarController {
         const planInfo = snapshot.userInfo?.tier ? ` | ${snapshot.userInfo.tier}` : '';
         md.appendMarkdown(`**🚀 ${t('dashboard.title')}${planInfo}**\n\n`);
 
-        const creditsTooltip = this.formatCreditsTooltipText(snapshot);
-        if (creditsTooltip) {
-            md.appendMarkdown(`${creditsTooltip}\n\n`);
+        if (config.showPromptCredits) {
+            md.appendMarkdown(`${this.formatCreditsTooltipText(snapshot)}\n\n`);
         }
 
-        // 检查是否启用分组显示
-        if (config.groupingEnabled && snapshot.groups && snapshot.groups.length > 0) {
-            // 分组模式：显示分组及其包含的模型
+        if (snapshot.groups && snapshot.groups.length > 0) {
             const groups = [...snapshot.groups];
-
-            // 按照用户自定义的分组顺序排序
-            if (config.groupOrder && config.groupOrder.length > 0) {
-                const orderMap = new Map<string, number>();
-                config.groupOrder.forEach((id, index) => orderMap.set(id, index));
+            if ((config.groupOrder ?? []).length > 0) {
                 groups.sort((a, b) => {
-                    const idxA = orderMap.has(a.groupId) ? orderMap.get(a.groupId)! : 99999;
-                    const idxB = orderMap.has(b.groupId) ? orderMap.get(b.groupId)! : 99999;
-                    if (idxA !== idxB) { return idxA - idxB; }
-                    return a.remainingPercentage - b.remainingPercentage;
+                    const idxA = config.groupOrder?.indexOf(a.groupId) ?? -1;
+                    const idxB = config.groupOrder?.indexOf(b.groupId) ?? -1;
+                    if (idxA !== -1 && idxB !== -1) { return idxA - idxB; }
+                    if (idxA !== -1) { return -1; }
+                    if (idxB !== -1) { return 1; }
+                    return 0;
                 });
             }
 
@@ -243,23 +231,26 @@ export class StatusBarController {
             // 遍历每个分组
             groups.forEach((group, groupIndex) => {
                 // 分组标题行
-                md.appendMarkdown(`| **${group.groupName}** | | |\n`);
+                md.appendMarkdown(`| **${getConfiguredGroupName(group, config)}** | | |\n`);
 
-                // 组内模型列表
-                if (group.models && group.models.length > 0) {
-                    group.models.forEach(model => {
-                        const modelPct = model.remainingPercentage ?? (group.remainingPercentage ?? 0);
-                        const modelIcon = this.getStatusIcon(modelPct, config);
-                        const bar = this.generateCompactProgressBar(modelPct);
-                        const resetTime = model.timeUntilResetFormatted || group.timeUntilResetFormatted || '-';
-                        const localTime = (model.resetTimeDisplay || group.resetTimeDisplay)?.split(' ')[1] || '';
-                        const resetDisplay = localTime ? `${resetTime} (${localTime})` : resetTime;
-                        const displayName = config.modelCustomNames?.[model.modelId] || model.label;
-                        const pctDisplay = (Math.floor(modelPct * 100) / 100).toFixed(2);
-                        
-                        // 绿点和模型名一起缩进
-                        md.appendMarkdown(`| &nbsp;&nbsp;&nbsp;&nbsp;${modelIcon} **${displayName}** | \`${bar}\` | ${pctDisplay}% → ${resetDisplay} |\n`);
-                    });
+                const windows = group.quotaWindows && group.quotaWindows.length > 0
+                    ? group.quotaWindows
+                    : [{
+                        windowName: 'Model Quota',
+                        remainingPercentage: group.remainingPercentage,
+                        timeUntilResetFormatted: group.timeUntilResetFormatted,
+                        resetTimeDisplay: group.resetTimeDisplay,
+                    }];
+
+                for (const window of windows) {
+                    const pct = window.remainingPercentage ?? group.remainingPercentage ?? 0;
+                    const icon = this.getStatusIcon(pct, config);
+                    const bar = this.generateCompactProgressBar(pct);
+                    const resetTime = window.timeUntilResetFormatted || group.timeUntilResetFormatted || '-';
+                    const localTime = (window.resetTimeDisplay || group.resetTimeDisplay)?.split(' ')[1] || '';
+                    const resetDisplay = localTime ? `${resetTime} (${localTime})` : resetTime;
+                    const pctDisplay = (Math.floor(pct * 100) / 100).toFixed(2);
+                    md.appendMarkdown(`| &nbsp;&nbsp;&nbsp;&nbsp;${icon} **${window.windowName}** | \`${bar}\` | ${pctDisplay}% → ${resetDisplay} |\n`);
                 }
 
                 // 分组之间添加分隔线行
@@ -353,31 +344,15 @@ export class StatusBarController {
     }
 
     private formatCreditsStatusText(snapshot: QuotaSnapshot): string {
-        const credits = this.resolveCreditsSnapshotForDisplay(snapshot);
+        const credits = this.resolveCreditsSnapshot(snapshot);
         const available = credits ? this.formatCreditsNumber(credits.available) : '--';
         return `💳 ${CREDITS_LABEL}: ${available}`;
     }
 
     private formatCreditsTooltipText(snapshot: QuotaSnapshot): string {
-        const credits = this.resolveCreditsSnapshotForDisplay(snapshot);
+        const credits = this.resolveCreditsSnapshot(snapshot);
         const available = credits ? this.formatCreditsNumber(credits.available) : '--';
         return `**💳 ${CREDITS_LABEL}**: ${available}`;
-    }
-
-    private resolveCreditsSnapshotForDisplay(snapshot: QuotaSnapshot): { available: number } | null {
-        const current = this.resolveCreditsSnapshot(snapshot);
-        if (current) {
-            this.lastKnownCreditsAvailable = current.available;
-            return current;
-        }
-
-        if (Number.isFinite(this.lastKnownCreditsAvailable)) {
-            return {
-                available: Math.max(0, Number(this.lastKnownCreditsAvailable)),
-            };
-        }
-
-        return null;
     }
 
     private formatCreditsNumber(value: number): string {

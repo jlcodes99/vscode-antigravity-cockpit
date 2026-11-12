@@ -35,7 +35,16 @@ export class TelemetryController {
 
     private setupTelemetryHandling(): void {
         this.reactor.onTelemetry(async (snapshot: QuotaSnapshot) => {
-            let config = configService.getConfig();
+            const source = configService.getConfig().quotaSource;
+            const authorizationStatus = await credentialStorage.getAuthorizationStatus();
+            const config = configService.getConfig();
+            if (this.reactor.getLatestSnapshot() !== snapshot || config.quotaSource !== source) {
+                return;
+            }
+            if (source === 'authorized' && snapshot.quotaAccountEmail
+                && snapshot.quotaAccountEmail.toLowerCase() !== authorizationStatus.activeAccount?.toLowerCase()) {
+                return;
+            }
 
             // 记录最后成功更新时间
             this.lastSuccessfulUpdate = new Date();
@@ -47,48 +56,19 @@ export class TelemetryController {
             // 检查配额并发送通知
             this.checkAndNotifyQuota(snapshot, config);
 
-            // 首次安装分组默认启用时，自动生成分组映射并重新渲染
-            if (config.groupingEnabled && Object.keys(config.groupMappings).length === 0 && snapshot.models.length > 0) {
-                const autoGrouping = ReactorCore.calculateSmartGrouping(snapshot.models);
-                if (Object.keys(autoGrouping.groupMappings).length > 0) {
-                    await configService.updateGroupMappings(autoGrouping.groupMappings);
-                    await configService.updateConfig('groupingCustomNames', autoGrouping.groupNames);
-                    logger.info(`Auto-grouped on first run: ${Object.keys(autoGrouping.groupMappings).length} models`);
-                    this.reactor.reprocess();
-                    return;
-                }
-                logger.debug('Auto-group on first run skipped: no models matched smart-group families');
-            }
-
-            // 自动将新分组添加到 pinnedGroups（第一次开启分组时默认全部显示在状态栏）
-            if (config.groupingEnabled && snapshot.groups && snapshot.groups.length > 0) {
-                const currentPinnedGroups = config.pinnedGroups;
-                const allGroupIds = snapshot.groups.map(g => g.groupId);
-
-                // 如果 pinnedGroups 为空，说明是第一次开启分组，自动 pin 全部
-                if (currentPinnedGroups.length === 0) {
-                    logger.info(`Auto-pinning all ${allGroupIds.length} groups to status bar`);
-                    await configService.updateConfig('pinnedGroups', allGroupIds);
-                    // 重新获取配置
-                    config = configService.getConfig();
-                }
-            }
-
-            const authorizationStatus = await credentialStorage.getAuthorizationStatus();
             const authorizedAvailable = authorizationStatus.isAuthorized;
 
             // 更新 Dashboard（使用可能已更新的 config）
             this.hud.refreshView(snapshot, {
                 showPromptCredits: config.showPromptCredits,
                 pinnedModels: config.pinnedModels,
-                modelOrder: config.modelOrder,
-                modelCustomNames: config.modelCustomNames,
-                visibleModels: config.visibleModels,
-                groupingEnabled: config.groupingEnabled,
-                groupCustomNames: config.groupingCustomNames,
-                groupingShowInStatusBar: config.groupingShowInStatusBar,
                 pinnedGroups: config.pinnedGroups,
+                modelOrder: config.modelOrder,
                 groupOrder: config.groupOrder,
+                modelCustomNames: config.modelCustomNames,
+                groupingCustomNames: config.groupingCustomNames,
+                groupingShowInStatusBar: config.groupingShowInStatusBar,
+                visibleModels: config.visibleModels,
                 refreshInterval: config.refreshInterval,
                 notificationEnabled: config.notificationEnabled,
                 warningThreshold: config.warningThreshold,
@@ -101,23 +81,12 @@ export class TelemetryController {
                 authorizationStatus,
                 displayMode: config.displayMode,
                 dataMasked: config.dataMasked,
-                groupMappings: config.groupMappings,
                 language: config.language,
                 antigravityToolsSyncEnabled: configService.getStateFlag('antigravityToolsSyncEnabled', false),
             });
 
-            const snapshotEmail = snapshot.userInfo?.email;
-            const localEmail = snapshot.localAccountEmail;
-            let historyEmail = (snapshotEmail && snapshotEmail.includes('@')) ? snapshotEmail : null;
-            if (!historyEmail && localEmail && localEmail.includes('@')) {
-                historyEmail = localEmail;
-            }
-            if (!historyEmail) {
-                const activeEmail = await credentialStorage.getActiveAccount();
-                if (activeEmail && activeEmail.includes('@')) {
-                    historyEmail = activeEmail;
-                }
-            }
+            const historyEmail = [snapshot.quotaAccountEmail, snapshot.userInfo?.email, snapshot.localAccountEmail]
+                .find(email => email?.includes('@'));
             if (historyEmail) {
                 void recordQuotaHistory(historyEmail, snapshot).then(changed => {
                     if (changed && this.hud.isVisible()) {
@@ -200,7 +169,7 @@ export class TelemetryController {
         const warningThreshold = config.warningThreshold ?? QUOTA_THRESHOLDS.WARNING_DEFAULT;
         const criticalThreshold = config.criticalThreshold ?? QUOTA_THRESHOLDS.CRITICAL_DEFAULT;
 
-        const useGroups = config.groupingEnabled && Array.isArray(snapshot.groups) && snapshot.groups.length > 0;
+        const useGroups = Array.isArray(snapshot.groups) && snapshot.groups.length > 0;
         if (useGroups) {
             for (const group of snapshot.groups!) {
                 const pct = group.remainingPercentage ?? 0;

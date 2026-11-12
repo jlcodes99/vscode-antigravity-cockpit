@@ -128,116 +128,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
     );
     const AUTH_MODEL_BLACKLIST_ID_SET = new Set(AUTH_MODEL_BLACKLIST_IDS);
 
-    // 自定义分组弹框状态
-    const customGroupingModal = document.getElementById('custom-grouping-modal');
-    let customGroupingState = {
-        groups: [],       // { id: string, name: string, modelIds: string[] }
-        allModels: [],    // 所有模型数据（从 snapshot 获取）
-        groupMappings: {}, // 原始分组映射（用于保存）
-        smartGroupCanonicalNames: null, // 自动分组后用于强制覆盖组名并清理残留名称映射
-    };
-
-    const CUSTOM_GROUP_FAMILY_ORDER = {
-        claude: 0,
-        gemini_pro: 1,
-        gemini_flash: 2,
-        gemini_image: 3,
-    };
-
-    function normalizeGroupMatchText(value) {
-        return (value || '')
-            .toLowerCase()
-            .replace(/[_-]+/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
-
-    function resolveGroupFamily(modelId, label) {
-        const modelIdLower = (modelId || '').toLowerCase();
-        const labelText = normalizeGroupMatchText(label || modelId || '');
-
-        if (
-            /^gemini-\d+(?:\.\d+)?-pro-image(?:-|$)/.test(modelIdLower)
-            || /^gemini \d+(?:\.\d+)? pro image\b/.test(labelText)
-            || modelIdLower === 'model_placeholder_m9'
-        ) {
-            return 'gemini_image';
-        }
-
-        if (
-            /^gemini-\d+(?:\.\d+)?-pro-(high|low)(?:-|$)/.test(modelIdLower)
-            || /^gemini \d+(?:\.\d+)? pro(?: \((high|low)\)| (high|low))\b/.test(labelText)
-            || modelIdLower === 'model_placeholder_m7'
-            || modelIdLower === 'model_placeholder_m8'
-            || modelIdLower === 'model_placeholder_m36'
-            || modelIdLower === 'model_placeholder_m37'
-        ) {
-            return 'gemini_pro';
-        }
-
-        if (
-            /^gemini-\d+(?:\.\d+)?-flash(?:-|$)/.test(modelIdLower)
-            || /^gemini \d+(?:\.\d+)? flash\b/.test(labelText)
-            || modelIdLower === 'model_placeholder_m18'
-        ) {
-            return 'gemini_flash';
-        }
-
-        if (
-            modelIdLower.startsWith('claude-')
-            || modelIdLower.startsWith('model_claude')
-            || labelText.startsWith('claude ')
-            || modelIdLower === 'model_placeholder_m12'
-            || modelIdLower === 'model_placeholder_m26'
-            || modelIdLower === 'model_placeholder_m35'
-            || modelIdLower === 'model_openai_gpt_oss_120b_medium'
-        ) {
-            return 'claude';
-        }
-
-        return null;
-    }
-
-    function resolveGroupFamilyByModels(group, allModels) {
-        const modelMap = new Map((allModels || []).map(model => [model.modelId, model]));
-        const familyCounter = new Map();
-
-        for (const modelId of group.modelIds || []) {
-            const model = modelMap.get(modelId);
-            const family = resolveGroupFamily(modelId, model?.label || modelId);
-            if (!family) continue;
-            familyCounter.set(family, (familyCounter.get(family) || 0) + 1);
-        }
-
-        if (familyCounter.size === 0) return null;
-
-        let selectedFamily = null;
-        let maxCount = -1;
-        for (const [family, count] of familyCounter.entries()) {
-            if (count > maxCount) {
-                selectedFamily = family;
-                maxCount = count;
-            }
-        }
-        return selectedFamily;
-    }
-
-    function sortGroupsForDisplay(groups, allModels) {
-        return (groups || [])
-            .map((group, index) => {
-                const family = resolveGroupFamilyByModels(group, allModels);
-                const rank = family ? CUSTOM_GROUP_FAMILY_ORDER[family] : 999;
-                return { group, index, rank };
-            })
-            .sort((a, b) => {
-                if (a.rank !== b.rank) return a.rank - b.rank;
-                return a.index - b.index;
-            })
-            .map(item => item.group);
-    }
-
-
-
     // ============ 初始化 ============
 
     function init() {
@@ -251,7 +141,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 startCooldown(savedCooldown - diff);
             }
         }
-        currentQuotaSource = 'authorized';
+        currentQuotaSource = state.quotaSource === 'local' ? 'local' : 'authorized';
         updatePlanButtonVisibility();
 
         // isProfileHidden and isDataMasked are now loaded from config in handleMessage
@@ -274,12 +164,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
         const toggleProfileBtn = document.getElementById('toggle-profile-btn');
         if (toggleProfileBtn) {
             toggleProfileBtn.addEventListener('click', handleToggleProfile);
-        }
-
-        // 分组开关按钮
-        const toggleGroupingBtn = document.getElementById('toggle-grouping-btn');
-        if (toggleGroupingBtn) {
-            toggleGroupingBtn.addEventListener('click', handleToggleGrouping);
         }
 
         // 设置按钮
@@ -331,30 +215,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
         if (resetNameBtn) {
             resetNameBtn.addEventListener('click', resetName);
         }
-
-        // 自定义分组弹框事件绑定
-        const closeCustomGroupingBtn = document.getElementById('close-custom-grouping-btn');
-        if (closeCustomGroupingBtn) {
-            closeCustomGroupingBtn.addEventListener('click', closeCustomGroupingModal);
-        }
-        const cancelCustomGroupingBtn = document.getElementById('cancel-custom-grouping-btn');
-        if (cancelCustomGroupingBtn) {
-            cancelCustomGroupingBtn.addEventListener('click', closeCustomGroupingModal);
-        }
-        const saveCustomGroupingBtn = document.getElementById('save-custom-grouping-btn');
-        if (saveCustomGroupingBtn) {
-            saveCustomGroupingBtn.addEventListener('click', saveCustomGrouping);
-        }
-        const smartGroupBtn = document.getElementById('smart-group-btn');
-        if (smartGroupBtn) {
-            smartGroupBtn.addEventListener('click', handleSmartGroup);
-        }
-        const addGroupBtn = document.getElementById('add-group-btn');
-        if (addGroupBtn) {
-            addGroupBtn.addEventListener('click', handleAddGroup);
-        }
-
-
 
         // Announcement Events
         announcementModule.initAnnouncementEvents();
@@ -604,24 +464,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
 
     // ============ 重命名模态框 ============
 
-    function openRenameModal(groupId, currentName, modelIds) {
-        if (renameModal) {
-            renameGroupId = groupId;
-            renameModelIds = modelIds || [];
-            isRenamingModel = false; // 分组重命名模式
-            renameModelId = null;
-
-            const renameInput = document.getElementById('rename-input');
-            if (renameInput) {
-                renameInput.value = currentName || '';
-                renameInput.focus();
-                renameInput.select();
-            }
-
-            renameModal.classList.remove('hidden');
-        }
-    }
-
     /**
      * 打开模型重命名模态框（非分组模式）
      * @param {string} modelId 模型 ID
@@ -634,6 +476,25 @@ import { createAnnouncementModule } from './dashboard_announcements';
             renameGroupId = null;
             renameModelIds = [];
             renameOriginalName = originalName || currentName || ''; // 保存原始名称
+
+            const renameInput = document.getElementById('rename-input');
+            if (renameInput) {
+                renameInput.value = currentName || '';
+                renameInput.focus();
+                renameInput.select();
+            }
+
+            renameModal.classList.remove('hidden');
+        }
+    }
+
+    function openRenameModal(groupId, currentName, modelIds) {
+        if (renameModal) {
+            isRenamingModel = false;
+            renameGroupId = groupId;
+            renameModelIds = modelIds || [];
+            renameModelId = null;
+            renameOriginalName = currentName || '';
 
             const renameInput = document.getElementById('rename-input');
             if (renameInput) {
@@ -676,8 +537,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
 
             showToast((i18n['model.renamed'] || 'Model renamed to {name}').replace('{name}', newName), 'success');
         } else if (renameGroupId && renameModelIds.length > 0) {
-            // 分组重命名模式
-            // 乐观更新：立即在前端更新 UI
             updateGroupNameOptimistically(renameGroupId, newName);
 
             vscode.postMessage({
@@ -693,13 +552,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
         closeRenameModal();
     }
 
-    /**
-     * 乐观更新分组名称（直接更新 DOM 和缓存）
-     * @param {string} groupId 分组 ID
-     * @param {string} newName 新名称
-     */
     function updateGroupNameOptimistically(groupId, newName) {
-        // 1. 更新 DOM（避免 groupId 特殊字符导致 querySelector 失效）
         const card = Array.from(document.querySelectorAll('.group-card'))
             .find(el => el.getAttribute('data-group-id') === groupId);
         if (card) {
@@ -708,8 +561,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 nameSpan.textContent = newName;
             }
         }
-        
-        // 2. 更新缓存 (lastSnapshot)
         if (lastSnapshot && lastSnapshot.groups) {
             const group = lastSnapshot.groups.find(g => g.groupId === groupId);
             if (group) {
@@ -724,12 +575,10 @@ import { createAnnouncementModule } from './dashboard_announcements';
         const renameInput = document.getElementById('rename-input');
         if (!renameInput) return;
 
-        if (isRenamingModel && renameModelId && renameOriginalName) {
-            // 模型重置模式：将原始名称填入输入框
+        if (renameOriginalName) {
             renameInput.value = renameOriginalName;
             renameInput.focus();
         }
-        // 分组重置暂不支持
     }
 
     function handleToggleProfile() {
@@ -759,24 +608,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
         btn.classList.toggle('hidden', !shouldShow);
     }
 
-    function handleToggleGrouping() {
-        // 发送切换分组的消息给扩展
-        vscode.postMessage({ command: 'toggleGrouping' });
-    }
-
-    function updateToggleGroupingButton(enabled) {
-        const btn = document.getElementById('toggle-grouping-btn');
-        if (btn) {
-            if (enabled) {
-                btn.textContent = (i18n['grouping.title'] || 'Groups') + ' ▲';
-                btn.classList.remove('toggle-off');
-            } else {
-                btn.textContent = (i18n['grouping.title'] || 'Groups') + ' ▼';
-                btn.classList.add('toggle-off');
-            }
-        }
-    }
-
     // ============ 事件处理 ============
 
     function handleRefresh() {
@@ -796,13 +627,13 @@ import { createAnnouncementModule } from './dashboard_announcements';
 
 
     function handleResetOrder() {
-        vscode.postMessage({ command: 'resetOrder' });
+        if (lastSnapshot?.groups?.length > 0) {
+            vscode.postMessage({ command: 'resetGroupOrder' });
+        } else {
+            vscode.postMessage({ command: 'resetOrder' });
+        }
         showToast(i18n['dashboard.resetOrder'] || 'Reset Order', 'success');
     }
-
-    // handleAutoGroup 已移除，功能已整合到其他模块
-
-
 
     function handleMessage(event) {
         const message = event.data;
@@ -834,7 +665,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 }
                 if (message.config.quotaSource) {
                     if (!isQuotaSourceSwitching || message.config.quotaSource === pendingQuotaSource) {
-                        currentQuotaSource = 'authorized';
+                        currentQuotaSource = message.config.quotaSource;
                         vscode.setState({ ...vscode.getState(), quotaSource: currentQuotaSource });
                     }
                 }
@@ -1268,7 +1099,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
      * @param {string} data.currentEmail - AntigravityTools 当前账户
      * @param {string} data.localEmail - 本地当前账户（switch_only 场景）
      * @param {boolean} data.autoConfirm - 是否自动确认（自动同步模式）
-     * @param {boolean} [data.autoConfirmImportOnly] - 是否自动确认但仅导入不切号
+     * @param {boolean} [data.autoConfirmImportOnly] - 是否仅自动导入
      */
     function showAntigravityToolsSyncPrompt(data) {
         const promptType = data.promptType || 'new_accounts';
@@ -2408,9 +2239,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
         return i18n['dashboard.danger'] || 'Danger';                                        // 危险
     }
 
-    /**
-     * 切换模型置顶状态
-     */
+    /** 切换模型置顶状态 */
     function togglePin(modelId) {
         vscode.postMessage({ command: 'togglePin', modelId: modelId });
     }
@@ -2483,20 +2312,16 @@ import { createAnnouncementModule } from './dashboard_announcements';
             // Get updated list of all items in this container
             const updatedItems = Array.from(dashboardOrTbody.querySelectorAll(selector));
 
-            // 检查是否是分组
             const isGroup = dragSrcEl.classList.contains('group-card') || dragSrcEl.classList.contains('list-group-row');
-
             if (isGroup) {
                 const groupOrder = updatedItems
                     .map(item => item.getAttribute('data-group-id'))
                     .filter(id => id !== null);
-
                 vscode.postMessage({ command: 'updateGroupOrder', order: groupOrder });
             } else {
                 const modelOrder = updatedItems
                     .map(item => item.getAttribute('data-id'))
                     .filter(id => id !== null);
-
                 vscode.postMessage({ command: 'updateOrder', order: modelOrder });
             }
         }
@@ -2571,29 +2396,18 @@ import { createAnnouncementModule } from './dashboard_announcements';
             renderUserProfile(snapshot.userInfo);
         }
 
-        // 更新分组按钮状态
-        updateToggleGroupingButton(config?.groupingEnabled);
-
-        // 如果启用了分组显示，仅渲染已分组卡片（未分组模型不显示）
-        if (config?.groupingEnabled) {
-            // 渲染自动分组按钮区域
-            renderAutoGroupBar();
-
-            // 分组排序：支持自定义顺序
-            let groups = snapshot.groups ? [...snapshot.groups] : [];
+        if (Array.isArray(snapshot.groups) && snapshot.groups.length > 0) {
+            let groups = [...snapshot.groups];
             if (config?.groupOrder?.length > 0) {
                 const orderMap = new Map();
                 config.groupOrder.forEach((id, index) => orderMap.set(id, index));
-
                 groups.sort((a, b) => {
                     const idxA = orderMap.has(a.groupId) ? orderMap.get(a.groupId) : 99999;
                     const idxB = orderMap.has(b.groupId) ? orderMap.get(b.groupId) : 99999;
                     if (idxA !== idxB) return idxA - idxB;
-                    // 如果没有自定义顺序，按配额百分比升序（低的在前）
                     return a.remainingPercentage - b.remainingPercentage;
                 });
             }
-
             groups.forEach(group => {
                 renderGroupCard(group, config?.pinnedGroups || []);
             });
@@ -2751,552 +2565,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
         if (modal) {
             modal.classList.add('hidden');
         }
-    }
-
-    function renderAutoGroupBar() {
-        const bar = document.createElement('div');
-        bar.className = 'auto-group-toolbar';
-        bar.innerHTML = `
-            <span class="grouping-hint">
-                ${i18n['grouping.description'] || 'This mode aggregates models sharing the same quota. Supports renaming, sorting, and status bar sync. Click "Manage Groups" to customize, or toggle "Quota Groups" above to switch back.'}
-            </span>
-            <button id="manage-group-btn" class="auto-group-link" title="${i18n['customGrouping.title'] || 'Manage Groups'}">
-                <span class="icon">⚙️</span>
-                ${i18n['customGrouping.title'] || 'Manage Groups'}
-            </button>
-        `;
-        dashboard.appendChild(bar);
-
-        // 绑定点击事件 - 打开自定义分组弹框
-        const btn = bar.querySelector('#manage-group-btn');
-        if (btn) {
-            btn.addEventListener('click', openCustomGroupingModal);
-        }
-    }
-
-    // ============ 自定义分组弹框 ============
-
-    function openCustomGroupingModal() {
-        if (!customGroupingModal || !lastSnapshot) return;
-
-        // 初始化状态
-        // 分组管理应基于全部模型，而不是“当前可见模型”，避免被可见模型筛选误伤
-        const models = lastSnapshot.allModels || lastSnapshot.models || [];
-        customGroupingState.allModels = models;
-        customGroupingState.groupMappings = { ...(currentConfig.groupMappings || {}) };
-        customGroupingState.smartGroupCanonicalNames = null;
-
-        // 从现有映射构建分组
-        const groupMap = new Map(); // groupId -> { id, name, modelIds }
-        const groupNames = currentConfig.groupCustomNames || {};
-
-        for (const model of models) {
-            const groupId = customGroupingState.groupMappings[model.modelId];
-            if (groupId) {
-                if (!groupMap.has(groupId)) {
-                    // 尝试从 groupNames 获取名称，否则使用默认名称
-                    let groupName = '';
-                    for (const modelId of Object.keys(groupNames)) {
-                        if (customGroupingState.groupMappings[modelId] === groupId) {
-                            groupName = groupNames[modelId];
-                            break;
-                        }
-                    }
-                    groupMap.set(groupId, {
-                        id: groupId,
-                        name: groupName || `Group ${groupMap.size + 1}`,
-                        modelIds: []
-                    });
-                }
-                groupMap.get(groupId).modelIds.push(model.modelId);
-            }
-        }
-
-        customGroupingState.groups = sortGroupsForDisplay(Array.from(groupMap.values()), models);
-
-        // 渲染弹框内容
-        renderCustomGroupingContent();
-
-        customGroupingModal.classList.remove('hidden');
-    }
-
-    function closeCustomGroupingModal() {
-        if (customGroupingModal) {
-            customGroupingModal.classList.add('hidden');
-        }
-    }
-
-    function renderCustomGroupingContent() {
-        const groupsList = document.getElementById('custom-groups-list');
-        const ungroupedList = document.getElementById('ungrouped-models-list');
-
-        if (!groupsList || !ungroupedList) return;
-
-        // 获取已分组的模型 ID
-        const groupedModelIds = new Set();
-        customGroupingState.groups.forEach(g => g.modelIds.forEach(id => groupedModelIds.add(id)));
-
-        // 渲染分组列表
-        if (customGroupingState.groups.length === 0) {
-            groupsList.innerHTML = `<div class="empty-groups-hint">${i18n['customGrouping.noModels'] || 'No groups yet. Click "Add Group" to create one.'}</div>`;
-        } else {
-            groupsList.innerHTML = customGroupingState.groups.map((group, index) => {
-                const modelsHtml = group.modelIds.map(modelId => {
-                    const model = customGroupingState.allModels.find(m => m.modelId === modelId);
-                    const name = model ? (currentConfig.modelCustomNames?.[modelId] || model.label) : modelId;
-                    return `
-                        <span class="custom-model-tag" data-model-id="${escapeHtml(modelId)}">
-                            ${escapeHtml(name)}
-                            <button class="remove-model-btn" data-group-index="${index}" data-model-id="${escapeHtml(modelId)}" title="${escapeHtml(i18n['customGrouping.removeModel'] || 'Remove')}">×</button>
-                        </span>
-                    `;
-                }).join('');
-
-                return `
-                    <div class="custom-group-item" data-group-index="${index}">
-                        <div class="custom-group-header">
-                            <div class="custom-group-name">
-                                <span>📦</span>
-                                <input type="text" value="${escapeHtml(group.name)}" data-group-index="${index}" placeholder="Group name...">
-                            </div>
-                            <div class="custom-group-actions">
-                                <button class="delete-group-btn" data-group-index="${index}" title="${escapeHtml(i18n['customGrouping.deleteGroup'] || 'Delete Group')}">🗑️</button>
-                            </div>
-                        </div>
-                        <div class="custom-group-models">
-                            ${modelsHtml}
-                            <button class="add-model-btn" data-group-index="${index}">
-                                ➕ ${escapeHtml(i18n['customGrouping.addModel'] || 'Add Model')}
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            // 绑定事件
-            groupsList.querySelectorAll('.remove-model-btn').forEach(btn => {
-                btn.addEventListener('click', handleRemoveModel);
-            });
-            groupsList.querySelectorAll('.delete-group-btn').forEach(btn => {
-                btn.addEventListener('click', handleDeleteGroup);
-            });
-            groupsList.querySelectorAll('.add-model-btn').forEach(btn => {
-                btn.addEventListener('click', handleAddModelToGroup);
-            });
-            groupsList.querySelectorAll('.custom-group-name input').forEach(input => {
-                input.addEventListener('change', handleGroupNameChange);
-            });
-        }
-
-        // 渲染未分组模型
-        const ungroupedModels = customGroupingState.allModels.filter(m => !groupedModelIds.has(m.modelId));
-
-        if (ungroupedModels.length === 0) {
-            ungroupedList.innerHTML = `<div style="color: var(--text-secondary); font-size: 12px;">${i18n['customGrouping.noModels'] || 'All models are grouped'}</div>`;
-        } else {
-            ungroupedList.innerHTML = ungroupedModels.map(model => {
-                const name = currentConfig.modelCustomNames?.[model.modelId] || model.label;
-                const quotaPct = (model.remainingPercentage || 0).toFixed(0);
-                return `
-                    <div class="ungrouped-model-item" data-model-id="${escapeHtml(model.modelId)}" title="${escapeHtml(model.modelId)}">
-                        ${escapeHtml(name)}
-                        <span class="quota-badge">${quotaPct}%</span>
-                    </div>
-                `;
-            }).join('');
-        }
-
-    }
-
-    function handleAddGroup() {
-        customGroupingState.smartGroupCanonicalNames = null;
-        const newGroupId = 'custom_group_' + Date.now();
-        customGroupingState.groups.push({
-            id: newGroupId,
-            name: `Group ${customGroupingState.groups.length + 1}`,
-            modelIds: []
-        });
-        renderCustomGroupingContent();
-    }
-
-    function handleDeleteGroup(e) {
-        customGroupingState.smartGroupCanonicalNames = null;
-        const index = parseInt(e.target.dataset.groupIndex, 10);
-        if (!isNaN(index) && index >= 0 && index < customGroupingState.groups.length) {
-            customGroupingState.groups.splice(index, 1);
-            renderCustomGroupingContent();
-        }
-    }
-
-    function handleRemoveModel(e) {
-        customGroupingState.smartGroupCanonicalNames = null;
-        e.stopPropagation();
-        const groupIndex = parseInt(e.target.dataset.groupIndex, 10);
-        const modelId = e.target.dataset.modelId;
-
-        if (!isNaN(groupIndex) && modelId) {
-            const group = customGroupingState.groups[groupIndex];
-            if (group) {
-                group.modelIds = group.modelIds.filter(id => id !== modelId);
-                renderCustomGroupingContent();
-            }
-        }
-    }
-
-    function handleGroupNameChange(e) {
-        customGroupingState.smartGroupCanonicalNames = null;
-        const index = parseInt(e.target.dataset.groupIndex, 10);
-        if (!isNaN(index) && customGroupingState.groups[index]) {
-            customGroupingState.groups[index].name = e.target.value.trim() || `Group ${index + 1}`;
-        }
-    }
-
-    function handleAddModelToGroup(e) {
-        customGroupingState.smartGroupCanonicalNames = null;
-        const groupIndex = parseInt(e.target.dataset.groupIndex, 10);
-        if (isNaN(groupIndex)) return;
-
-        const group = customGroupingState.groups[groupIndex];
-        if (!group) return;
-
-        // 获取已分组的模型
-        const groupedModelIds = new Set();
-        customGroupingState.groups.forEach(g => g.modelIds.forEach(id => groupedModelIds.add(id)));
-
-        // 获取可用模型（未分组的）
-        const availableModels = customGroupingState.allModels.filter(m => !groupedModelIds.has(m.modelId));
-
-        if (availableModels.length === 0) {
-            showToast(i18n['customGrouping.noModels'] || 'No available models', 'info');
-            return;
-        }
-
-        // 获取组的配额签名（如果组已有模型）
-        let groupSignature = null;
-        if (group.modelIds.length > 0) {
-            const firstModelId = group.modelIds[0];
-            const firstModel = customGroupingState.allModels.find(m => m.modelId === firstModelId);
-            if (firstModel) {
-                groupSignature = {
-                    remainingPercentage: firstModel.remainingPercentage,
-                    resetTimeDisplay: firstModel.resetTimeDisplay
-                };
-            }
-        }
-
-        // 创建下拉选择菜单
-        showModelSelectDropdown(e.target, availableModels, groupSignature, (selectedModelId) => {
-            group.modelIds.push(selectedModelId);
-            renderCustomGroupingContent();
-        });
-    }
-
-    function showModelSelectDropdown(anchor, models, groupSignature, onSelect) {
-        // 移除已存在的下拉框
-        const existingDropdown = document.querySelector('.model-select-dropdown');
-        if (existingDropdown) {
-            existingDropdown.remove();
-        }
-
-        const dropdown = document.createElement('div');
-        dropdown.className = 'model-select-dropdown';
-
-        // 计算位置
-        const rect = anchor.getBoundingClientRect();
-        dropdown.style.position = 'fixed';
-        dropdown.style.left = rect.left + 'px';
-        dropdown.style.top = (rect.bottom + 4) + 'px';
-
-        // 计算每个模型的兼容性
-        const modelsWithCompatibility = models.map(model => {
-            let isCompatible = true;
-            let incompatibleReason = '';
-
-            if (groupSignature) {
-                if (model.remainingPercentage !== groupSignature.remainingPercentage) {
-                    isCompatible = false;
-                    incompatibleReason = i18n['customGrouping.quotaMismatch'] || 'Quota mismatch';
-                } else if (model.resetTimeDisplay !== groupSignature.resetTimeDisplay) {
-                    isCompatible = false;
-                    incompatibleReason = i18n['customGrouping.resetMismatch'] || 'Reset time mismatch';
-                }
-            }
-
-            return { model, isCompatible, incompatibleReason };
-        });
-
-        // 排序：兼容的排在前面
-        modelsWithCompatibility.sort((a, b) => {
-            if (a.isCompatible && !b.isCompatible) return -1;
-            if (!a.isCompatible && b.isCompatible) return 1;
-            return 0;
-        });
-
-        // 检查是否有兼容的模型
-        const hasCompatibleModels = modelsWithCompatibility.some(m => m.isCompatible);
-
-        dropdown.innerHTML = `
-            <div class="model-select-list">
-                ${modelsWithCompatibility.map(({ model, isCompatible, incompatibleReason }) => {
-            const name = currentConfig.modelCustomNames?.[model.modelId] || model.label;
-            const quotaPct = (model.remainingPercentage || 0).toFixed(1);
-
-            return `
-                        <label class="model-select-item ${isCompatible ? '' : 'disabled'}" 
-                             data-model-id="${escapeHtml(model.modelId)}" 
-                             data-compatible="${isCompatible}">
-                            <input type="checkbox" class="model-checkbox" 
-                                   value="${escapeHtml(model.modelId)}" 
-                                   ${isCompatible ? '' : 'disabled'}>
-                            <span class="model-name">${escapeHtml(name)}</span>
-                            <span class="model-quota">${quotaPct}%</span>
-                            ${!isCompatible ? `<span class="incompatible-reason">${escapeHtml(incompatibleReason)}</span>` : ''}
-                        </label>
-                    `;
-        }).join('')}
-            </div>
-            ${hasCompatibleModels ? `
-                <div class="model-select-footer">
-                    <button class="btn-confirm-add" disabled>
-                        ${escapeHtml(i18n['customGrouping.addModel'] || 'Add')} (<span class="selected-count">0</span>)
-                    </button>
-                </div>
-            ` : ''}
-        `;
-
-        document.body.appendChild(dropdown);
-
-        // 选中计数和确认按钮逻辑
-        const confirmBtn = dropdown.querySelector('.btn-confirm-add');
-        const countSpan = dropdown.querySelector('.selected-count');
-        const allCheckboxes = dropdown.querySelectorAll('.model-checkbox');
-
-        const updateSelectionState = () => {
-            const checkedBoxes = dropdown.querySelectorAll('.model-checkbox:checked');
-            const selectedCount = checkedBoxes.length;
-
-            // 更新计数和按钮状态
-            if (countSpan) countSpan.textContent = String(selectedCount);
-            if (confirmBtn) confirmBtn.disabled = selectedCount === 0;
-
-            // 获取当前选中模型的签名（用于动态兼容性检查）
-            let currentSignature = groupSignature; // 使用分组已有的签名
-
-            if (!currentSignature && selectedCount > 0) {
-                // 如果分组为空，使用第一个选中模型的签名
-                const firstCheckedId = checkedBoxes[0].value;
-                const firstModel = modelsWithCompatibility.find(m => m.model.modelId === firstCheckedId);
-                if (firstModel) {
-                    currentSignature = {
-                        remainingPercentage: firstModel.model.remainingPercentage,
-                        resetTimeDisplay: firstModel.model.resetTimeDisplay
-                    };
-                }
-            }
-
-            // 更新所有 checkbox 的禁用状态
-            allCheckboxes.forEach(cb => {
-                if (cb.checked) return; // 已勾选的不处理
-
-                const modelId = cb.value;
-                const modelData = modelsWithCompatibility.find(m => m.model.modelId === modelId);
-                if (!modelData) return;
-
-                const item = cb.closest('.model-select-item');
-                if (!item) return;
-
-                // 检查兼容性
-                let isCompatible = true;
-                let reason = '';
-
-                if (currentSignature) {
-                    if (modelData.model.remainingPercentage !== currentSignature.remainingPercentage) {
-                        isCompatible = false;
-                        reason = i18n['customGrouping.quotaMismatch'] || 'Quota mismatch';
-                    } else if (modelData.model.resetTimeDisplay !== currentSignature.resetTimeDisplay) {
-                        isCompatible = false;
-                        reason = i18n['customGrouping.resetMismatch'] || 'Reset time mismatch';
-                    }
-                }
-
-                cb.disabled = !isCompatible;
-                item.classList.toggle('disabled', !isCompatible);
-
-                // 更新或移除不兼容原因显示
-                let reasonSpan = item.querySelector('.incompatible-reason');
-                if (!isCompatible) {
-                    if (!reasonSpan) {
-                        reasonSpan = document.createElement('span');
-                        reasonSpan.className = 'incompatible-reason';
-                        item.appendChild(reasonSpan);
-                    }
-                    reasonSpan.textContent = reason;
-                } else {
-                    if (reasonSpan) reasonSpan.remove();
-                }
-            });
-        };
-
-        allCheckboxes.forEach(cb => {
-            if (!cb.disabled) {
-                cb.addEventListener('change', updateSelectionState);
-            }
-        });
-
-        // 确认按钮点击
-        if (confirmBtn) {
-            confirmBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const selectedIds = Array.from(dropdown.querySelectorAll('.model-checkbox:checked'))
-                    .map(cb => cb.value);
-                if (selectedIds.length > 0) {
-                    // 批量添加
-                    selectedIds.forEach(modelId => onSelect(modelId));
-                    dropdown.remove();
-                }
-            });
-        }
-
-        // 点击外部关闭
-        const closeHandler = (e) => {
-            if (!dropdown.contains(e.target) && e.target !== anchor) {
-                dropdown.remove();
-                document.removeEventListener('click', closeHandler);
-            }
-        };
-        setTimeout(() => {
-            document.addEventListener('click', closeHandler);
-        }, 10);
-    }
-
-    function handleSmartGroup() {
-        // 使用固定分组配置（与桌面端一致）
-        const models = customGroupingState.allModels;
-        if (!models || models.length === 0) {
-            showToast(i18n['customGrouping.noModels'] || 'No models available', 'info');
-            return;
-        }
-
-        // 固定分组配置（优先精确 ID，补充前缀/模式匹配，忽略版本号）
-        const defaultGroups = [
-            {
-                id: 'claude',
-                name: 'Claude',
-                family: 'claude',
-                modelIds: [
-                    'MODEL_OPENAI_GPT_OSS_120B_MEDIUM', // GPT-OSS 120B (Medium)
-                    'MODEL_PLACEHOLDER_M12',            // Claude Opus 4.5 (Thinking)
-                    'MODEL_PLACEHOLDER_M26',            // Claude Opus 4.6 (Thinking)
-                    'MODEL_CLAUDE_4_5_SONNET',
-                    'MODEL_CLAUDE_4_5_SONNET_THINKING',
-                    'MODEL_PLACEHOLDER_M35',            // Claude Sonnet 4.6 (Thinking)
-                ],
-            },
-            {
-                id: 'g3_pro',
-                name: 'Gemini Pro',
-                family: 'gemini_pro',
-                modelIds: [
-                    'MODEL_PLACEHOLDER_M36', // Gemini 3.1 Pro (Low)
-                    'MODEL_PLACEHOLDER_M37', // Gemini 3.1 Pro (High)
-                    'MODEL_PLACEHOLDER_M7',  // Gemini 3 Pro (Low)
-                    'MODEL_PLACEHOLDER_M8',  // Gemini 3 Pro (High)
-                ],
-            },
-            {
-                id: 'g3_flash',
-                name: 'Gemini Flash',
-                family: 'gemini_flash',
-                modelIds: [
-                    'MODEL_PLACEHOLDER_M18', // Gemini 3 Flash
-                ],
-            },
-            {
-                id: 'g3_image',
-                name: 'Gemini Image',
-                family: 'gemini_image',
-                modelIds: [
-                    'MODEL_PLACEHOLDER_M9', // Gemini 3 Pro Image
-                ],
-            },
-        ];
-
-        // 按固定分组分配模型
-        const groupMap = new Map(); // groupId -> { id, name, modelIds }
-        const smartGroupCanonicalNames = {};
-        for (const defaultGroup of defaultGroups) {
-            const groupModels = [];
-            
-            for (const model of models) {
-                const exactMatch = defaultGroup.modelIds.includes(model.modelId);
-                const familyMatch = resolveGroupFamily(model.modelId, model.label) === defaultGroup.family;
-                const prefixMatch = familyMatch;
-                if (exactMatch || prefixMatch) {
-                    groupModels.push(model.modelId);
-                }
-            }
-
-            if (groupModels.length > 0) {
-                for (const modelId of groupModels) {
-                    smartGroupCanonicalNames[modelId] = defaultGroup.name;
-                }
-                groupMap.set(defaultGroup.id, {
-                    id: defaultGroup.id,
-                    // 点击“自动分组”时强制以固定分组名称覆盖，避免继承历史自定义组名
-                    name: defaultGroup.name,
-                    modelIds: groupModels
-                });
-            }
-        }
-
-        // 转换为数组
-        customGroupingState.groups = sortGroupsForDisplay(Array.from(groupMap.values()), models);
-        customGroupingState.smartGroupCanonicalNames = smartGroupCanonicalNames;
-
-        renderCustomGroupingContent();
-        const smartGroupMsg = (i18n['customGrouping.smartGroupCount'] || 'Auto Group: {count} groups').replace('{count}', String(customGroupingState.groups.length));
-        showToast(smartGroupMsg, 'success');
-    }
-
-    function saveCustomGrouping() {
-        // 检查是否有空分组
-        const emptyGroups = customGroupingState.groups.filter(g => g.modelIds.length === 0);
-        if (emptyGroups.length > 0) {
-            // 移除空分组
-            customGroupingState.groups = customGroupingState.groups.filter(g => g.modelIds.length > 0);
-        }
-
-        // 构建新的 groupMappings
-        const newMappings = {};
-        const newGroupNames = {};
-        const smartGroupCanonicalNames = customGroupingState.smartGroupCanonicalNames;
-
-        for (const group of customGroupingState.groups) {
-            // 生成稳定的 groupId
-            const stableGroupId = group.modelIds.sort().join('_');
-            for (const modelId of group.modelIds) {
-                newMappings[modelId] = stableGroupId;
-                // 自动分组后保存时强制覆盖组名，并通过“仅写当前分组模型”清理旧残留名称映射
-                if (smartGroupCanonicalNames && smartGroupCanonicalNames[modelId]) {
-                    newGroupNames[modelId] = smartGroupCanonicalNames[modelId];
-                } else {
-                    // 使用锚点共识机制保存分组名称
-                    newGroupNames[modelId] = group.name;
-                }
-            }
-        }
-
-        customGroupingState.smartGroupCanonicalNames = null;
-
-        // 发送到扩展保存
-        vscode.postMessage({
-            command: 'saveCustomGrouping',
-            customGroupMappings: newMappings,
-            customGroupNames: newGroupNames
-        });
-
-        showToast(i18n['customGrouping.saved'] || 'Groups saved', 'success');
-        closeCustomGroupingModal();
     }
 
     // State for profile toggle
@@ -3552,10 +2820,20 @@ import { createAnnouncementModule } from './dashboard_announcements';
         return modelNameRow + capRows;
     }
 
-    function renderGroupCard(group, pinnedGroups) {
+    function getGroupDisplayName(group) {
+        const customNames = currentConfig?.groupingCustomNames || {};
+        return customNames[group.groupId]
+            || (group.models || [])
+                .map(model => customNames[model.modelId])
+                .find(name => typeof name === 'string' && name.trim())
+            || group.groupName;
+    }
+
+    function renderGroupCard(group, pinnedGroups = []) {
         const pct = group.remainingPercentage || 0;
         const color = getHealthColor(pct);
-        const isPinned = pinnedGroups && pinnedGroups.includes(group.groupId);
+        const isPinned = pinnedGroups.includes(group.groupId);
+        const groupDisplayName = getGroupDisplayName(group);
 
         const card = document.createElement('div');
         card.className = 'card group-card draggable';
@@ -3563,7 +2841,6 @@ import { createAnnouncementModule } from './dashboard_announcements';
         card.setAttribute('data-group-id', group.groupId);
         card.setAttribute('draggable', 'true');
 
-        // 绑定拖拽事件
         card.addEventListener('dragstart', handleDragStart, false);
         card.addEventListener('dragenter', handleDragEnter, false);
         card.addEventListener('dragover', handleDragOver, false);
@@ -3572,7 +2849,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
         card.addEventListener('dragend', handleDragEnd, false);
 
         // 生成组内模型列表（带能力图标）
-        const modelList = group.models.map(m => {
+        const modelList = (group.models || []).map(m => {
             const caps = getModelCapabilityList(m);
             const tagHtml = m.tagTitle
                 ? `<span class="tag-new tag-new-transient tag-new-hidden-after-burst">${escapeHtml(m.tagTitle)}</span>`
@@ -3586,11 +2863,40 @@ import { createAnnouncementModule } from './dashboard_announcements';
             return `<span class="group-model-tag${recClass}" title="${escapeHtml(m.modelId)}"${tooltipAttr}>${escapeHtml(m.label)}${tagHtml}</span>`;
         }).join('');
 
+        const quotaWindows = Array.isArray(group.quotaWindows) && group.quotaWindows.length > 0
+            ? group.quotaWindows
+            : [{
+                windowId: 'model-quota',
+                windowName: i18n['dashboard.modelQuota'] || 'Model Quota',
+                remainingPercentage: pct,
+                timeUntilResetFormatted: group.timeUntilResetFormatted,
+                resetTimeDisplay: group.resetTimeDisplay
+            }];
+
+        const quotaWindowRows = quotaWindows.map(window => {
+            const windowPct = typeof window.remainingPercentage === 'number' ? window.remainingPercentage : pct;
+            const windowColor = getHealthColor(windowPct);
+            const resetIn = window.timeUntilResetFormatted || group.timeUntilResetFormatted || '-';
+            const resetTime = window.resetTimeDisplay || group.resetTimeDisplay || 'N/A';
+            return `
+                <div class="quota-window-row">
+                    <div class="quota-window-main">
+                        <span class="quota-window-name">${escapeHtml(window.windowName || 'Model Quota')}</span>
+                        <span class="quota-window-pct" style="color: ${windowColor}">${windowPct.toFixed(2)}%</span>
+                    </div>
+                    <div class="quota-window-meta">
+                        <span>${escapeHtml(i18n['dashboard.resetIn'] || 'Reset In')}: ${escapeHtml(resetIn)}</span>
+                        <span>${escapeHtml(i18n['dashboard.resetTime'] || 'Reset Time')}: ${escapeHtml(resetTime)}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
         card.innerHTML = `
             <div class="card-title">
                 <span class="drag-handle" data-tooltip="${escapeHtml(i18n['dashboard.dragHint'] || 'Drag to reorder')}">⋮⋮</span>
                 <span class="group-icon">📦</span>
-                <span class="label group-name">${escapeHtml(group.groupName)}</span>
+                <span class="label group-name">${escapeHtml(groupDisplayName)}</span>
                 <div class="actions">
                     <button class="rename-group-btn icon-btn" data-group-id="${escapeHtml(group.groupId)}" data-tooltip-html="${encodeURIComponent('<div class="rich-tooltip-item"><span class="text">' + escapeHtml(i18n['grouping.rename'] || 'Rename') + '</span></div>')}">✏️</button>
                     <label class="switch" data-tooltip-html="${encodeURIComponent('<div class="rich-tooltip-item"><span class="text">' + escapeHtml(i18n['dashboard.pinHint'] || 'Pin to Status Bar') + '</span></div>')}">
@@ -3603,45 +2909,36 @@ import { createAnnouncementModule } from './dashboard_announcements';
                 <div class="percentage">${pct.toFixed(2)}%</div>
             </div>
             <div class="info-row">
-                <span>${escapeHtml(i18n['dashboard.resetIn'] || 'Reset In')}</span>
-                <span class="info-value">${escapeHtml(group.timeUntilResetFormatted)}</span>
-            </div>
-            <div class="info-row">
-                <span>${escapeHtml(i18n['dashboard.resetTime'] || 'Reset Time')}</span>
-                <span class="info-value small">${escapeHtml(group.resetTimeDisplay || 'N/A')}</span>
-            </div>
-            <div class="info-row">
                 <span>${escapeHtml(i18n['dashboard.status'] || 'Status')}</span>
                 <span class="info-value" style="color: ${color}">
                     ${getStatusText(pct)}
                 </span>
             </div>
+            <div class="quota-window-list">${quotaWindowRows}</div>
             <div class="group-models">
-                <div class="group-models-label">${escapeHtml(i18n['grouping.models'] || 'Models')} (${group.models.length}):</div>
+                <div class="group-models-label">${escapeHtml(i18n['grouping.models'] || 'Models')} (${(group.models || []).length}):</div>
                 <div class="group-models-list">${modelList}</div>
             </div>
         `;
 
-        // 绑定重命名按钮事件 - 打开模态框
         const renameBtn = card.querySelector('.rename-group-btn');
         if (renameBtn) {
             renameBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 openRenameModal(
                     group.groupId,
-                    group.groupName,
-                    group.models.map(m => m.modelId)
+                    groupDisplayName,
+                    group.models.map(m => m.modelId),
                 );
             });
         }
 
-        // 绑定 pin 开关事件
         const pinToggle = card.querySelector('.group-pin-toggle');
         if (pinToggle) {
-            pinToggle.addEventListener('change', (_e) => {
+            pinToggle.addEventListener('change', () => {
                 vscode.postMessage({
                     command: 'toggleGroupPin',
-                    groupId: group.groupId
+                    groupId: group.groupId,
                 });
             });
         }

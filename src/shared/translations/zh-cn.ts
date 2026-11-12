@@ -61,7 +61,7 @@ export const zhCN = {
     'history.resetTime': '重置时间',
     'history.updatedAt': '更新时间',
     'history.burnRate': '消耗速率',
-    'history.exhaustIn': '预计还剩',
+    'history.exhaustIn': '预计耗尽还需',
     'history.lastUntilReset': '预计可撑到重置（约余 {percent}%）',
     'history.tableTitle': '明细',
     'history.tableTime': '记录时间',

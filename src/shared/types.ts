@@ -18,6 +18,34 @@ export interface PromptCreditsInfo {
 }
 
 /** 模型配额信息 */
+export interface QuotaWindow {
+    /** 窗口唯一标识（优先来自官方 quota bucket/type） */
+    windowId: string;
+    /** 窗口显示名称，例如 Weekly Limit / Five Hour Limit */
+    windowName: string;
+    /** 剩余比例 (0-1) */
+    remainingFraction?: number;
+    /** 剩余百分比 (0-100) */
+    remainingPercentage: number;
+    /** 是否已耗尽 */
+    isExhausted: boolean;
+    /** 重置时间 */
+    resetTime: Date;
+    /** 距离重置的毫秒数 */
+    timeUntilReset: number;
+    /** 格式化的重置倒计时 */
+    timeUntilResetFormatted: string;
+    /** 格式化的重置时间显示 */
+    resetTimeDisplay: string;
+    /** 重置时间是否可信 */
+    resetTimeValid?: boolean;
+    /** 官方 quota bucket 类型（如 SHORT_TERM / LONG_TERM） */
+    quotaBucketType?: string | number;
+    /** 字段来源，用于诊断是否来自官方 bucket 还是旧 quotaInfo 兼容 */
+    source?: 'official' | 'inferred' | 'modelQuota';
+}
+
+/** 模型配额信息 */
 export interface ModelQuotaInfo {
     /** 显示标签 */
     label: string;
@@ -47,16 +75,32 @@ export interface ModelQuotaInfo {
     tagTitle?: string;
     /** 支持的 MIME 类型映射 */
     supportedMimeTypes?: Record<string, boolean>;
+    /** 模型服务商（官方 authorized API） */
+    modelProvider?: string;
+    /** API 服务商（官方 authorized API） */
+    apiProvider?: string;
+    /** 官方/兼容解析出的配额窗口 */
+    quotaWindows?: QuotaWindow[];
+    /** 官方/兼容解析出的配额组 ID */
+    quotaGroupId?: string;
+    /** 官方/兼容解析出的配额组名称 */
+    quotaGroupName?: string;
 }
 
 /** 配额分组 - 共享相同配额的模型集合 */
 export interface QuotaGroup {
-    /** 分组唯一标识 (基于 remainingFraction + resetTime 生成) */
+    /** 分组唯一标识（优先来自官方配额组，缺失时按 provider 动态归类） */
     groupId: string;
-    /** 分组名称 (用户自定义或自动生成) */
+    /** 分组名称（官方 Model Quota group） */
     groupName: string;
     /** 分组内的模型列表 */
     models: ModelQuotaInfo[];
+    /** 分组下的配额窗口 */
+    quotaWindows?: QuotaWindow[];
+    /** provider fallback 分组标识 */
+    providerGroup?: string;
+    /** 分组说明 */
+    description?: string;
     /** 共享的剩余百分比 */
     remainingPercentage: number;
     /** 共享的重置时间 */
@@ -91,6 +135,8 @@ export interface QuotaSnapshot {
     errorMessage?: string;
     /** 本地账户邮箱（local 模式下使用远端 API 时） */
     localAccountEmail?: string;
+    /** 授权遥测实际使用的监控账号 */
+    quotaAccountEmail?: string;
     /** 当前用户在 Antigravity 中选中的模型 ID */
     activeModelId?: string;
 }
@@ -208,6 +254,7 @@ export interface UserStatus {
     email: string;
     planStatus?: PlanStatus;
     cascadeModelConfigData?: CascadeModelConfigData;
+    quotaSummary?: unknown;
     acceptedLatestTermsOfService?: boolean;
     userTier?: {
         name: string;
@@ -221,6 +268,7 @@ export interface UserStatus {
 /** 服务端用户状态响应 */
 export interface ServerUserStatusResponse {
     userStatus: UserStatus;
+    quotaSummary?: unknown;
     /** 服务端返回的错误消息 */
     message?: string;
     /** 服务端返回的错误代码 */
@@ -279,7 +327,7 @@ export interface UserInfo {
     hasAutocompleteFastMode: boolean;
     monthlyPromptCredits: number;
     monthlyFlowCredits: number;
-    availablePromptCredits: number;
+    availablePromptCredits?: number;
     availableFlowCredits: number;
     cascadeWebSearchEnabled: boolean;
     canGenerateCommitMessages: boolean;
@@ -317,6 +365,7 @@ export type WebviewMessageType =
     | 'toggleCredits'
     | 'updateOrder'
     | 'resetOrder'
+    | 'resetGroupOrder'
     | 'retry'
     | 'openLogs'
     | 'rerender'
@@ -510,22 +559,20 @@ export interface DashboardConfig {
     showPromptCredits: boolean;
     /** 置顶的模型 */
     pinnedModels: string[];
+    /** 置顶的分组 */
+    pinnedGroups?: string[];
     /** 模型顺序 */
     modelOrder: string[];
+    /** 分组顺序 */
+    groupOrder?: string[];
     /** 模型自定义名称映射 (modelId -> displayName) */
     modelCustomNames?: Record<string, string>;
+    /** 分组自定义名称映射 */
+    groupingCustomNames?: Record<string, string>;
+    /** 是否在状态栏显示分组 */
+    groupingShowInStatusBar?: boolean;
     /** 可见模型列表（为空时显示全部） */
     visibleModels?: string[];
-    /** 是否启用分组显示 */
-    groupingEnabled: boolean;
-    /** 分组自定义名称映射 (modelId -> groupName) */
-    groupCustomNames: Record<string, string>;
-    /** 是否在状态栏显示分组 */
-    groupingShowInStatusBar: boolean;
-    /** 置顶的分组 */
-    pinnedGroups: string[];
-    /** 分组顺序 */
-    groupOrder: string[];
     /** 刷新冷却时间（秒） */
     refreshInterval: number;
     /** 是否启用通知 */
@@ -552,8 +599,6 @@ export interface DashboardConfig {
     dataMasked?: boolean;
     /** External URL */
     url?: string;
-    /** 分组映射 (modelId -> groupId) */
-    groupMappings?: Record<string, string>;
     /** 语言设置（'auto' 跟随 VS Code，或具体语言代码） */
     language?: string;
     /** 是否开启 AntigravityTools 同步（来自 globalState） */

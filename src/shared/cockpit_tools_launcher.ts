@@ -69,6 +69,9 @@ async function launchByDeepLink(sourceTag: string): Promise<boolean> {
 }
 
 export async function openCockpitToolsDesktop(sourceTag: string): Promise<boolean> {
+    if (vscode.env.remoteName === 'ssh-remote') {
+        return launchByDeepLink(sourceTag);
+    }
     const command = getLaunchCommand();
     const result = await launchByCommand(command);
     if (result.opened) {

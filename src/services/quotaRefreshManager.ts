@@ -182,7 +182,8 @@ export class QuotaRefreshManager {
         }
         const age = getApiCacheAge(cached);
         logger.info(`[QuotaRefresh] Using api cache for ${email} (age: ${Math.round(age / 1000)}s, reason: ${reason})`);
-        const snapshot = this.reactor.buildAuthorizedSnapshotFromResponse(cached!.payload, cached!.updatedAt);
+        const localSnapshot = await this.reactor.fetchMatchingLocalTelemetry(email);
+        const snapshot = await this.reactor.buildCachedAuthorizedSnapshot(cached!, email, localSnapshot);
         try {
             const credits = await this.reactor.fetchAvailableAICreditsForAccount(email);
             if (Number.isFinite(credits)) {

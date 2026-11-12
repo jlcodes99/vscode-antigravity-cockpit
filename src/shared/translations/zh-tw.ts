@@ -58,7 +58,7 @@ export const zhTW = {
     'history.resetTime': '重置時間',
     'history.updatedAt': '更新時間',
     'history.burnRate': '消耗速率',
-    'history.exhaustIn': '預計還剩',
+    'history.exhaustIn': '預計耗盡還需',
     'history.lastUntilReset': '預計可撐到重置（約餘 {percent}%）',
     'history.tableTitle': '明細',
     'history.tableTime': '記錄時間',

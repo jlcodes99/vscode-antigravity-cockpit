@@ -241,14 +241,13 @@ export class CockpitHUD {
         this.refreshView(this.cachedTelemetry, {
             showPromptCredits: config.showPromptCredits,
             pinnedModels: config.pinnedModels,
-            modelOrder: config.modelOrder,
-            modelCustomNames: config.modelCustomNames,
-            visibleModels: config.visibleModels,
-            groupingEnabled: config.groupingEnabled,
-            groupCustomNames: config.groupingCustomNames,
-            groupingShowInStatusBar: config.groupingShowInStatusBar,
             pinnedGroups: config.pinnedGroups,
+            modelOrder: config.modelOrder,
             groupOrder: config.groupOrder,
+            modelCustomNames: config.modelCustomNames,
+            groupingCustomNames: config.groupingCustomNames,
+            groupingShowInStatusBar: config.groupingShowInStatusBar,
+            visibleModels: config.visibleModels,
             refreshInterval: config.refreshInterval,
             notificationEnabled: config.notificationEnabled,
             warningThreshold: config.warningThreshold,
@@ -260,7 +259,6 @@ export class CockpitHUD {
             authorizationStatus,
             displayMode: config.displayMode,
             dataMasked: config.dataMasked,
-            groupMappings: config.groupMappings,
             language: config.language,
             antigravityToolsSyncEnabled: false,
         });
@@ -406,6 +404,13 @@ export class CockpitHUD {
                 resetTimeDisplay: g.resetTimeDisplay,
                 timeUntilResetFormatted: g.timeUntilResetFormatted,
                 isExhausted: g.isExhausted,
+                quotaWindows: (g.quotaWindows || []).map(window => ({
+                    windowId: window.windowId,
+                    windowName: window.windowName,
+                    remainingPercentage: window.remainingPercentage,
+                    timeUntilResetFormatted: window.timeUntilResetFormatted,
+                    resetTimeDisplay: window.resetTimeDisplay,
+                })),
                 models: g.models.map(m => ({
                     label: m.label,
                     modelId: m.modelId,
@@ -510,6 +515,13 @@ export class CockpitHUD {
         percentage: number;
         resetTime: string;
         resetTimeFormatted: string;
+        quotaWindows: Array<{
+            windowId: string;
+            windowName: string;
+            percentage: number;
+            resetTime: string;
+            resetTimeFormatted: string;
+        }>;
         models: Array<{
             label: string;
             modelId: string;
@@ -525,6 +537,13 @@ export class CockpitHUD {
                 percentage: model.remainingPercentage ?? 0,
                 resetTime: model.resetTimeDisplay,
                 resetTimeFormatted: model.timeUntilResetFormatted,
+                quotaWindows: (model.quotaWindows || []).map(window => ({
+                    windowId: window.windowId,
+                    windowName: window.windowName,
+                    percentage: window.remainingPercentage,
+                    resetTime: window.resetTimeDisplay,
+                    resetTimeFormatted: window.timeUntilResetFormatted,
+                })),
                 models: [{
                     label: model.label,
                     modelId: model.modelId,
@@ -541,6 +560,13 @@ export class CockpitHUD {
             percentage: group.remainingPercentage ?? 0,
             resetTime: group.resetTimeDisplay,
             resetTimeFormatted: group.timeUntilResetFormatted,
+            quotaWindows: (group.quotaWindows || []).map(window => ({
+                windowId: window.windowId,
+                windowName: window.windowName,
+                percentage: window.remainingPercentage,
+                resetTime: window.resetTimeDisplay,
+                resetTimeFormatted: window.timeUntilResetFormatted,
+            })),
             models: group.models.map(model => ({
                 label: model.label,
                 modelId: model.modelId,
@@ -743,9 +769,6 @@ export class CockpitHUD {
             </button>
             <button id="manage-models-btn" class="refresh-btn" title="${t('models.manageTitle')}">
                 ${t('models.manage')}
-            </button>
-            <button id="toggle-grouping-btn" class="refresh-btn" title="${t('grouping.toggleHint')}">
-                ${t('grouping.title')}
             </button>
             <button id="toggle-profile-btn" class="refresh-btn" title="${t('profile.togglePlan')}">
                 ${t('profile.planDetails')}
@@ -1497,49 +1520,6 @@ export class CockpitHUD {
             <div class="modal-footer modal-footer-space-between">
                 <button id="reset-name-btn" class="btn-secondary">${i18n.t('model.reset')}</button>
                 <button id="save-rename-btn" class="btn-primary">${i18n.t('model.ok')}</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="custom-grouping-modal" class="modal hidden">
-        <div class="modal-content modal-content-large">
-            <div class="modal-header">
-                <h3>⚙️ ${i18n.t('customGrouping.title')}</h3>
-                <button id="close-custom-grouping-btn" class="close-btn">×</button>
-            </div>
-            <div class="modal-body custom-grouping-body">
-                <div class="custom-grouping-hint">
-                    💡 ${i18n.t('customGrouping.hint')}
-                </div>
-                <div class="custom-grouping-toolbar">
-                    <button id="smart-group-btn" class="btn-accent">
-                        <span class="icon">🪄</span>
-                        ${i18n.t('customGrouping.smartGroup')}
-                    </button>
-                    <button id="add-group-btn" class="btn-secondary">
-                        <span class="icon">➕</span>
-                        ${i18n.t('customGrouping.addGroup')}
-                    </button>
-                </div>
-                <div class="custom-grouping-content">
-                    <div class="custom-groups-section">
-                        <h4>📦 ${i18n.t('customGrouping.groupList')}</h4>
-                        <div id="custom-groups-list" class="custom-groups-list">
-                            <!-- Groups will be rendered here -->
-                        </div>
-                    </div>
-                    <div class="ungrouped-section">
-                        <h4>🎲 ${i18n.t('customGrouping.ungrouped')}</h4>
-                        <p class="ungrouped-hint">${i18n.t('customGrouping.ungroupedHint')}</p>
-                        <div id="ungrouped-models-list" class="ungrouped-models-list">
-                            <!-- Ungrouped models will be rendered here -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="cancel-custom-grouping-btn" class="btn-secondary">${i18n.t('customGrouping.cancel')}</button>
-                <button id="save-custom-grouping-btn" class="btn-primary">💾 ${i18n.t('customGrouping.save')}</button>
             </div>
         </div>
     </div>

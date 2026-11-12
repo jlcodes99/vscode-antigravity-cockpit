@@ -96,14 +96,22 @@ export class GroupNode extends vscode.TreeItem {
 
         this.iconPath = new vscode.ThemeIcon('circle-filled', color);
         
-        // 简短倒计时格式
-        const resetTime = group.timeUntilResetFormatted || '-';
+        const primaryWindow = group.quotaWindows && group.quotaWindows.length > 0
+            ? group.quotaWindows.reduce((lowest, current) => (
+                current.remainingPercentage < lowest.remainingPercentage ? current : lowest
+            ))
+            : undefined;
+        const resetTime = primaryWindow?.timeUntilResetFormatted || group.timeUntilResetFormatted || '-';
         this.description = `${pct}%  ${resetTime}`;
-        
+
+        const windowTooltip = (group.quotaWindows || []).map(window => (
+            `${window.windowName}: ${Math.round(window.remainingPercentage)}% (${window.timeUntilResetFormatted || '-'})`
+        ));
         this.tooltip = [
             `${t('groupNode.group')}: ${group.groupName}`,
             `${t('groupNode.quota')}: ${pct}%`,
             `${t('groupNode.reset')}: ${group.resetTimeDisplay}`,
+            ...windowTooltip,
             t('groupNode.modelsCount', { count: group.models.length.toString() }),
         ].join('\n');
 

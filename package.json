@@ -3,7 +3,7 @@
   "displayName": "Antigravity Cockpit",
   "icon": "assets/icon.png",
   "description": "A premium, dashboard-style quota monitor for Antigravity AI.",
-  "version": "2.1.52",
+  "version": "2.1.53",
   "publisher": "jlcodes",
   "engines": {
     "vscode": "^1.90.0"
@@ -184,6 +184,11 @@
           "default": true,
           "description": "Show notifications when quota is exhausted or running low."
         },
+        "agCockpit.showPromptCredits": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Credits in the status bar and its tooltip."
+        },
         "agCockpit.statusBarFormat": {
           "type": "string",
           "default": "standard",
@@ -205,16 +210,6 @@
           ],
           "description": "Format of the status bar display."
         },
-        "agCockpit.groupingEnabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable quota grouping feature. Models sharing the same quota pool will be grouped together."
-        },
-        "agCockpit.groupingShowInStatusBar": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show quota groups in the status bar instead of individual models."
-        },
         "agCockpit.warningThreshold": {
           "type": "number",
           "default": 30,
@@ -231,16 +226,16 @@
         },
         "agCockpit.quotaSource": {
           "type": "string",
-          "default": "authorized",
+          "default": "local",
           "enum": [
             "local",
             "authorized"
           ],
           "enumDescriptions": [
-            "Local process",
-            "Authorized account (default)"
+            "Local process (default)",
+            "Authorized account"
           ],
-          "description": "Quota source. Use authorized account to fetch quota without local process."
+          "description": "Quota source. Use the local process or an authorized account."
         },
         "agCockpit.displayMode": {
           "type": "string",
@@ -329,12 +324,10 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run lint && npm run build:prod",
+    "vscode:prepublish": "npm run typecheck && npm run typecheck:webview && npm run lint && npm run build:prod",
     "compile": "npm run lint:webview && npm run build",
     "build": "node scripts/build.js",
     "build:prod": "node scripts/build.js --production",
-    "typecheck": "tsc --noEmit",
-    "typecheck:webview": "tsc -p tsconfig.webview.json --noEmit",
     "watch": "npm run watch:esbuild",
     "watch:esbuild": "node scripts/build.js --watch",
     "lint": "eslint src --ext ts,js",
@@ -344,7 +337,9 @@
     "test": "jest",
     "pretest": "npm run compile",
     "postinstall": "bash scripts/install-hooks.sh",
-    "release": "bash scripts/release.sh"
+    "release": "bash scripts/release.sh",
+    "typecheck": "tsc --noEmit",
+    "typecheck:webview": "tsc -p tsconfig.webview.json --noEmit"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",

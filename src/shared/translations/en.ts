@@ -62,7 +62,7 @@ export const en = {
     'history.updatedAt': 'Updated',
     'history.burnRate': 'Burn rate',
     'history.exhaustIn': 'projected to run out in',
-    'history.lastUntilReset': 'lasts until reset',
+    'history.lastUntilReset': 'lasts until reset (~{percent}%)',
     'history.tableTitle': 'Details',
     'history.tableTime': 'Recorded At',
     'history.tablePercent': 'Remaining %',

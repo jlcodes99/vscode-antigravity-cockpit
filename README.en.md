@@ -10,7 +10,7 @@ English · [简体中文](README.md)
 
 VS Code extension for monitoring Google Antigravity AI model quotas.
 
-**Features**: Webview Dashboard · QuickPick Mode · Quota Grouping · Auto-Grouping · Rename · Card View · Drag-and-Drop Sorting · Status Bar Monitor · Threshold Notifications · Privacy Mode
+**Features**: Webview Dashboard · QuickPick Mode · Official Model Quota Groups · Weekly / Five-Hour Quota Windows · Card View · Status Bar Monitor · Threshold Notifications · Privacy Mode
 
 **Languages**: Follows VS Code language setting, supports 16 languages
 
@@ -28,11 +28,10 @@ Two display modes available, configurable via `agCockpit.displayMode`:
 
 ![Dashboard Overview](assets/dashboard_card_grouped.png)
 
-- **Card View**: Card layout for quota overview
-- **Grouping Mode**: Aggregates models by quota pool
-- **Non-Grouping Mode**: Shows individual model quotas
-- **Drag-and-Drop Sorting**: Reorder cards by dragging
-- **Auto-Grouping**: Automatically categorizes models by quota pool
+- **Card View**: Card layout for official Model Quota groups
+- **Official Quota Groups**: Renders quota groups dynamically from the Antigravity official response when available
+- **Multi-Window Display**: Shows weekly, five-hour, or other quota windows in the same card when returned by the official API
+- **Model Details**: Expand groups to view included models and their remaining quota
 
 #### QuickPick Mode
 
@@ -44,10 +43,10 @@ Uses VS Code native QuickPick API, suitable for:
 - Quick quota checks
 
 Features:
-- Supports grouping / non-grouping mode
-- Title bar buttons: Refresh, Toggle Grouping, Logs, Settings, Switch to Webview
-- Pin models to status bar
-- Rename models and groups
+- Shows quotas by official quota group
+- Title bar buttons: Refresh, Logs, Settings, Switch to Webview
+- Displays official quota windows and included model details
+- Fixed group cards keep previous interactions: drag ordering, rename, and pin to status bar
 
 ---
 
@@ -64,18 +63,19 @@ Displays quota status of monitored models. 6 formats available:
 | Name + Percent | `Sonnet: 95%` |
 | Full display | `🟢 Sonnet: 95%` |
 
-- **Multi-Model Pinning**: Monitor multiple models simultaneously
-- **Auto-Monitor**: Shows the model with lowest remaining quota when no model is pinned
+- **Official Group First**: Uses fixed official groups in the status bar; pin groups from the card switch, otherwise the group with the lowest remaining quota is shown
+- **Compatible Monitor**: Falls back to the model with lowest remaining quota when no quota group is available
 
 ---
 
 ### Quota Display
 
-Each model / group shows:
+Each model / official quota group shows:
 - **Remaining quota percentage**
 - **Countdown**: e.g., `4h 40m`
 - **Reset time**: e.g., `15:16`
 - **Progress bar**: Visual representation of remaining quota
+- **Quota windows**: When the official API returns `Weekly Limit` / `Five Hour Limit`, each window is shown separately
 
 ---
 
@@ -83,7 +83,7 @@ Each model / group shows:
 
 Two quota sources are available, and you can switch from the top-right of the panel at any time:
 
-- **Local Monitoring**: Reads from the local Antigravity client process; more stable but requires the client to stay running
+- **Local Monitoring (default)**: Reads from the local Antigravity client process. On Windows, PowerShell looks up the process and listening ports.
 - **Authorized Monitoring**: Fetches quota via authorized remote APIs, independent of the local process; ideal for API relays or headless usage
 - **Multi-account Authorization**: Authorized monitoring supports multiple accounts with account switching and status badges
 - **Switching Tips**: Shows loading/timeout hints during switches; you can switch back to local if the network is unstable
@@ -101,12 +101,12 @@ Hover over model name to view:
 
 ---
 
-### Grouping Feature
+### Official Model Quota
 
-- **Group by Quota Pool**: Models sharing quota pools are grouped automatically or manually
-- **Custom Group Names**: Click edit icon to rename
-- **Group Sorting**: Drag to reorder groups
-- **Group Pinning**: Pin groups to status bar
+- **Official First**: Quota group names, included models, and quota windows prefer the structure returned by the Antigravity official API
+- **Dynamic Updates**: If the official client adds or renames quota groups later, the extension will render the returned data as directly as possible
+- **Compatible Fallback**: When only per-model `quotaInfo` is returned, the extension creates provider-based compatibility groups and shows the real available reset window
+- **Consistent Views**: Dashboard, QuickPick, Status Bar, Account Tree, and Accounts Overview use the same official quota group data
 
 ---
 
@@ -176,12 +176,11 @@ Sends notifications when model quota falls below warning threshold or is exhaust
 | `agCockpit.displayMode` | `webview` | Display mode: `webview` / `quickpick` |
 | `agCockpit.refreshInterval` | `120` | Refresh interval (seconds, 10-3600) |
 | `agCockpit.statusBarFormat` | `standard` | Status bar format |
-| `agCockpit.groupingEnabled` | `true` | Enable grouping mode |
+| `agCockpit.showPromptCredits` | `true` | Show Credits in the status bar and its tooltip |
 | `agCockpit.warningThreshold` | `30` | Warning threshold (%) |
 | `agCockpit.criticalThreshold` | `10` | Critical threshold (%) |
 | `agCockpit.notificationEnabled` | `true` | Enable notifications |
 | `agCockpit.pinnedModels` | `[]` | Models pinned to status bar |
-| `agCockpit.pinnedGroups` | `[]` | Groups pinned to status bar |
 
 ---
 

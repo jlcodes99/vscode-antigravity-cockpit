@@ -542,12 +542,49 @@
 }
 
 .group-name {
-    cursor: pointer;
-    transition: color 0.2s;
+    cursor: default;
 }
 
-.group-name:hover {
-    color: var(--accent);
+.quota-window-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    margin: 12px 0;
+}
+
+.quota-window-row {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.quota-window-main,
+.quota-window-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.quota-window-name {
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.quota-window-pct {
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.quota-window-meta {
+    margin-top: 6px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    line-height: 1.4;
 }
 
 .rename-group-btn {
@@ -727,6 +764,10 @@
 }
 
 .group-model-tag {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
     font-size: 11px;
     padding: 3px 8px;
     background: rgba(47, 129, 247, 0.15);
@@ -734,6 +775,11 @@
     border-radius: 12px;
     color: var(--text-primary);
     white-space: nowrap;
+}
+
+.group-model-tag-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .tag.disabled {

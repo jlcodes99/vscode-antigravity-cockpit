@@ -23,7 +23,7 @@ VS Code 扩展 (本仓库, Node)
 | 数据 | 存储位置 | 权限 |
 |---|---|---|
 | 扩展自身 OAuth 凭据 | VS Code `SecretStorage`（macOS Keychain / Windows Credential Manager / libsecret） | 系统托管 |
-| 扩展写入的配额/模型缓存、同步设置 | `~/.antigravity_cockpit/cache/**`、`sync_settings.json` | 目录 700 / 文件 600（`src/shared/secure_fs.ts` 统一强制） |
+| 扩展写入的配额/模型缓存、同步设置 | `~/.antigravity_cockpit/cache/**`、`sync_settings.json` | POSIX 平台写入目录 700 / 文件 600；Windows 使用账户目录 ACL |
 | 桌面端账号库（含 token 文件） | `~/.antigravity_cockpit/accounts/**`（桌面端写入，扩展只通过 WS 或索引读取） | **由桌面端负责，须 600** |
 
 ## 已知缺口（需桌面端配合，扩展侧无法单独闭环）
@@ -58,7 +58,7 @@ JavaScript 发起 `ws://127.0.0.1:<port>` 连接**（WebSocket 不受同源策�
 
 ## 扩展侧已实施的加固
 
-- 敏感缓存/设置文件统一 600、目录 700（`src/shared/secure_fs.ts`）。
+- POSIX 平台敏感缓存/设置文件以 600 原子写入，写入目录收紧为 700；Windows 沿用账户目录 ACL（`src/shared/secure_fs.ts`）。
 - 入站 `event.plugin_switch_account` / `event.plugin_set_switch_mode` 强制 payload 为对象，
   且切号必须携带非空 `target_email`，否则在 WS 边界直接丢弃（`src/services/cockpitToolsWs.ts`）。
 - Webview CSP：`default-src 'none'` + 随机 nonce 脚本（`src/view/hud.ts`）。
@@ -66,4 +66,4 @@ JavaScript 发起 `ws://127.0.0.1:<port>` 连接**（WebSocket 不受同源策�
 
 ## 报告漏洞
 
-请通过 GitHub Issues 私密披露，标题前缀 `[security]`。
+请勿在公开 Issue 中发布漏洞利用细节或凭据。优先使用仓库 Security 页面提供的私密报告入口（若已启用）；否则先联系维护者确认私密披露渠道。

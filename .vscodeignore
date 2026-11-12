@@ -2,6 +2,7 @@
 .vscode/**
 .vscode-test/**
 .claude/**
+.aitasks/**
 scripts/**
 tmp/**
 
@@ -18,7 +19,7 @@ out/sql-asm.js
 .eslintrc.js
 .prettierrc
 .editorconfig
-tsconfig.json
+tsconfig*.json
 package-lock.json
 jest.config.js
 .env.local

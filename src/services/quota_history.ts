@@ -4,9 +4,7 @@ import * as os from 'os';
 import { createHash } from 'crypto';
 import { QuotaSnapshot } from '../shared/types';
 import { logger } from '../shared/log_service';
-import { AUTH_RECOMMENDED_MODEL_IDS } from '../shared/recommended_models';
-import { ensurePrivateDir } from '../shared/secure_fs';
-import { resolveModelFamily, type ModelFamily } from '../engine/model_family';
+import { writePrivateFileAtomic } from '../shared/secure_fs';
 import { predictBurnRate, type BurnRatePrediction } from './burn_rate';
 
 export interface QuotaHistoryPoint {
@@ -42,64 +40,12 @@ export interface QuotaHistoryResult {
     modelId: string | null;
     models: QuotaHistoryModelOption[];
     points: QuotaHistoryPoint[];
-    /** 当前选中模型的 burn-rate 耗尽预测（样本不足时为 null） */
     prediction: BurnRatePrediction | null;
 }
 
 const HISTORY_DAYS_LIMIT = 30;
 const HISTORY_MAX_POINTS_PER_MODEL = 5000;
 const HISTORY_ROOT = path.join(os.homedir(), '.antigravity_cockpit', 'cache', 'quota_history');
-const RECOMMENDED_MODEL_ID_SET = new Set(AUTH_RECOMMENDED_MODEL_IDS);
-
-type HistoryGroupDefinition = {
-    groupId: string;
-    label: string;
-    modelIds: string[];
-    family: ModelFamily;
-};
-
-const HISTORY_GROUPS: HistoryGroupDefinition[] = [
-    {
-        groupId: 'claude-4-5',
-        label: 'Claude',
-        modelIds: [
-            'MODEL_PLACEHOLDER_M12',
-            'MODEL_CLAUDE_4_5_SONNET',
-            'MODEL_CLAUDE_4_5_SONNET_THINKING',
-            'MODEL_PLACEHOLDER_M26',
-            'MODEL_PLACEHOLDER_M35',
-            'MODEL_OPENAI_GPT_OSS_120B_MEDIUM',
-        ],
-        family: 'claude',
-    },
-    {
-        groupId: 'g3-pro',
-        label: 'Gemini Pro',
-        modelIds: [
-            'MODEL_PLACEHOLDER_M7',
-            'MODEL_PLACEHOLDER_M8',
-            'MODEL_PLACEHOLDER_M36',
-            'MODEL_PLACEHOLDER_M37',
-        ],
-        family: 'gemini_pro',
-    },
-    {
-        groupId: 'g3-flash',
-        label: 'Gemini Flash',
-        modelIds: [
-            'MODEL_PLACEHOLDER_M18',
-        ],
-        family: 'gemini_flash',
-    },
-    {
-        groupId: 'g3-image',
-        label: 'Gemini Image',
-        modelIds: [
-            'MODEL_PLACEHOLDER_M9',
-        ],
-        family: 'gemini_image',
-    },
-];
 
 function normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
@@ -151,7 +97,7 @@ function getCountdownDisplayMinutes(seconds?: number): number | null {
     return Math.ceil(seconds / 60);
 }
 
-function extractRecommendedGroups(
+function extractSnapshotQuotaSeries(
     snapshot: QuotaSnapshot,
     now: number,
 ): Array<{
@@ -161,10 +107,6 @@ function extractRecommendedGroups(
     resetTime?: number;
     countdownSeconds?: number;
 }> {
-    const sourceModels = snapshot.allModels && snapshot.allModels.length > 0
-        ? snapshot.allModels
-        : snapshot.models;
-
     const groups: Array<{
         groupId: string;
         label: string;
@@ -173,49 +115,49 @@ function extractRecommendedGroups(
         countdownSeconds?: number;
     }> = [];
 
-    for (const group of HISTORY_GROUPS) {
-        const candidates = sourceModels.filter(model => {
-            if (!model?.modelId) {
-                return false;
-            }
-            const exactMatch = group.modelIds.includes(model.modelId);
-            const prefixMatch = resolveModelFamily(model.modelId, model.label) === group.family;
-            if (!exactMatch && !prefixMatch) {
-                return false;
-            }
-            // 优先沿用推荐模型白名单，同时放行命中前缀/模式的新版本模型
-            return RECOMMENDED_MODEL_ID_SET.has(model.modelId) || prefixMatch;
-        });
+    if (snapshot.groups && snapshot.groups.length > 0) {
+        for (const group of snapshot.groups) {
+            const windows = group.quotaWindows && group.quotaWindows.length > 0
+                ? group.quotaWindows
+                : [{
+                    windowId: 'model-quota',
+                    windowName: 'Model Quota',
+                    remainingPercentage: group.remainingPercentage,
+                    resetTime: group.resetTime,
+                }];
 
-        if (candidates.length === 0) {
+            for (const window of windows) {
+                if (!Number.isFinite(window.remainingPercentage)) {
+                    continue;
+                }
+                const resetTimeMs = window.resetTime?.getTime();
+                const groupLabel = windows.length > 1
+                    ? `${group.groupName} / ${window.windowName}`
+                    : group.groupName;
+                const label = window.windowId === 'gemini-argon-wtu-weekly' ? window.windowName : groupLabel;
+                groups.push({
+                    groupId: `${group.groupId}:${window.windowId}`,
+                    label,
+                    remainingPercentage: window.remainingPercentage,
+                    resetTime: Number.isFinite(resetTimeMs) ? resetTimeMs : undefined,
+                    countdownSeconds: normalizeCountdownSeconds(window.resetTime, now),
+                });
+            }
+        }
+        return groups;
+    }
+
+    for (const model of snapshot.models) {
+        if (!Number.isFinite(model.remainingPercentage)) {
             continue;
         }
-
-        let selected = candidates[0];
-        let selectedRemaining = typeof selected.remainingPercentage === 'number'
-            ? selected.remainingPercentage
-            : Number.POSITIVE_INFINITY;
-        for (const model of candidates) {
-            const remaining = typeof model.remainingPercentage === 'number'
-                ? model.remainingPercentage
-                : Number.POSITIVE_INFINITY;
-            if (remaining < selectedRemaining) {
-                selected = model;
-                selectedRemaining = remaining;
-            }
-        }
-
-        if (!Number.isFinite(selectedRemaining)) {
-            continue;
-        }
-
-        const resetTimeMs = selected.resetTime?.getTime();
+        const resetTimeMs = model.resetTime?.getTime();
         groups.push({
-            groupId: group.groupId,
-            label: group.label,
-            remainingPercentage: selectedRemaining,
+            groupId: model.modelId,
+            label: model.label,
+            remainingPercentage: model.remainingPercentage ?? 0,
             resetTime: Number.isFinite(resetTimeMs) ? resetTimeMs : undefined,
-            countdownSeconds: normalizeCountdownSeconds(selected.resetTime, now),
+            countdownSeconds: normalizeCountdownSeconds(model.resetTime, now),
         });
     }
 
@@ -235,13 +177,19 @@ function resolvePointAction(
     const lastPct = last.remainingPercentage;
     const nextPct = next.remainingPercentage;
 
+    if (last.resetTime && last.resetTime <= next.timestamp && next.resetTime && next.resetTime > next.timestamp) {
+        record.hasCountdownDropAt100 = false;
+        return { action: 'add', isReset: true };
+    }
+
     if (nextPct < 100) {
         record.hasCountdownDropAt100 = false;
         if (lastPct === 100 && nextPct < 100) {
             return { action: 'add', isStart: true };
         }
         if (lastPct === nextPct) {
-            return { action: 'skip' };
+            // Keep idle periods in the regression instead of assuming continued consumption.
+            return { action: next.timestamp - last.timestamp >= 10 * 60 * 1000 ? 'add' : 'skip' };
         }
         if (nextPct > lastPct) {
             return { action: 'add', isReset: true };
@@ -298,12 +246,7 @@ async function readHistory(email: string): Promise<QuotaHistoryRecord | null> {
 }
 
 async function writeHistory(record: QuotaHistoryRecord): Promise<void> {
-    await ensurePrivateDir(HISTORY_ROOT);
-    const filePath = getHistoryFilePath(record.email);
-    const tempPath = `${filePath}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
-    await fs.writeFile(tempPath, JSON.stringify(record, null, 2), { encoding: 'utf8', mode: 0o600 });
-    await fs.chmod(tempPath, 0o600).catch(() => undefined);
-    await fs.rename(tempPath, filePath);
+    await writePrivateFileAtomic(getHistoryFilePath(record.email), JSON.stringify(record, null, 2));
 }
 
 export async function clearHistory(email: string): Promise<boolean> {
@@ -332,20 +275,12 @@ export async function clearAllHistory(): Promise<boolean> {
 }
 
 function buildModelOptions(record: QuotaHistoryRecord): QuotaHistoryModelOption[] {
-    const orderRank = new Map(HISTORY_GROUPS.map((group, index) => [group.groupId, index]));
     return Object.values(record.models || {})
         .map(model => ({
             modelId: model.modelId,
             label: model.label || model.modelId,
         }))
-        .sort((a, b) => {
-            const rankA = orderRank.get(a.modelId) ?? Number.MAX_SAFE_INTEGER;
-            const rankB = orderRank.get(b.modelId) ?? Number.MAX_SAFE_INTEGER;
-            if (rankA !== rankB) {
-                return rankA - rankB;
-            }
-            return a.label.localeCompare(b.label);
-        });
+        .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 export async function recordQuotaHistory(email: string | null | undefined, snapshot: QuotaSnapshot): Promise<boolean> {
@@ -357,7 +292,7 @@ export async function recordQuotaHistory(email: string | null | undefined, snaps
     }
 
     const now = Date.now();
-    const groups = extractRecommendedGroups(snapshot, now);
+    const groups = extractSnapshotQuotaSeries(snapshot, now);
     if (groups.length === 0) {
         return false;
     }
@@ -476,7 +411,6 @@ export async function getQuotaHistory(
             .sort((a, b) => a.timestamp - b.timestamp);
     }
 
-    // 预测基于该模型完整的当前周期（不受所选图表时间窗截断影响）
     const fullPoints = selectedModelId ? record.models[selectedModelId]?.points ?? [] : [];
     const predictionResult = predictBurnRate(fullPoints);
     const prediction = predictionResult.projectedExhaustAt ? predictionResult : null;

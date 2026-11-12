@@ -40,6 +40,7 @@ export interface BurnRatePrediction {
 const MIN_SAMPLE_COUNT = 3;
 const MIN_SPAN_HOURS = 0.5; // 30 分钟内的抖动不足以拟合趋势
 const HOUR_MS = 3_600_000;
+const MAX_SAMPLE_AGE_MS = 30 * 60 * 1000;
 
 /**
  * 截取当前配额周期的有效燃烧段：
@@ -160,6 +161,18 @@ export function predictBurnRate(
         return empty;
     }
 
+    const latest = cycle[cycle.length - 1];
+    // A historical cycle must not keep predicting after monitoring stops or it resets.
+    let resetAt: number | undefined;
+    if (Number.isFinite(latest.resetTime) && latest.resetTime! > 0) {
+        resetAt = latest.resetTime;
+    } else if (Number.isFinite(latest.countdownSeconds) && latest.countdownSeconds! > 0) {
+        resetAt = latest.timestamp + latest.countdownSeconds! * 1000;
+    }
+    if (now - latest.timestamp > MAX_SAMPLE_AGE_MS || (resetAt !== undefined && resetAt <= now)) {
+        return empty;
+    }
+
     const regression = linearRegression(cycle);
     if (!regression || regression.slope >= 0) {
         // 斜率非负 = 当前周期没有净消耗，不预测耗尽
@@ -173,7 +186,6 @@ export function predictBurnRate(
 
     const confidence = confidenceFromR2(regression.r2);
     const burnRate = Math.abs(regression.slope);
-    const latest = cycle[cycle.length - 1];
 
     // 用最新实测点（而非拟合线终点）做预测锚点，减少末端偏差
     const hoursToExhaustFromLatest = Math.max(0, latest.remainingPercentage) / burnRate;
@@ -181,11 +193,8 @@ export function predictBurnRate(
         ? undefined
         : latest.timestamp + hoursToExhaustFromLatest * HOUR_MS;
 
-    let resetAt: number | undefined;
-    if (typeof latest.resetTime === 'number' && Number.isFinite(latest.resetTime) && latest.resetTime > now) {
-        resetAt = latest.resetTime;
-    } else if (typeof latest.countdownSeconds === 'number' && Number.isFinite(latest.countdownSeconds) && latest.countdownSeconds > 0) {
-        resetAt = now + latest.countdownSeconds * 1000;
+    if (projectedExhaustAt !== undefined && projectedExhaustAt <= now) {
+        return empty;
     }
 
     let projectedRemainingAtReset: number | undefined;
@@ -208,5 +217,25 @@ export function predictBurnRate(
         spanHours,
         confidence,
         resetAt,
+    };
+}
+
+/** Clip both coordinates of the forecast to the chart's visible time window. */
+export function projectBurnRate(
+    latest: BurnRatePoint,
+    prediction: BurnRatePrediction,
+    endTime: number,
+): { timestamp: number; remainingPercentage: number } {
+    const timestamp = Math.min(
+        endTime,
+        prediction.projectedExhaustAt ?? endTime,
+        prediction.resetAt ?? endTime,
+    );
+    const elapsedHours = Math.max(0, timestamp - latest.timestamp) / HOUR_MS;
+    return {
+        timestamp,
+        remainingPercentage: Math.max(0, Math.min(100,
+            latest.remainingPercentage - prediction.burnRatePctPerHour * elapsedHours,
+        )),
     };
 }

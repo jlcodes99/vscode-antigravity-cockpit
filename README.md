@@ -10,7 +10,7 @@
 
 VS Code 扩展，用于监控 Google Antigravity AI 模型配额。
 
-**功能**：Webview 仪表盘 · QuickPick 模式 · 配额分组 · 自动分组 · 重命名 · 卡片视图 · 拖拽排序 · 状态栏监控 · 阈值通知 · 隐私模式
+**功能**：Webview 仪表盘 · QuickPick 模式 · 官方 Model Quota 分组 · 周配额 / 5 小时配额窗口 · 卡片视图 · 状态栏监控 · 阈值通知 · 隐私模式
 
 **语言**：跟随 VS Code 语言设置，支持 16 种语言
 
@@ -28,11 +28,10 @@ VS Code 扩展，用于监控 Google Antigravity AI 模型配额。
 
 ![Dashboard Overview](assets/dashboard_card_grouped.png)
 
-- **卡片视图**：卡片布局展示模型配额
-- **分组模式**：按配额池聚合模型，显示分组配额
-- **非分组模式**：显示单个模型配额
-- **拖拽排序**：拖动卡片调整显示顺序
-- **自动分组**：根据配额池自动归类模型
+- **卡片视图**：卡片布局展示官方 Model Quota 配额组
+- **官方配额组**：优先按 Antigravity 官方返回的 quota group 动态渲染
+- **多窗口展示**：当官方返回周配额、5 小时配额等窗口时，会在同一卡片中展示
+- **模型明细**：可展开查看组内模型及其剩余配额
 
 #### QuickPick 模式
 
@@ -44,10 +43,10 @@ VS Code 扩展，用于监控 Google Antigravity AI 模型配额。
 - 需要快速查看配额
 
 功能：
-- 支持分组 / 非分组模式
-- 标题栏按钮：刷新、切换分组、打开日志、设置、切换到 Webview
-- 置顶模型到状态栏
-- 重命名模型和分组
+- 按官方配额组展示模型额度
+- 标题栏按钮：刷新、打开日志、设置、切换到 Webview
+- 展示官方返回的配额窗口与组内模型明细
+- 固定分组卡片保留拖拽排序、重命名、置顶到状态栏等原有交互
 
 ---
 
@@ -64,18 +63,19 @@ VS Code 扩展，用于监控 Google Antigravity AI 模型配额。
 | 名称 + 百分比 | `Sonnet: 95%` |
 | 完整显示 | `🟢 Sonnet: 95%` |
 
-- **多模型置顶**：可同时监控多个模型
-- **自动监控**：未指定模型时，自动显示剩余配额最低的模型
+- **官方组优先**：当存在官方配额组时，状态栏使用固定分组；可在分组卡片右上角开关置顶显示，未置顶时显示剩余配额最低的组
+- **兼容监控**：无官方配额组时，回退显示剩余配额最低的模型
 
 ---
 
 ### 配额显示
 
-每个模型 / 分组显示：
+每个模型 / 官方配额组显示：
 - **剩余配额百分比**
 - **倒计时**：如 `4h 40m`
 - **重置时间**：如 `15:16`
 - **进度条**：可视化剩余配额
+- **配额窗口**：如官方返回 `Weekly Limit` / `Five Hour Limit`，会按窗口分别展示
 
 ---
 
@@ -83,7 +83,7 @@ VS Code 扩展，用于监控 Google Antigravity AI 模型配额。
 
 支持两种配额来源，可在面板右上角随时切换：
 
-- **本地监控**：读取本地 Antigravity 客户端进程，更稳定但需要客户端运行
+- **本地监控（默认）**：读取本地 Antigravity 客户端进程。Windows 上通过 PowerShell 查询进程和监听端口。
 - **授权监控**：通过授权访问远端接口获取配额，不依赖本地进程，适合 API 中转或无客户端场景
 - **多账号授权**：授权监控支持多个账号，支持切换当前账号与状态展示
 - **切换提示**：切换过程中会显示加载/超时提示，网络异常时可切回本地
@@ -101,12 +101,12 @@ VS Code 扩展，用于监控 Google Antigravity AI 模型配额。
 
 ---
 
-### 分组功能
+### 官方 Model Quota
 
-- **按配额池分组**：共享配额池的模型自动或手动归类
-- **自定义分组名称**：点击编辑图标重命名
-- **分组排序**：拖拽调整分组顺序
-- **分组置顶**：将分组固定到状态栏
+- **官方优先**：配额组名称、组内模型和配额窗口优先来自 Antigravity 官方 API 返回结构
+- **动态跟随**：官方后续新增或改名 quota group 时，插件会尽量按返回数据自动展示
+- **兼容兜底**：当官方只返回单模型 `quotaInfo` 时，会按服务商生成兼容组，并展示真实可用的重置窗口
+- **跨视图一致**：Dashboard、QuickPick、状态栏、账号树和账号总览使用同一套官方配额组数据
 
 ---
 
@@ -176,12 +176,11 @@ VS Code 扩展，用于监控 Google Antigravity AI 模型配额。
 | `agCockpit.displayMode` | `webview` | 显示模式：`webview` / `quickpick` |
 | `agCockpit.refreshInterval` | `120` | 刷新间隔（秒，10-3600） |
 | `agCockpit.statusBarFormat` | `standard` | 状态栏格式 |
-| `agCockpit.groupingEnabled` | `true` | 启用分组模式 |
+| `agCockpit.showPromptCredits` | `true` | 在状态栏和悬浮提示中显示 Credits |
 | `agCockpit.warningThreshold` | `30` | 警告阈值（%） |
 | `agCockpit.criticalThreshold` | `10` | 危险阈值（%） |
 | `agCockpit.notificationEnabled` | `true` | 启用通知 |
 | `agCockpit.pinnedModels` | `[]` | 状态栏置顶模型 |
-| `agCockpit.pinnedGroups` | `[]` | 状态栏置顶分组 |
 
 ---
 

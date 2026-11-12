@@ -10,7 +10,6 @@ import { configService } from '../shared/config_service';
 import { logger } from '../shared/log_service';
 import { i18n, t } from '../shared/i18n';
 import { DISPLAY_MODE } from '../shared/constants';
-import { ReactorCore } from '../engine/reactor';
 
 /** 按钮标识 */
 const BUTTON_ID = {
@@ -27,7 +26,7 @@ interface QuotaQuickPickItem extends vscode.QuickPickItem {
     /** 分组内的模型 ID 列表 */
     groupModelIds?: string[];
     /** 操作类型 */
-    action?: 'openActions' | 'refresh' | 'logs' | 'settings' | 'switchToWebview' | 'toggleGrouping' | 'autoGroup' | 'back';
+    action?: 'openActions' | 'refresh' | 'logs' | 'settings' | 'switchToWebview' | 'back';
     /** 原始名称（用于重命名时显示原名） */
     originalLabel?: string;
 }
@@ -40,8 +39,6 @@ interface IdentifiableButton extends vscode.QuickInputButton {
 /** 标题栏按钮 ID */
 const TITLE_BUTTON_ID = {
     REFRESH: 'refresh',
-    TOGGLE_GROUPING: 'toggleGrouping',
-    AUTO_GROUP: 'autoGroup',
     LOGS: 'logs',
     SETTINGS: 'settings',
     SWITCH_WEBVIEW: 'switchWebview',
@@ -85,7 +82,7 @@ export class QuickPickView {
             return;
         }
         
-        if (config.groupingEnabled && this.lastSnapshot.groups) {
+        if (this.lastSnapshot.groups && this.lastSnapshot.groups.length > 0) {
             await this.showGroupedView();
         } else {
             await this.showModelView();
@@ -106,8 +103,7 @@ export class QuickPickView {
         pick.items = this.buildModelItems();
 
         // 标题栏按钮
-        const config = configService.getConfig();
-        pick.buttons = this.buildTitleButtons(config.groupingEnabled);
+        pick.buttons = this.buildTitleButtons();
 
         let currentActiveItem: QuotaQuickPickItem | undefined;
 
@@ -184,58 +180,7 @@ export class QuickPickView {
 
         pick.items = this.buildGroupItems();
 
-        // 标题栏按钮
-        const config = configService.getConfig();
-        pick.buttons = this.buildTitleButtons(config.groupingEnabled);
-
-        let currentActiveItem: QuotaQuickPickItem | undefined;
-
-        pick.onDidChangeActive(items => {
-            currentActiveItem = items[0] as QuotaQuickPickItem;
-        });
-
-        pick.onDidAccept(async () => {
-            if (!currentActiveItem) {return;}
-
-            // 处理分组置顶切换
-            if (currentActiveItem.groupId) {
-                const targetGroupId = currentActiveItem.groupId;
-                await configService.togglePinnedGroup(targetGroupId);
-                
-                // 局部刷新
-                const config = configService.getConfig();
-                const isPinnedNow = config.pinnedGroups.includes(targetGroupId);
-                
-                const currentItems = [...pick.items] as QuotaQuickPickItem[];
-                const targetIndex = currentItems.findIndex(item => item.groupId === targetGroupId);
-                
-                if (targetIndex >= 0) {
-                    const oldItem = currentItems[targetIndex];
-                    const newPinIcon = isPinnedNow ? '$(pinned)' : '$(circle-outline)';
-                    const newLabel = oldItem.label.replace(/^\$\((pinned|circle-outline)\)/, newPinIcon);
-                    
-                    const updatedItem: QuotaQuickPickItem = { ...oldItem, label: newLabel };
-                    currentItems[targetIndex] = updatedItem;
-                    
-                    pick.items = currentItems;
-                    pick.activeItems = [updatedItem];
-                }
-            }
-        });
-
-        // 处理按钮点击（重命名/重置分组名）
-        pick.onDidTriggerItemButton(async (event) => {
-            const item = event.item as QuotaQuickPickItem;
-            const button = event.button as IdentifiableButton;
-            
-            if (!item.groupId || !item.groupModelIds) {return;}
-
-            if (button.id === BUTTON_ID.RENAME) {
-                await this.handleGroupRename(pick, item.groupModelIds, item.originalLabel || '');
-            } else if (button.id === BUTTON_ID.RESET) {
-                await this.handleGroupReset(pick, item.groupModelIds, item.originalLabel || '');
-            }
-        });
+        pick.buttons = this.buildTitleButtons();
 
         // 处理标题栏按钮点击
         pick.onDidTriggerButton(async (button) => {
@@ -320,62 +265,33 @@ export class QuickPickView {
     private buildGroupItems(): QuotaQuickPickItem[] {
         const items: QuotaQuickPickItem[] = [];
         const snapshot = this.lastSnapshot;
-        const config = configService.getConfig();
 
         if (snapshot && snapshot.groups && snapshot.groups.length > 0) {
-            const pinnedGroups = config.pinnedGroups;
-            const customNames = config.groupingCustomNames || {};
-            
-            const renameButton: IdentifiableButton = {
-                iconPath: new vscode.ThemeIcon('edit'),
-                tooltip: t('grouping.rename'),
-                id: BUTTON_ID.RENAME,
-            };
-            const resetButton: IdentifiableButton = {
-                iconPath: new vscode.ThemeIcon('discard'),
-                tooltip: t('model.reset'),
-                id: BUTTON_ID.RESET,
-            };
-
             for (const group of snapshot.groups) {
                 const pct = group.remainingPercentage ?? 0;
                 const bar = this.drawProgressBar(pct);
-                const isPinned = pinnedGroups.includes(group.groupId);
-
-                const pinIcon = isPinned ? '$(pinned)' : '$(circle-outline)';
-                
-                // 使用自定义名称（通过锚点共识机制）
-                const firstModelId = group.models[0]?.modelId;
-                const displayName = (firstModelId && customNames[firstModelId]) || group.groupName;
-                const hasCustomName = !!(firstModelId && customNames[firstModelId]);
                 
                 // 组内模型名称列表
-                const modelNames = group.models.map(m => 
-                    config.modelCustomNames?.[m.modelId] || m.label,
-                ).join(', ');
+                const modelNames = group.models.map(m => m.label).join(', ');
 
-                // 计算具体重置时间（使用分组中第一个模型的重置时间）
-                const firstModel = group.models[0];
-                const resetTimeStr = firstModel?.resetTime 
-                    ? new Date(firstModel.resetTime).toLocaleString(undefined, { 
-                        year: 'numeric', 
-                        month: '2-digit', 
-                        day: '2-digit', 
-                        hour: '2-digit', 
-                        minute: '2-digit',
-                        hour12: false, 
-                    })
-                    : '-';
-                const countdown = group.timeUntilResetFormatted || firstModel?.timeUntilResetFormatted || '-';
+                const windows = group.quotaWindows && group.quotaWindows.length > 0
+                    ? group.quotaWindows
+                    : [{
+                        windowName: 'Model Quota',
+                        remainingPercentage: pct,
+                        timeUntilResetFormatted: group.timeUntilResetFormatted,
+                    }];
+                const windowDetail = windows.map(window => (
+                    `${window.windowName}: ${window.remainingPercentage.toFixed(1)}% (${window.timeUntilResetFormatted || '-'})`
+                )).join(' | ');
 
                 items.push({
-                    label: `${pinIcon} ${displayName}`,
+                    label: `$(symbol-namespace) ${group.groupName}`,
                     description: `(${modelNames})`,
-                    detail: `    ${bar} ${pct.toFixed(1)}% | ${t('dashboard.resetTime')}: ${countdown} (${resetTimeStr})`,
+                    detail: `    ${bar} ${pct.toFixed(1)}% | ${windowDetail}`,
                     groupId: group.groupId,
                     groupModelIds: group.models.map(m => m.modelId),
                     originalLabel: group.groupName,
-                    buttons: hasCustomName ? [renameButton, resetButton] : [renameButton],
                 });
             }
         } else {
@@ -435,57 +351,6 @@ export class QuickPickView {
     }
 
     /**
-     * 处理分组重命名
-     */
-    private async handleGroupRename(
-        pick: vscode.QuickPick<QuotaQuickPickItem>,
-        modelIds: string[],
-        originalLabel: string,
-    ): Promise<void> {
-        const config = configService.getConfig();
-        const firstModelId = modelIds[0];
-        const currentName = config.groupingCustomNames?.[firstModelId] || originalLabel;
-        
-        pick.hide();
-        
-        const newName = await vscode.window.showInputBox({
-            prompt: t('grouping.renamePrompt'),
-            value: currentName,
-            placeHolder: originalLabel,
-        });
-        
-        if (newName !== undefined && newName.trim()) {
-            await configService.updateGroupName(modelIds, newName.trim());
-            vscode.window.showInformationMessage(t('model.renamed', { name: newName }));
-        }
-        
-        await this.show();
-    }
-
-    /**
-     * 处理分组名称重置
-     */
-    private async handleGroupReset(
-        pick: vscode.QuickPick<QuotaQuickPickItem>,
-        modelIds: string[],
-        originalLabel: string,
-    ): Promise<void> {
-        // 清除所有模型的自定义分组名
-        const config = configService.getConfig();
-        const customNames = { ...config.groupingCustomNames };
-        
-        for (const modelId of modelIds) {
-            delete customNames[modelId];
-        }
-        
-        await configService.updateConfig('groupingCustomNames', customNames);
-        vscode.window.showInformationMessage(t('model.renamed', { name: originalLabel }));
-        
-        // 刷新视图
-        pick.items = this.buildGroupItems();
-    }
-
-    /**
      * 绘制进度条
      */
     private drawProgressBar(percentage: number): string {
@@ -499,7 +364,7 @@ export class QuickPickView {
      * 处理操作
      */
     private async handleAction(
-        action: 'openActions' | 'refresh' | 'logs' | 'settings' | 'switchToWebview' | 'toggleGrouping' | 'autoGroup' | 'back',
+        action: 'openActions' | 'refresh' | 'logs' | 'settings' | 'switchToWebview' | 'back',
     ): Promise<void> {
         switch (action) {
             case 'back':
@@ -544,40 +409,13 @@ export class QuickPickView {
                 vscode.commands.executeCommand('agCockpit.open');
                 break;
                 
-            case 'toggleGrouping': {
-                const newValue = await configService.toggleGroupingEnabled();
-                const msg = newValue ? t('grouping.enable') : t('grouping.disable');
-                vscode.window.showInformationMessage(msg);
-                // 触发数据刷新以更新分组信息
-                if (this.refreshCallback) {
-                    this.refreshCallback();
-                }
-                setTimeout(() => this.show(), 500);
-                break;
-            }
-                
-            case 'autoGroup':
-                if (this.lastSnapshot && this.lastSnapshot.models.length > 0) {
-                    const autoGrouping = ReactorCore.calculateSmartGrouping(this.lastSnapshot.models);
-                    await configService.updateGroupMappings(autoGrouping.groupMappings);
-                    await configService.updateConfig('groupingCustomNames', autoGrouping.groupNames);
-                    vscode.window.showInformationMessage(
-                        t('grouping.autoGroupApplied', { count: Object.keys(autoGrouping.groupMappings).length }),
-                    );
-                    // 需要触发数据刷新以更新分组
-                    if (this.refreshCallback) {
-                        this.refreshCallback();
-                    }
-                    setTimeout(() => this.show(), 500);
-                }
-                break;
         }
     }
 
     /**
      * 构建标题栏按钮
      */
-    private buildTitleButtons(isGroupingEnabled: boolean): IdentifiableButton[] {
+    private buildTitleButtons(): IdentifiableButton[] {
         const buttons: IdentifiableButton[] = [];
 
         // 刷新按钮
@@ -585,13 +423,6 @@ export class QuickPickView {
             iconPath: new vscode.ThemeIcon('sync'),
             tooltip: t('dashboard.refresh'),
             id: TITLE_BUTTON_ID.REFRESH,
-        });
-
-        // 切换分组按钮
-        buttons.push({
-            iconPath: new vscode.ThemeIcon(isGroupingEnabled ? 'list-flat' : 'list-tree'),
-            tooltip: isGroupingEnabled ? t('grouping.disable') : t('grouping.enable'),
-            id: TITLE_BUTTON_ID.TOGGLE_GROUPING,
         });
 
         // 日志按钮
@@ -615,15 +446,6 @@ export class QuickPickView {
             id: TITLE_BUTTON_ID.SWITCH_WEBVIEW,
         });
 
-        // 自动分组按钮（仅分组模式显示，放最后）
-        if (isGroupingEnabled) {
-            buttons.push({
-                iconPath: new vscode.ThemeIcon('sparkle'),
-                tooltip: t('grouping.autoGroup'),
-                id: TITLE_BUTTON_ID.AUTO_GROUP,
-            });
-        }
-
         return buttons;
     }
 
@@ -634,12 +456,6 @@ export class QuickPickView {
         switch (buttonId) {
             case TITLE_BUTTON_ID.REFRESH:
                 await this.handleAction('refresh');
-                break;
-            case TITLE_BUTTON_ID.TOGGLE_GROUPING:
-                await this.handleAction('toggleGrouping');
-                break;
-            case TITLE_BUTTON_ID.AUTO_GROUP:
-                await this.handleAction('autoGroup');
                 break;
             case TITLE_BUTTON_ID.LOGS:
                 await this.handleAction('logs');

@@ -296,6 +296,30 @@
         return 'Credits';
     }
 
+    function getCompactQuotaGroupName(groupName) {
+        const raw = String(groupName || '').trim();
+        const normalized = raw.toLowerCase().replace(/\s+/g, ' ');
+        if (normalized.includes('gemini') && !normalized.includes('argon')) {
+            return 'Gemini';
+        }
+        if (normalized.includes('claude')) {
+            return 'Claude';
+        }
+        return raw;
+    }
+
+    function getCompactQuotaWindowName(windowName) {
+        const raw = String(windowName || '').trim();
+        const normalized = raw.toLowerCase().replace(/\s+/g, ' ');
+        if (normalized.includes('weekly') && !normalized.includes('argon')) {
+            return 'Weekly';
+        }
+        if (normalized.includes('five hour') || normalized.includes('5h')) {
+            return '5h';
+        }
+        return raw || 'Model Quota';
+    }
+
     function getTierLabel(account) {
         const raw = (account.tier || '').trim();
         if (!raw) return '';
@@ -369,20 +393,9 @@
 
     function getDisplayGroups(account) {
         if (!account.groups || account.groups.length === 0) return [];
-        const groups = [...account.groups];
-        const order = Array.isArray(currentConfig.groupOrder) ? currentConfig.groupOrder : [];
-        if (order.length > 0) {
-            const orderMap = new Map(order.map((id, index) => [id, index]));
-            groups.sort((a, b) => {
-                const idxA = orderMap.has(a.groupId) ? orderMap.get(a.groupId) : 99999;
-                const idxB = orderMap.has(b.groupId) ? orderMap.get(b.groupId) : 99999;
-                if (idxA !== idxB) return idxA - idxB;
-                return a.groupName.localeCompare(b.groupName);
-            });
-        } else {
-            groups.sort((a, b) => a.groupName.localeCompare(b.groupName));
-        }
-        return groups.slice(0, 4);
+        const groups = account.groups.slice(0, 4);
+        const argon = account.groups.find(group => group.groupId === 'official:gemini-4-argon');
+        return argon && !groups.includes(argon) ? [...groups, argon] : groups;
     }
 
     function getGroupColor(groupId) {
@@ -455,7 +468,7 @@
         accounts.forEach(account => {
             (account.groups || []).forEach(group => {
                 if (group.groupId && group.groupName) {
-                    groupMap.set(group.groupId, group.groupName);
+                    groupMap.set(group.groupId, getCompactQuotaGroupName(group.groupName));
                 }
             });
         });
@@ -589,15 +602,30 @@
         return groups.map(group => {
             const pct = Math.round(group.percentage || 0);
             const pctClass = getQuotaClass(pct);
+            const groupName = getCompactQuotaGroupName(group.groupName);
+            const windowRows = Array.isArray(group.quotaWindows) && group.quotaWindows.length > 0
+                ? group.quotaWindows.map(window => {
+                    const windowPct = Math.round(window.percentage || 0);
+                    const windowClass = getQuotaClass(windowPct);
+                    const reset = window.resetTimeFormatted ? ` · ${escapeHtml(window.resetTimeFormatted)}` : '';
+                    return `
+                        <div class="quota-window-compact">
+                            <span>${escapeHtml(getCompactQuotaWindowName(window.windowName))}</span>
+                            <span class="${windowClass}">${windowPct}%${reset}</span>
+                        </div>
+                    `;
+                }).join('')
+                : '';
             return `
                 <div class="quota-compact-item">
                     <div class="quota-compact-header">
-                        <span class="model-label">${escapeHtml(group.groupName)}</span>
+                        <span class="model-label">${escapeHtml(groupName)}</span>
                         <span class="model-pct ${pctClass}">${pct}%</span>
                     </div>
                     <div class="quota-compact-bar-track">
                         <div class="quota-compact-bar ${pctClass}" style="width: ${Math.min(100, pct)}%"></div>
                     </div>
+                    ${windowRows}
                     ${group.resetTimeFormatted ? `<span class="quota-compact-reset">${escapeHtml(group.resetTimeFormatted)}</span>` : ''}
                 </div>
             `;
@@ -622,8 +650,9 @@
         return groups.map((group) => {
             const pct = Math.round(group.percentage || 0);
             const cls = getQuotaClass(pct);
+            const groupName = getCompactQuotaGroupName(group.groupName);
             return `
-                <span class="compact-quota-item ${cls}" title="${escapeHtml(group.groupName)}">
+                <span class="compact-quota-item ${cls}" title="${escapeHtml(groupName)}">
                     <span class="compact-quota-dot" style="background:${escapeHtml(getGroupColor(group.groupId))}"></span>
                     ${pct}%
                 </span>

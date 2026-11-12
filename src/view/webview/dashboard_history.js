@@ -1,3 +1,5 @@
+import { projectBurnRate } from '../../services/burn_rate';
+
 export function createHistoryModule({
     vscode,
     i18n,
@@ -593,16 +595,9 @@ export function createHistoryModule({
 
         // 预测虚线：按 burn-rate 从最新实测点延伸到耗尽/重置边界
         if (prediction && typeof prediction.projectedExhaustAt === 'number' && prediction.projectedExhaustAt > now) {
-            let endPredictionPct;
-            let endPredictionAt;
-            if (prediction.willExhaustBeforeReset || typeof prediction.resetAt !== 'number') {
-                endPredictionPct = 0;
-                endPredictionAt = prediction.projectedExhaustAt;
-            } else {
-                endPredictionPct = Math.max(0, prediction.projectedRemainingAtReset ?? 0);
-                endPredictionAt = prediction.resetAt;
-            }
-            endPredictionAt = Math.min(endPredictionAt, endTime);
+            const projected = projectBurnRate(last.raw, prediction, endTime);
+            const endPredictionAt = projected.timestamp;
+            const endPredictionPct = projected.remainingPercentage;
             const endRatio = (endPredictionAt - startTime) / (endTime - startTime);
             const endX = padding.left + Math.min(1, Math.max(0, endRatio)) * chartWidth;
             const endY = padding.top + (1 - Math.min(100, Math.max(0, endPredictionPct)) / 100) * chartHeight;

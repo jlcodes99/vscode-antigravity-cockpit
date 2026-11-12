@@ -64,15 +64,10 @@ export class MessageController {
     private async applyQuotaSourceChange(
         source: 'local' | 'authorized',
     ): Promise<void> {
-        const requestedSource = source;
-        source = 'authorized';
         const previousSource = configService.getConfig().quotaSource;
 
         this.reactor.cancelInitRetry();
 
-        if (requestedSource !== 'authorized') {
-            logger.info(`Quota source switch request ignored (${requestedSource}), forcing authorized mode`);
-        }
         logger.info(`User changed quota source: ${previousSource} -> ${source}`);
         await configService.updateConfig('quotaSource', source);
         // 验证保存是否成功
@@ -282,14 +277,15 @@ export class MessageController {
                     break;
 
                 case 'resetOrder': {
-                    const currentConfig = configService.getConfig();
-                    if (currentConfig.groupingEnabled) {
-                        logger.info('User reset group order to default');
-                        await configService.resetGroupOrder();
-                    } else {
-                        logger.info('User reset model order to default');
-                        await configService.resetModelOrder();
-                    }
+                    logger.info('User reset model order to default');
+                    await configService.resetModelOrder();
+                    this.reactor.reprocess();
+                    break;
+                }
+
+                case 'resetGroupOrder': {
+                    logger.info('User reset group order to default');
+                    await configService.resetGroupOrder();
                     this.reactor.reprocess();
                     break;
                 }
@@ -365,40 +361,15 @@ export class MessageController {
                     break;
 
                 case 'toggleGrouping': {
-                    logger.info('User toggled grouping display');
-                    const enabled = await configService.toggleGroupingEnabled();
-                    // 用户期望：切换到分组模式时，状态栏默认也显示分组
-                    if (enabled) {
-                        const config = configService.getConfig();
-                        if (!config.groupingShowInStatusBar) {
-                            await configService.updateConfig('groupingShowInStatusBar', true);
-                        }
-
-                        // 首次开启分组时（groupMappings 为空），自动执行分组
-                        if (Object.keys(config.groupMappings).length === 0) {
-                            const latestSnapshot = this.reactor.getLatestSnapshot();
-                            if (latestSnapshot && latestSnapshot.models.length > 0) {
-                                const autoGrouping = ReactorCore.calculateSmartGrouping(latestSnapshot.models);
-                                if (Object.keys(autoGrouping.groupMappings).length > 0) {
-                                    await configService.updateGroupMappings(autoGrouping.groupMappings);
-                                    await configService.updateConfig('groupingCustomNames', autoGrouping.groupNames);
-                                    logger.info(`First-time grouping: auto-grouped ${Object.keys(autoGrouping.groupMappings).length} models`);
-                                } else {
-                                    logger.debug('First-time grouping skipped: no models matched smart-group families');
-                                }
-                            }
-                        }
-                    }
-                    // 使用缓存数据重新渲染
+                    logger.info('Ignoring legacy grouping toggle; quota groups now follow official data');
                     this.reactor.reprocess();
                     break;
                 }
 
                 case 'renameGroup':
                     if (message.modelIds && message.groupName) {
-                        logger.info(`User renamed group to: ${message.groupName}`);
+                        logger.info(`User renamed fixed quota group to: ${message.groupName}`);
                         await configService.updateGroupName(message.modelIds, message.groupName);
-                        // 使用缓存数据重新渲染
                         this.reactor.reprocess();
                     } else {
                         logger.warn('renameGroup signal missing required data');
@@ -413,7 +384,7 @@ export class MessageController {
                             placeHolder: t('grouping.rename'),
                         });
                         if (newName && newName.trim() && newName !== message.currentName) {
-                            logger.info(`User renamed group to: ${newName}`);
+                            logger.info(`User renamed fixed quota group to: ${newName}`);
                             await configService.updateGroupName(message.modelIds, newName.trim());
                             this.reactor.reprocess();
                         }
@@ -424,7 +395,7 @@ export class MessageController {
 
                 case 'toggleGroupPin':
                     if (message.groupId) {
-                        logger.info(`Toggling group pin: ${message.groupId}`);
+                        logger.info(`Toggling fixed quota group pin: ${message.groupId}`);
                         await configService.togglePinnedGroup(message.groupId);
                         this.reactor.reprocess();
                     } else {
@@ -434,7 +405,7 @@ export class MessageController {
 
                 case 'updateGroupOrder':
                     if (message.order) {
-                        logger.info(`User updated group order. Count: ${message.order.length}`);
+                        logger.info(`User updated fixed quota group order. Count: ${message.order.length}`);
                         await configService.updateGroupOrder(message.order);
                         this.reactor.reprocess();
                     } else {
@@ -443,24 +414,8 @@ export class MessageController {
                     break;
 
                 case 'autoGroup': {
-                    logger.info('User triggered auto-grouping');
-                    // 获取最新的快照数据
-                    const latestSnapshot = this.reactor.getLatestSnapshot();
-                    if (latestSnapshot && latestSnapshot.models.length > 0) {
-                        // 计算新的分组映射（与自定义分组弹框的“自动分组”一致）
-                        const autoGrouping = ReactorCore.calculateSmartGrouping(latestSnapshot.models);
-                        await configService.updateGroupMappings(autoGrouping.groupMappings);
-                        await configService.updateConfig('groupingCustomNames', autoGrouping.groupNames);
-                        logger.info(`Auto-grouped ${Object.keys(autoGrouping.groupMappings).length} models`);
-
-                        // 清除之前的 pinnedGroups（因为 groupId 已变化）
-                        await configService.updateConfig('pinnedGroups', []);
-
-                        // 重新处理数据以刷新 UI
-                        this.reactor.reprocess();
-                    } else {
-                        logger.warn('No snapshot data available for auto-grouping');
-                    }
+                    logger.info('Ignoring legacy auto-grouping; quota groups now follow official data');
+                    this.reactor.reprocess();
                     break;
                 }
 
@@ -691,23 +646,8 @@ export class MessageController {
                     break;
 
                 case 'saveCustomGrouping': {
-                    // 保存自定义分组
-                    const { customGroupMappings, customGroupNames } = message;
-                    if (customGroupMappings) {
-                        logger.info(`User saved custom grouping: ${Object.keys(customGroupMappings).length} models`);
-                        await configService.updateGroupMappings(customGroupMappings);
-
-                        // 清除之前的 pinnedGroups（因为 groupId 可能已变化）
-                        await configService.updateConfig('pinnedGroups', []);
-
-                        // 保存分组名称（如果有）
-                        if (customGroupNames) {
-                            await configService.updateConfig('groupingCustomNames', customGroupNames);
-                        }
-
-                        // 刷新 UI
-                        this.reactor.reprocess();
-                    }
+                    logger.info('Ignoring legacy custom grouping save; quota groups now follow official data');
+                    this.reactor.reprocess();
                     break;
                 }
 
@@ -736,10 +676,11 @@ export class MessageController {
                     const requestedEmail = message.email;
                     const activeEmail = await credentialStorage.getActiveAccount();
                     const latestSnapshot = this.reactor.getLatestSnapshot();
-                    const snapshotEmail = latestSnapshot?.userInfo?.email || latestSnapshot?.localAccountEmail || null;
+                    const snapshotEmail = [latestSnapshot?.quotaAccountEmail, latestSnapshot?.userInfo?.email, latestSnapshot?.localAccountEmail]
+                        .find(isValidEmail);
                     const resolvedEmail = isValidEmail(requestedEmail)
                         ? requestedEmail
-                        : (isValidEmail(activeEmail) ? activeEmail : (isValidEmail(snapshotEmail) ? snapshotEmail : null));
+                        : (snapshotEmail ?? (isValidEmail(activeEmail) ? activeEmail : null));
 
                     const credentials = await credentialStorage.getAllCredentials();
                     const accounts = Object.keys(credentials);
@@ -1693,6 +1634,7 @@ export class MessageController {
             
             // 检查是否已是当前账户
             if (activeEmail && activeEmail.toLowerCase() === currentEmailLower) {
+                await this.reactor.syncTelemetry();
                 vscode.window.showInformationMessage(
                     t('antigravityToolsSync.alreadySynced') || '已是当前账户',
                 );
@@ -1712,12 +1654,7 @@ export class MessageController {
                 const state = await autoTriggerController.getState();
                 this.hud.sendMessage({ type: 'autoTriggerState', data: state });
                 
-                // 刷新配额
-                const source = configService.getConfig().quotaSource === 'authorized' ? 'authorized' : 'local';
-                const usedCache = await this.reactor.tryUseQuotaCache(source, existingEmail);
-                if (!usedCache) {
-                    this.reactor.syncTelemetry();
-                }
+                await this.reactor.syncTelemetry();
                 
                 vscode.window.showInformationMessage(
                     t('autoTrigger.accountSwitched', { email: existingEmail }) 

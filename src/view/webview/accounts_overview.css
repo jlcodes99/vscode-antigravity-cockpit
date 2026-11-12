@@ -619,6 +619,25 @@ body {
     font-family: var(--font-mono);
 }
 
+.quota-window-compact {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 10px;
+    line-height: 1.35;
+    color: var(--text-muted);
+}
+
+.quota-window-compact span:last-child {
+    font-family: var(--font-mono);
+    white-space: nowrap;
+}
+
+.quota-window-compact .high { color: var(--success); }
+.quota-window-compact .medium { color: var(--warning); }
+.quota-window-compact .low { color: var(--danger); }
+
 .quota-empty {
     grid-column: 1 / -1;
     text-align: center;

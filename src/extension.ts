@@ -162,17 +162,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // 初始化状态栏控制器
     statusBar = new StatusBarController(context);
 
-    const syncStatusBarFromAccountsCache = (): void => {
-        const currentEmail = accountsRefreshService.getCurrentEmail();
-        if (!currentEmail) {
-            return;
-        }
-        const cache = accountsRefreshService.getQuotaCache(currentEmail);
-        if (!cache || cache.loading || cache.error || !cache.snapshot?.isConnected) {
+    const syncStatusBarFromAccountsCache = async (): Promise<void> => {
+        if (configService.getConfig().quotaSource !== 'authorized') {
             return;
         }
         try {
-            statusBar.update(cache.snapshot, configService.getConfig());
+            const activeEmail = await credentialStorage.getActiveAccount();
+            const config = configService.getConfig();
+            if (!activeEmail || config.quotaSource !== 'authorized') {
+                return;
+            }
+            const cache = accountsRefreshService.getQuotaCache(activeEmail);
+            if (!cache || cache.loading || cache.error || !cache.snapshot?.isConnected) {
+                return;
+            }
+            statusBar.update(cache.snapshot, config);
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
             logger.debug(`[StatusBar] Sync from accounts cache skipped: ${err.message}`);
@@ -181,7 +185,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     context.subscriptions.push(
         accountsRefreshService.onDidUpdate(() => {
-            syncStatusBarFromAccountsCache();
+            void syncStatusBarFromAccountsCache();
         }),
     );
 
@@ -481,8 +485,15 @@ async function handleConfigChange(config: CockpitConfig): Promise<void> {
     const currentQuotaSource = config.quotaSource === 'authorized' ? 'authorized' : 'local';
     const quotaSourceChanged = currentQuotaSource !== lastQuotaSource;
     if (quotaSourceChanged) {
-        logger.info(`Quota source changed: ${lastQuotaSource} -> ${currentQuotaSource}, skipping reprocess`);
+        logger.info(`Quota source changed: ${lastQuotaSource} -> ${currentQuotaSource}, syncing telemetry`);
         lastQuotaSource = currentQuotaSource;
+        if (currentQuotaSource === 'local' && !reactor.hasLocalConnection()) {
+            systemOnline = false;
+            await bootSystems();
+            return;
+        }
+        void reactor.syncTelemetry();
+        return;
     }
 
     // 仅当刷新间隔变化时重启 Reactor
@@ -510,6 +521,14 @@ async function bootSystems(): Promise<void> {
     }
 
     const quotaSource = configService.getConfig().quotaSource;
+    reactor.setLocalRescanHandler(async () => {
+        const info = await hunter.scanEnvironment(1);
+        if (info) {
+            reactor.engage(info.connectPort, info.csrfToken, hunter.getLastDiagnostics());
+            return true;
+        }
+        return false;
+    });
     if (quotaSource === 'authorized') {
         logger.info('Authorized quota source active, starting reactor with background local scan');
         reactor.startReactor(configService.getRefreshIntervalMs());
@@ -521,6 +540,10 @@ async function bootSystems(): Promise<void> {
                 if (info) {
                     reactor.engage(info.connectPort, info.csrfToken, hunter.getLastDiagnostics());
                     logger.info('Local Antigravity connection detected in authorized mode');
+                    void reactor.syncTelemetry();
+                    if (accountsRefreshService) {
+                        void accountsRefreshService.refreshQuotas();
+                    }
                 }
             })
             .catch(err => {
@@ -540,7 +563,7 @@ async function bootSystems(): Promise<void> {
             reactor.startReactor(configService.getRefreshIntervalMs());
             systemOnline = true;
             autoRetryCount = 0; // 重置计数器
-            statusBar.setReady();
+            statusBar.setReady(configService.getConfig().showPromptCredits);
             logger.info('System boot successful');
         } else {
             // 自动重试机制
@@ -618,15 +641,10 @@ function handleOfflineState(): void {
         showPromptCredits: false,
         pinnedModels: [],
         modelOrder: [],
-        groupingEnabled: false,
-        groupCustomNames: {},
-        groupingShowInStatusBar: false,
-        pinnedGroups: [],
-        groupOrder: [],
         refreshInterval: 120,
         notificationEnabled: false,
         language: configService.getConfig().language,
-        quotaSource: 'authorized',
+        quotaSource: configService.getConfig().quotaSource,
     });
 }
 

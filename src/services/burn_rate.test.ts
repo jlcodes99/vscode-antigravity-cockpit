@@ -1,6 +1,7 @@
 import {
     predictBurnRate,
     extractCurrentCycle,
+    projectBurnRate,
     BurnRatePoint,
 } from './burn_rate';
 
@@ -122,5 +123,39 @@ describe('predictBurnRate', () => {
         const result = predictBurnRate(points, NOW);
         expect(result.confidence).toBe('low');
         expect(result.projectedExhaustAt).toBeUndefined();
+    });
+
+    it('历史倒计时以采样时刻为起点，不随查询时间延后', () => {
+        const points = [2, 1, 0.25].map(hAgo => point(hAgo, 40 + hAgo * 10, { countdownSeconds: 3600 }));
+        expect(predictBurnRate(points, NOW).resetAt).toBe(NOW + 0.75 * HOUR);
+    });
+
+    it('重置已过去时不回退旧倒计时，也不再预测旧周期', () => {
+        const points = steadyDecline();
+        points[points.length - 1].resetTime = NOW - 1;
+        points[points.length - 1].countdownSeconds = 3600;
+        expect(predictBurnRate(points, NOW).projectedExhaustAt).toBeUndefined();
+    });
+
+    it('停止采样后不继续显示旧速率的耗尽警告', () => {
+        expect(predictBurnRate(steadyDecline(), NOW + HOUR).projectedExhaustAt).toBeUndefined();
+    });
+
+    it('长周期预测截到 12 小时后时仍显示 48% 而非提前耗尽', () => {
+        const points = [2, 1, 0].map(hAgo => point(hAgo, 60 + hAgo, { resetTime: NOW + 72 * HOUR }));
+        const prediction = predictBurnRate(points, NOW);
+        expect(prediction.projectedExhaustAt).toBe(NOW + 60 * HOUR);
+        expect(projectBurnRate(points[2], prediction, NOW + 12 * HOUR)).toEqual({
+            timestamp: NOW + 12 * HOUR,
+            remainingPercentage: 48,
+        });
+    });
+
+    it('重置早于耗尽时，虚线停在重置时刻的实际预测余量', () => {
+        const points = [2, 1, 0].map(hAgo => point(hAgo, 60 + hAgo, { resetTime: NOW + 4 * HOUR }));
+        expect(projectBurnRate(points[2], predictBurnRate(points, NOW), NOW + 12 * HOUR)).toEqual({
+            timestamp: NOW + 4 * HOUR,
+            remainingPercentage: 56,
+        });
     });
 });

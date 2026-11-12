@@ -232,7 +232,7 @@ export function parsePluginSwitchAccountPayload(
     if (!isObjectPayload(payload)) {
         return null;
     }
-    if (typeof payload.target_email !== 'string' || payload.target_email.length === 0) {
+    if (typeof payload.target_email !== 'string' || payload.target_email.trim().length === 0) {
         return null;
     }
     return payload as unknown as PluginSwitchAccountPayload;

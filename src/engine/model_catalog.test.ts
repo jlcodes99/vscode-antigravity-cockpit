@@ -1,7 +1,6 @@
 import {
     resolveAuthorizedOrderedModelKeys,
     computeModelAdoption,
-    isHiddenAuthorizedModel,
     type AuthorizedQuotaResponse,
 } from './model_catalog';
 

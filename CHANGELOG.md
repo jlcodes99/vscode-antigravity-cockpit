@@ -10,38 +10,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.1.53] - 2026-11-12
+
 ### Added
-- **Burn-rate exhaustion forecast**: on the quota-history tab, the extension regresses the current quota cycle (monotonic decrease since the last reset) via ordinary least squares over the collected 30-day history and estimates hourly burn rate and projected exhaustion time:
-  - the summary footer shows `Burn rate: X%/h`, followed by either a warning (`projected to run out in Yh Zm`, ⚠️ when exhaustion precedes reset) or `lasts until reset (~N%)`;
-  - the chart renders a dashed projection line (error-colored when exhaustion precedes reset);
-  - forecasts require ≥3 samples spanning ≥30 minutes with R² ≥ 0.4; noisy low-confidence data yields no exhaustion timestamp;
-  - new pure module `src/services/burn_rate.ts` with 10 unit tests (cycle slicing, dirty-data filtering, slope/R², countdown fallback).
+- **Quota exhaustion forecasts**: History charts show estimated consumption rates and exhaustion times for each quota series, including official weekly and five-hour windows. Forecasts require sufficient recent samples, stop after a quota reset, and extend the chart only to the visible forecast boundary.
+- **Status bar Credits setting**: `agCockpit.showPromptCredits` controls whether Credits appear in the status bar and its tooltip.
+- **Gemini 4 Argon (Weekly)**: Shows the official Argon weekly quota separately from the regular Gemini quota, even when the model list omits Argon. Local monitoring can use the same account’s cached official bucket before it resets.
+
+### Changed
+- **Model Quota display follows official groups**: Dashboard, QuickPick, Status Bar, Account Tree, Accounts Overview, and quota history use official quota groups and windows when available. Fixed group cards retain rename, drag-to-reorder, and status-bar pin interactions.
+- **Local monitoring is the default**: Existing quota source selections are preserved. Local model variants with matching balances and reset times share one display row.
+- **Quality checks before packaging and release**: Extension and Webview type checks, lint, tests, and production builds run in CI; local packaging also checks types and lint before building.
 
 ### Fixed
-- **New models (e.g. Gemini 4) could not be monitored**: in authorized mode the official `models` map is now the single source of truth — models missing from a stale `agentModelSorts` list are appended automatically instead of being dropped.
-- **New models missing from card list**: newly released models are auto-added to the user's customized visible-model list (blacklisted models excluded); first run only establishes a baseline without changing the current view.
-- **New models hidden in grouped mode**: ungrouped models now join an existing family group (Claude / Gemini Pro / Flash / Image) at runtime, or render as a solo group when no family matches, instead of being silently hidden.
-- **Internal noise stays hidden**: the fallback no longer surfaces `isInternal` experiment models (`chat_20706`/`chat_23310`), tab-completion preview models (`M19`/`M28`), the tiered routing alias (`M322`) or legacy `gemini-2.5-*` aliases whose quota duplicates newer entries (shared predicate on both the sorts and fallback paths).
-- Fixed 24 pre-existing `tsc --noEmit` errors masked by esbuild's transpile-only pipeline (missing `OAuthCredential.isGcpTos` / `QuotaSnapshot.activeModelId` fields, undefined symbol references) and removed an unreachable duplicate "reauthorize account" dead block (the live handler is the `autoTrigger.reauthorizeAccount` case).
+- **Weekly and five-hour quota windows**: Authorized refresh retrieves the official quota summary and preserves it in the cache. When missing, a same-account desktop cache can supply the summary.
+- **Quota windows and account history**: Known weekly and five-hour buckets use their official IDs, and buckets with missing balances no longer show 0%. History follows the account that supplied the quota. WSL reads desktop quota caches from the Windows user profile.
+- **New model discovery**: Models omitted from the official ordering list remain visible. Newly discovered models join customized visible lists while internal, disabled, and blacklisted cloud models remain hidden.
+- **New local process support**: Detects both legacy language servers and the newer agy hub process, with reconnection after process restarts. Local-only models supplement cloud results only after a successful local request with a matching account identity.
+- **Quota source preferences**: Local and authorized monitoring choices are respected across settings changes and restarts.
+- **Account-specific quota and Credits**: Authorized status bar updates and cached Credits use the selected monitoring account. Switching to the current IDE login refreshes quota, and expired authorization keeps other saved accounts intact. Omitted amounts on Google One AI credit entries are treated as zero, while unavailable balances remain unknown.
+- **Cockpit Tools over Remote SSH**: The extension opens the desktop app through its registered link on the local computer.
+- **README star history and announcement links**: Updated the star history chart provider and the author's shop link in the announcement.
 
 ### Security
-- **Reduced plaintext-token exposure**: account sync with Cockpit Tools now fetches the token-free account list first and pulls plaintext tokens only when remote-only accounts actually exist (previously every sync read all refresh/access tokens).
-- **Enforced owner-only permissions on shared files**: caches and sync settings written under `~/.antigravity_cockpit` are now created with dir 700 / file 600 via the new `src/shared/secure_fs.ts` (previously default umask, typically 644, exposed email-containing caches to other local users on multi-user machines).
-- **Validated inbound WebSocket commands**: `plugin_switch_account` now requires an object payload with non-empty `target_email`; `plugin_set_switch_mode` requires an object payload as well. Malformed/spoofed messages are dropped at the WS boundary (8 new guard tests).
-- Added [SECURITY.md](SECURITY.md) documenting the local-WS threat model and the required desktop-side hardening (Origin check + handshake shared secret via `auth_token` in `server.json`) to block malicious browser pages/local processes from calling `get_accounts_with_tokens`.
+- **Reduced token reads during account sync**: Token-free account lists are used first; plaintext tokens are requested only when remote accounts need to be imported.
+- **Private cache and settings writes**: Files are written atomically with owner-only permissions on POSIX systems. Inbound WebSocket commands reject malformed payloads; desktop-side connection authentication remains required.
 
-### Engineering
-- **Webview is now type-checked**: added `tsconfig.webview.json` (checkJs + DOM lib) and a `typecheck:webview` script, wired into CI. The ~9k lines of plain JS went from 246 type issues to 0. Added `webview.globals.d.ts` declaring the real contracts injected by `hud.ts` (i18n/VS Code API/cross-module handles) plus a bounded DOM glue-layer narrowing (no `any` — typos still fail); fixed genuine issues checkJs exposed: smart-grouping toast called `replace('{count}', number)` (never substituted), `Date` arithmetic now uses `getTime()`, numeric values assigned to inputs are stringified, click listeners with boolean parameters are wrapped, and a stale JSDoc block pointing at a deleted function was removed. Removed the unused `copy-webview` script and `shx` dependency (webview is bundled by esbuild).
-- **Split reactor.ts god object (2014 → 1390 lines)** into four pure-function modules, making the core quota logic testable without VS Code:
-  - `engine/model_family.ts`: family detection (Claude / Gemini Pro / Flash / Image), family-group majority vote, smart grouping;
-  - `engine/snapshot_builder.ts`: visible-model filtering, group mappings, quota-signature majority check, fallback grouping for ungrouped models;
-  - `engine/quota_mapper.ts`: authorized/local response mapping and official ordering, time formatting;
-  - also fixes a label-regex bug where labels ending in parentheses (e.g. `Gemini 4 Pro (High)`) failed family detection due to a `\b` boundary issue (caught by tests).
-- De-duplicated `services/quota_history.ts`: removed four copies of the family regexes in favor of `model_family` (DRY).
-- Added 31 pure-function tests (family 11 + snapshot assembly 10 + quota mapping 10); 58 tests total.
-- Added CI workflow (`.github/workflows/ci.yml`) enforcing `tsc --noEmit` + ESLint + Jest + production build on PRs and main pushes; the release / Open VSX publish pipelines now run the same type-check, lint and test gates.
-- Added `src/engine/model_catalog.ts`: model ordering and new-model adoption extracted as pure functions with 12 unit tests.
-- Enabled `skipLibCheck` in tsconfig to isolate third-party `@types/emscripten` declaration noise.
+### Removed
+- **Legacy custom/auto grouping membership UI**: Dashboard and QuickPick no longer remap model membership manually or generate custom groups; official quota groups supply the active grouping structure.
 
 ## [2.1.52] - 2026-04-19
 

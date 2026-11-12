@@ -24,6 +24,8 @@ export interface CloudCodeQuotaResponse {
             resetTime?: string;
         };
     }>;
+    quota_summary?: unknown;
+    quotaSummary?: unknown;
 }
 
 export interface CloudCodeResponse<T> {
@@ -266,6 +268,21 @@ export class CloudCodeClient {
         const payload = projectId ? { project: projectId } : {};
         const { data } = await this.requestJson<CloudCodeQuotaResponse>(
             '/v1internal:fetchAvailableModels',
+            payload,
+            accessToken,
+            options,
+        );
+        return data;
+    }
+
+    async retrieveUserQuotaSummary(
+        accessToken: string,
+        projectId?: string,
+        options?: CloudCodeRequestOptions,
+    ): Promise<unknown> {
+        const payload = projectId ? { project: projectId } : {};
+        const { data } = await this.requestJson<unknown>(
+            '/v1internal:retrieveUserQuotaSummary',
             payload,
             accessToken,
             options,

@@ -84,6 +84,15 @@ class ConfigService {
     constructor() {
         // 监听配置变化
         vscode.workspace.onDidChangeConfiguration((e) => {
+            if (e.affectsConfiguration(`${this.configSection}.${CONFIG_KEYS.QUOTA_SOURCE}`)) {
+                const config = vscode.workspace.getConfiguration(this.configSection);
+                const inspected = config.inspect<'local' | 'authorized'>(CONFIG_KEYS.QUOTA_SOURCE);
+                const configuredValue = inspected?.workspaceValue ?? inspected?.globalValue;
+                if (configuredValue && this.globalState) {
+                    const stateKey = this.buildStateKey(CONFIG_KEYS.QUOTA_SOURCE);
+                    void this.globalState.update(stateKey, configuredValue);
+                }
+            }
             if (e.affectsConfiguration(this.configSection)) {
                 const newConfig = this.getConfig();
                 this.configChangeListeners.forEach(listener => listener(newConfig));
@@ -100,20 +109,6 @@ class ConfigService {
         await this.migrateSettingsToState();
         await this.migrateDeprecatedModelPreferences();
         await this.cleanupLegacySettings();
-        await this.ensureAuthorizedQuotaSource();
-    }
-
-    private async ensureAuthorizedQuotaSource(): Promise<void> {
-        if (!this.globalState) {
-            return;
-        }
-        const stateKey = this.buildStateKey(CONFIG_KEYS.QUOTA_SOURCE);
-        const current = this.globalState.get<string>(stateKey);
-        if (current !== 'authorized') {
-            logger.info(`[ConfigService] Forcing quota source to authorized (was: ${JSON.stringify(current)})`);
-            await this.globalState.update(stateKey, 'authorized');
-            this.notifyListeners();
-        }
     }
 
     /**
@@ -124,7 +119,7 @@ class ConfigService {
 
         return {
             refreshInterval: config.get<number>(CONFIG_KEYS.REFRESH_INTERVAL, TIMING.DEFAULT_REFRESH_INTERVAL_MS / 1000),
-            showPromptCredits: config.get<boolean>(CONFIG_KEYS.SHOW_PROMPT_CREDITS, false),
+            showPromptCredits: config.get<boolean>(CONFIG_KEYS.SHOW_PROMPT_CREDITS, true),
             pinnedModels: this.getConfigStateValue(CONFIG_KEYS.PINNED_MODELS, []),
             modelOrder: this.getConfigStateValue(CONFIG_KEYS.MODEL_ORDER, []),
             modelCustomNames: this.getConfigStateValue(CONFIG_KEYS.MODEL_CUSTOM_NAMES, {}),
@@ -140,7 +135,7 @@ class ConfigService {
             groupMappings: this.getConfigStateValue(CONFIG_KEYS.GROUP_MAPPINGS, {}),
             warningThreshold: config.get<number>(CONFIG_KEYS.WARNING_THRESHOLD, QUOTA_THRESHOLDS.WARNING_DEFAULT),
             criticalThreshold: config.get<number>(CONFIG_KEYS.CRITICAL_THRESHOLD, QUOTA_THRESHOLDS.CRITICAL_DEFAULT),
-            quotaSource: 'authorized',
+            quotaSource: this.getQuotaSourceValue(config),
             displayMode: config.get<string>(CONFIG_KEYS.DISPLAY_MODE, DISPLAY_MODE.WEBVIEW),
             profileHidden: config.get<boolean>(CONFIG_KEYS.PROFILE_HIDDEN, false),
             dataMasked: config.get<boolean>(CONFIG_KEYS.DATA_MASKED, false),
@@ -198,6 +193,15 @@ class ConfigService {
         await this.globalState.update(stateKey, value);
     }
 
+    private getQuotaSourceValue(config: vscode.WorkspaceConfiguration): string {
+        const inspected = config.inspect<string>(CONFIG_KEYS.QUOTA_SOURCE);
+        const configured = inspected?.workspaceValue ?? inspected?.globalValue;
+        if (configured === 'local' || configured === 'authorized') {
+            return configured;
+        }
+        return this.getConfigStateValue<string>(CONFIG_KEYS.QUOTA_SOURCE, 'local');
+    }
+
     private getConfigStateValue<T>(configKey: string, fallbackValue: T): T {
         if (this.globalState) {
             const stateKey = this.buildStateKey(configKey);
@@ -238,14 +242,15 @@ class ConfigService {
         value: CockpitConfig[K], 
         target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Global,
     ): Promise<void> {
-        const normalizedValue = this.normalizeModelPreferenceConfigValue(
-            key,
-            (key === 'quotaSource' ? 'authorized' : value) as CockpitConfig[K],
-        );
+        const normalizedValue = this.normalizeModelPreferenceConfigValue(key, value);
         if (this.isStateKey(key) && this.globalState) {
             const stateKey = this.buildStateKey(key);
             logger.info(`Updating state '${stateKey}':`, JSON.stringify(normalizedValue));
             await this.globalState.update(stateKey, normalizedValue);
+            if (key === 'quotaSource') {
+                const config = vscode.workspace.getConfiguration(this.configSection);
+                await config.update(key, normalizedValue, target).then(undefined, () => {});
+            }
             this.notifyListeners();
             return;
         }
@@ -524,7 +529,6 @@ class ConfigService {
             { key: 'pinnedGroups', configKey: CONFIG_KEYS.PINNED_GROUPS, defaultValue: [] },
             { key: 'groupingCustomNames', configKey: CONFIG_KEYS.GROUPING_CUSTOM_NAMES, defaultValue: {} },
             { key: 'visibleModels', configKey: CONFIG_KEYS.VISIBLE_MODELS, defaultValue: [] },
-            { key: 'quotaSource', configKey: CONFIG_KEYS.QUOTA_SOURCE, defaultValue: 'authorized' },
         ];
 
         let migrated = false;
@@ -560,7 +564,6 @@ class ConfigService {
             CONFIG_KEYS.PINNED_GROUPS,
             CONFIG_KEYS.GROUPING_CUSTOM_NAMES,
             CONFIG_KEYS.VISIBLE_MODELS,
-            CONFIG_KEYS.QUOTA_SOURCE,
             'viewMode',
             'dashboardViewMode',
             'cardStyle',

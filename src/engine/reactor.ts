@@ -4,12 +4,17 @@
  */
 
 import * as https from 'https';
+import { computeModelAdoption, resolveAuthorizedOrderedModelKeys } from './model_catalog';
+import { collapseLocalQuotaVariants, mergeAuthorizedModels, matchLocalAccount } from './local_quota';
+import { AUTH_MODEL_BLACKLIST_IDS } from '../shared/recommended_models';
 import { 
     QuotaSnapshot,
     ModelQuotaInfo,
     PromptCreditsInfo,
     ServerUserStatusResponse,
     ClientModelConfig,
+    QuotaGroup,
+    QuotaWindow,
     ScanDiagnostics,
     UserInfo,
 } from '../shared/types';
@@ -24,26 +29,70 @@ import { oauthService, credentialStorage } from '../auto_trigger';
 import { antigravityToolsSyncService } from '../antigravityTools_sync';
 import {
     readQuotaApiCache,
+    readDesktopQuotaApiCache,
     writeQuotaApiCache,
     isApiCacheValid,
     type QuotaApiCacheRecord,
 } from '../services/quota_api_cache';
-import { AUTH_MODEL_BLACKLIST_IDS } from '../shared/recommended_models';
-import {
-    computeModelAdoption,
-    type AuthorizedQuotaResponse,
-    type AuthorizedModelInfo,
-} from './model_catalog';
-import {
-    resolveModelFamily,
-    buildFamilyGroupMap,
-    calculateSmartGrouping,
-    type ModelFamily as AutoGroupFamily,
-} from './model_family';
-import { assembleSnapshotModels } from './snapshot_builder';
-import { mapAuthorizedResponseToModels, mapLocalConfigsToModels } from './quota_mapper';
 
-export type { AuthorizedQuotaResponse, AuthorizedModelInfo };
+
+interface AuthorizedQuotaInfo {
+    remainingFraction?: number;
+    resetTime?: string;
+    quotaBucketType?: string | number;
+    type?: string | number;
+    displayName?: string;
+    name?: string;
+    label?: string;
+}
+
+interface AuthorizedModelInfo {
+    displayName?: string;
+    model?: string;
+    disabled?: boolean;
+    quotaInfo?: AuthorizedQuotaInfo;
+    quotaInfos?: unknown;
+    quotaBuckets?: unknown;
+    quotaBucket?: unknown;
+    quotaLimits?: unknown;
+    quotaWindows?: unknown;
+    quotaGroup?: unknown;
+    quotaGroupId?: string;
+    quotaGroupName?: string;
+    quotaPool?: unknown;
+    quotaPoolId?: string;
+    quotaPoolName?: string;
+    modelProvider?: string;
+    apiProvider?: string;
+    // 模型能力字段
+    supportsImages?: boolean;
+    supportsVideo?: boolean;
+    supportsThinking?: boolean;
+    thinkingBudget?: number;
+    minThinkingBudget?: number;
+    maxTokens?: number;
+    maxOutputTokens?: number;
+    recommended?: boolean;
+    tagTitle?: string;
+    supportedMimeTypes?: Record<string, boolean>;
+    isInternal?: boolean;
+}
+
+interface AuthorizedModelSortGroup {
+    modelIds?: string[];
+}
+
+interface AuthorizedModelSort {
+    displayName?: string;
+    groups?: AuthorizedModelSortGroup[];
+}
+
+interface AuthorizedQuotaResponse {
+    models?: Record<string, AuthorizedModelInfo>;
+    agentModelSorts?: AuthorizedModelSort[];
+    quota_summary?: unknown;
+    quotaSummary?: unknown;
+}
 
 export interface AccountQuotaFetchResult {
     snapshot: QuotaSnapshot;
@@ -51,9 +100,152 @@ export interface AccountQuotaFetchResult {
 }
 
 const AUTH_MODEL_BLACKLIST_ID_SET = new Set(AUTH_MODEL_BLACKLIST_IDS);
-
-/** globalState key：已见过的模型 ID，用于识别官方新上线的模型 */
 const KNOWN_MODEL_IDS_STATE_KEY = 'knownModelIds';
+const ARGON_WEEKLY_BUCKET_ID = 'gemini-argon-wtu-weekly';
+const ARGON_GROUP_ID = 'official:gemini-4-argon';
+const ARGON_GROUP_NAME = 'Gemini 4 Argon';
+
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readStringField(record: UnknownRecord, keys: string[]): string | undefined {
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === 'string' && value.trim()) {
+            return value.trim();
+        }
+    }
+    return undefined;
+}
+
+function readNumberField(record: UnknownRecord, keys: string[]): number | undefined {
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            return value;
+        }
+        if (typeof value === 'string' && value.trim()) {
+            const parsed = Number(value.trim());
+            if (Number.isFinite(parsed)) {
+                return parsed;
+            }
+        }
+    }
+    return undefined;
+}
+
+function readStringOrNumberField(record: UnknownRecord, keys: string[]): string | number | undefined {
+    for (const key of keys) {
+        const value = record[key];
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            return value;
+        }
+        if (typeof value === 'string' && value.trim()) {
+            return value.trim();
+        }
+    }
+    return undefined;
+}
+
+function sanitizeQuotaId(value: string): string {
+    return value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'quota';
+}
+
+function isArgonWeeklyBucketId(id: string): boolean {
+    return id === 'argon-weekly' || /^gemini-argon-(?:.+-)?weekly$/.test(id);
+}
+
+function isArgonShortBucketId(id: string): boolean {
+    return id === 'argon-5h' || /^gemini-argon-(?:.+-)?5h$/.test(id);
+}
+
+function isArgonModel(model: ModelQuotaInfo): boolean {
+    return /(?:gemini[-\s]+(?:4[-\s]+)?argon|model_placeholder_m41[789])/i.test(`${model.modelId} ${model.label}`);
+}
+
+function normalizeProviderLabel(value: string): string {
+    return value
+        .replace(/^MODEL_PROVIDER_/i, '')
+        .replace(/^API_PROVIDER_/i, '')
+        .replace(/_VERTEX$/i, '')
+        .replace(/_GEMINI$/i, '')
+        .replace(/_/g, ' ')
+        .toLowerCase()
+        .replace(/\b\w/g, char => char.toUpperCase())
+        .trim();
+}
+
+function normalizeQuotaBucketType(value: string | number | undefined): string | number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        if (value === 0) {
+            return 'SHORT_TERM';
+        }
+        if (value === 1) {
+            return 'LONG_TERM';
+        }
+        return value;
+    }
+    if (typeof value !== 'string') {
+        return undefined;
+    }
+    const normalized = value.trim().toUpperCase();
+    if (!normalized) {
+        return undefined;
+    }
+    if (
+        normalized === '0'
+        || normalized === '5H'
+        || normalized === 'FIVE_HOUR'
+        || normalized === 'FIVE_HOUR_LIMIT'
+        || normalized === 'SHORT'
+        || normalized === 'SHORT_TERM'
+    ) {
+        return 'SHORT_TERM';
+    }
+    if (
+        normalized === '1'
+        || normalized === 'WEEK'
+        || normalized === 'WEEKLY'
+        || normalized === 'WEEKLY_LIMIT'
+        || normalized === 'LONG'
+        || normalized === 'LONG_TERM'
+    ) {
+        return 'LONG_TERM';
+    }
+    return normalized;
+}
+
+function findQuotaMetricRecord(record: UnknownRecord): UnknownRecord | null {
+    const candidates: unknown[] = [
+        record,
+        record.quotaInfo,
+        record.quota_info,
+        record.quota,
+        record.limit,
+        record.window,
+        record.bucket,
+    ];
+
+    for (const candidate of candidates) {
+        if (!isRecord(candidate)) {
+            continue;
+        }
+        const hasQuotaMetric = readNumberField(candidate, ['remainingFraction', 'remaining_fraction', 'fraction', 'remaining']) !== undefined
+            || readStringField(candidate, ['resetTime', 'reset_time', 'resetTimestamp', 'reset_timestamp']) !== undefined;
+        if (hasQuotaMetric) {
+            return candidate;
+        }
+    }
+
+    return null;
+}
+
 
 /**
  * 反应堆核心类
@@ -62,6 +254,8 @@ const KNOWN_MODEL_IDS_STATE_KEY = 'knownModelIds';
 export class ReactorCore {
     private port: number = 0;
     private token: string = '';
+    private localRescanHandler?: () => Promise<boolean>;
+    private lastLocalRescanAt = 0;
 
     private updateHandler?: (data: QuotaSnapshot) => void;
     private errorHandler?: (error: Error) => void;
@@ -75,10 +269,14 @@ export class ReactorCore {
     private lastSnapshotSource?: 'local' | 'authorized';
     /** 上一次的原始 API 响应缓存（用于 reprocess 时重新生成分组） */
     private lastRawResponse?: ServerUserStatusResponse;
+    private lastLocalArgonBucket?: UnknownRecord;
     /** 上一次的授权配额模型缓存（用于 reprocess 时重新生成分组） */
     private lastAuthorizedModels?: ModelQuotaInfo[];
+    private lastAuthorizedModelsAccount?: string | null;
+    /** 上一次的官方配额摘要缓存（用于显示周额度 / 5 小时额度） */
+    private lastAuthorizedQuotaSummary?: unknown;
     /** 最近一次成功获取到的授权 Credits（用于缓存重放时避免回退为 --） */
-    private lastAuthorizedAvailableAICredits?: number;
+    private lastAuthorizedCredits?: { account: string; amount: number };
     /** 本地配额上次拉取时间 */
     private lastLocalFetchedAt?: number;
     /** 授权配额上次拉取时间 */
@@ -104,10 +302,53 @@ export class ReactorCore {
      * 启动反应堆，设置连接参数
      */
     engage(port: number, token: string, diagnostics?: ScanDiagnostics): void {
+        if (this.port !== port || this.token !== token) {
+            this.lastRawResponse = undefined;
+        }
         this.port = port;
         this.token = token;
         this.lastScanDiagnostics = diagnostics;
         logger.info(`Reactor Engaged: :${port}`);
+    }
+
+    hasLocalConnection(): boolean {
+        return this.port > 0 && Boolean(this.token);
+    }
+
+    setLocalRescanHandler(handler: () => Promise<boolean>): void {
+        this.localRescanHandler = handler;
+    }
+
+    private async rescanLocalConnection(): Promise<boolean> {
+        this.lastLocalRescanAt = Date.now();
+        try {
+            if (await this.localRescanHandler?.()) {
+                return true;
+            }
+        } catch (error) {
+            logger.debug(`[LocalQuota] Rescan failed: ${String(error)}`);
+        }
+        this.port = 0;
+        this.token = '';
+        this.lastRawResponse = undefined;
+        return false;
+    }
+
+    /** Only this request's successful, identified local response may enrich an account. */
+    async fetchMatchingLocalTelemetry(email?: string | null): Promise<QuotaSnapshot | null> {
+        if (!email) {
+            return null;
+        }
+        if (this.localRescanHandler && Date.now() - this.lastLocalRescanAt > 15000) {
+            await this.rescanLocalConnection();
+        }
+        let snapshot = await this.tryFetchLocalTelemetry();
+        if (!snapshot && this.hasLocalConnection() && this.localRescanHandler) {
+            if (await this.rescanLocalConnection()) {
+                snapshot = await this.tryFetchLocalTelemetry();
+            }
+        }
+        return matchLocalAccount(snapshot, email);
     }
 
     /**
@@ -144,16 +385,28 @@ export class ReactorCore {
             return false;
         }
         try {
-            const models = this.buildModelsFromAuthorizedResponse(record!.payload as AuthorizedQuotaResponse);
-            if (models.length === 0) {
+            const localSnapshot = await this.fetchMatchingLocalTelemetry(email);
+            const models = mergeAuthorizedModels(
+                this.buildModelsFromAuthorizedResponse(record!.payload as AuthorizedQuotaResponse),
+                localSnapshot,
+                email,
+            );
+            const quotaSummary = await this.resolveQuotaSummary(email, record!.payload as AuthorizedQuotaResponse);
+            if (models.length === 0 && !this.findArgonWeeklyBucket(quotaSummary)) {
+                return false;
+            }
+            if (this.normalizeAccount(await credentialStorage.getActiveAccount()) !== this.normalizeAccount(email)) {
                 return false;
             }
             this.lastAuthorizedModels = models;
+            this.lastAuthorizedModelsAccount = email;
+            this.lastAuthorizedQuotaSummary = quotaSummary;
             const telemetry = this.buildSnapshot(
                 models,
                 undefined,
                 undefined,
-                this.getCachedAuthorizedAvailableAICredits(),
+                this.getCachedAuthorizedAvailableAICredits(email),
+                quotaSummary,
             );
             this.publishTelemetry(telemetry, 'authorized');
             return true;
@@ -271,7 +524,13 @@ export class ReactorCore {
             const models = modelsResult.models;
 
             // 构建快照（复用现有分组/过滤逻辑）
-            const snapshot = this.buildSnapshot(models, undefined, undefined, availableAICredits);
+            const snapshot = this.buildSnapshot(
+                models,
+                undefined,
+                undefined,
+                availableAICredits,
+                modelsResult.quotaSummary,
+            );
             
             logger.info(`[ReactorCore] Quota for ${email}: ${models.length} models, ${snapshot.groups?.length ?? 0} groups`);
             return {
@@ -539,12 +798,6 @@ export class ReactorCore {
             } catch (error) {
                 if (error instanceof CloudCodeAuthError) {
                     logger.warn(`[AuthorizedQuota] Authorization invalid: ${error.message}`);
-                    try {
-                        await credentialStorage.deleteCredential();
-                    } catch (deleteError) {
-                        const err = deleteError instanceof Error ? deleteError : new Error(String(deleteError));
-                        logger.warn(`[AuthorizedQuota] Failed to clear credential: ${err.message}`);
-                    }
                     const telemetry = ReactorCore.createOfflineSnapshot();
                     this.publishTelemetry(telemetry, 'authorized');
                     return;
@@ -558,7 +811,8 @@ export class ReactorCore {
                 }
 
                 if (error instanceof CloudCodeRequestError && error.retryable) {
-                    if (this.lastAuthorizedModels) {
+                    const activeAccount = await credentialStorage.getActiveAccount();
+                    if (this.lastAuthorizedModels && this.normalizeAccount(activeAccount) === this.normalizeAccount(this.lastAuthorizedModelsAccount)) {
                         const cacheAge = this.getCacheAgeMs('authorized');
                         const ageNote = cacheAge !== undefined ? ` (age=${Math.round(cacheAge / 1000)}s)` : '';
                         logger.warn(`[AuthorizedQuota] Request failed, using cached models${ageNote}`);
@@ -566,7 +820,8 @@ export class ReactorCore {
                             this.lastAuthorizedModels,
                             undefined,
                             undefined,
-                            this.getCachedAuthorizedAvailableAICredits(),
+                            this.getCachedAuthorizedAvailableAICredits(activeAccount),
+                            this.lastAuthorizedQuotaSummary,
                         );
                         this.publishTelemetry(telemetry, 'authorized');
                         return;
@@ -596,7 +851,17 @@ export class ReactorCore {
         logger.info('[LocalQuota] Using local process API');
         this.localUsingRemoteApi = false;
         this.localAccountEmail = undefined;
-        return await this.fetchLocalTelemetry();
+        if (this.localRescanHandler && Date.now() - this.lastLocalRescanAt > 15000) {
+            await this.rescanLocalConnection();
+        }
+        try {
+            return await this.fetchLocalTelemetry();
+        } catch (error) {
+            if (this.localRescanHandler && await this.rescanLocalConnection()) {
+                return await this.fetchLocalTelemetry();
+            }
+            throw error;
+        }
     }
 
     private async fetchLocalTelemetry(): Promise<QuotaSnapshot> {
@@ -610,9 +875,13 @@ export class ReactorCore {
                 },
             },
         );
+        const email = raw?.userStatus?.email;
+        const nativeArgonBucket = this.findArgonWeeklyBucket(raw?.userStatus?.quotaSummary ?? raw?.quotaSummary);
+        const cachedArgonBucket = !nativeArgonBucket && email?.includes('@') ? await this.readCachedArgonWeeklyBucket(email) : undefined;
         this.lastRawResponse = raw; // 缓存原始响应
+        this.lastLocalArgonBucket = cachedArgonBucket;
         this.lastLocalFetchedAt = Date.now();
-        return this.decodeSignal(raw);
+        return this.decodeSignal(raw, this.getLocalArgonSummary(raw));
     }
 
     private async tryFetchLocalTelemetry(): Promise<QuotaSnapshot | null> {
@@ -678,6 +947,9 @@ export class ReactorCore {
             }
         }
         telemetry.activeModelId = this.activeModelId;
+        if (source === 'authorized' && telemetry.isConnected) {
+            telemetry.quotaAccountEmail = this.lastAuthorizedModelsAccount ?? undefined;
+        }
         this.lastSnapshot = telemetry; // Cache the latest snapshot
         if (source) {
             this.lastSnapshotSource = source;
@@ -717,7 +989,10 @@ export class ReactorCore {
             logger.warn('[AuthorizedQuota] Max account change retries reached, returning empty snapshot');
             return ReactorCore.createOfflineSnapshot();
         }
-        const tokenResult = await oauthService.getAccessTokenStatus();
+        const activeAccount = await credentialStorage.getActiveAccount();
+        const tokenResult = activeAccount
+            ? await oauthService.getAccessTokenStatusForAccount(activeAccount)
+            : await oauthService.getAccessTokenStatus();
         if (tokenResult.state === 'invalid_grant') {
             throw new CloudCodeAuthError('Authorization expired');
         }
@@ -728,11 +1003,12 @@ export class ReactorCore {
             throw new Error(t('quotaSource.authorizedMissing') || 'Authorize auto wake-up first');
         }
         const accessToken = tokenResult.token;
-        const activeAccount = await credentialStorage.getActiveAccount();
 
         let projectId: string | undefined;
         let availableAICredits: number | undefined;
-        const credential = await credentialStorage.getCredential();
+        const credential = activeAccount
+            ? await credentialStorage.getCredentialForAccount(activeAccount)
+            : await credentialStorage.getCredential();
         if (credential?.projectId) {
             projectId = credential.projectId;
         }
@@ -757,7 +1033,6 @@ export class ReactorCore {
             }
             if (Number.isFinite(info.availableAICredits)) {
                 availableAICredits = Math.max(0, Number(info.availableAICredits));
-                this.lastAuthorizedAvailableAICredits = availableAICredits;
             }
         } catch (error) {
             if (error instanceof CloudCodeAuthError) {
@@ -767,21 +1042,29 @@ export class ReactorCore {
             logger.warn(`[AuthorizedQuota] loadCodeAssist failed, continuing without project: ${err.message}`);
         }
 
-        const models = await this.fetchAuthorizedQuotaModels(
+        const modelsResult = await this.fetchAuthorizedQuotaModelsWithSource(
             accessToken,
             projectId,
             activeAccount ?? undefined,
             false,
             credential?.isGcpTos,
         );
+        const models = modelsResult.models;
         const activeAccountAfter = await credentialStorage.getActiveAccount();
         if (this.normalizeAccount(activeAccount) !== this.normalizeAccount(activeAccountAfter)) {
             logger.info('[AuthorizedQuota] Active account changed during fetch, retrying with new account');
             this.lastAuthorizedModels = undefined;
+            this.lastAuthorizedQuotaSummary = undefined;
             // 递归重试，获取新账号的配额
             return this.fetchAuthorizedTelemetry(retryCount + 1);
         }
         this.lastAuthorizedModels = models;
+        this.lastAuthorizedModelsAccount = activeAccount;
+        this.lastAuthorizedQuotaSummary = modelsResult.quotaSummary;
+        const account = this.normalizeAccount(activeAccount);
+        if (account && availableAICredits !== undefined) {
+            this.lastAuthorizedCredits = { account, amount: availableAICredits };
+        }
 
         const snapshot = this.buildSnapshot(
             models,
@@ -789,10 +1072,11 @@ export class ReactorCore {
             undefined,
             Number.isFinite(availableAICredits)
                 ? Math.max(0, Number(availableAICredits))
-                : this.getCachedAuthorizedAvailableAICredits(),
+                : this.getCachedAuthorizedAvailableAICredits(activeAccount),
+            modelsResult.quotaSummary,
         );
-        const localSnapshot = await this.tryFetchLocalTelemetry();
-        if (localSnapshot?.promptCredits || localSnapshot?.userInfo) {
+        const localSnapshot = modelsResult.localSnapshot;
+        if (localSnapshot) {
             snapshot.promptCredits = localSnapshot.promptCredits;
             snapshot.userInfo = localSnapshot.userInfo;
         }
@@ -808,109 +1092,574 @@ export class ReactorCore {
         return normalized ? normalized : null;
     }
 
-    private getCachedAuthorizedAvailableAICredits(): number | undefined {
-        if (Number.isFinite(this.lastAuthorizedAvailableAICredits)) {
-            return Math.max(0, Number(this.lastAuthorizedAvailableAICredits));
+    private getCachedAuthorizedAvailableAICredits(email = this.lastAuthorizedModelsAccount): number | undefined {
+        return this.lastAuthorizedCredits?.account === this.normalizeAccount(email)
+            ? this.lastAuthorizedCredits.amount
+            : undefined;
+    }
+
+    private normalizeRemainingFraction(value: unknown): number | undefined {
+        if (typeof value !== 'number' || !Number.isFinite(value)) {
+            return undefined;
+        }
+        if (value < 0 || value > 1) {
+            return undefined;
+        }
+        return value;
+    }
+
+    private inferQuotaWindowIdentity(
+        resetTime: Date,
+        resetTimeValid: boolean,
+        now: number,
+        quotaBucketType?: string | number,
+    ): { windowId: string; windowName: string } {
+        const normalizedBucketType = normalizeQuotaBucketType(quotaBucketType);
+        if (normalizedBucketType === 'LONG_TERM') {
+            return { windowId: 'long-term', windowName: 'Weekly Limit' };
+        }
+        if (normalizedBucketType === 'SHORT_TERM') {
+            return { windowId: 'short-term', windowName: 'Five Hour Limit' };
         }
 
-        const snapshotCredits = this.lastSnapshot?.availableAICredits;
-        if (Number.isFinite(snapshotCredits)) {
-            return Math.max(0, Number(snapshotCredits));
+        if (resetTimeValid) {
+            const deltaMs = resetTime.getTime() - now;
+            if (deltaMs > 0 && deltaMs <= 6 * 60 * 60 * 1000) {
+                return { windowId: 'short-term', windowName: 'Five Hour Limit' };
+            }
+            if (deltaMs >= 24 * 60 * 60 * 1000) {
+                return { windowId: 'long-term', windowName: 'Weekly Limit' };
+            }
         }
 
+        return { windowId: 'model-quota', windowName: 'Model Quota' };
+    }
+
+    private parseQuotaWindow(raw: unknown, fallbackId: string, fallbackName: string, now: number): QuotaWindow | null {
+        if (!isRecord(raw)) {
+            return null;
+        }
+
+        const metricRecord = findQuotaMetricRecord(raw);
+        if (!metricRecord) {
+            return null;
+        }
+
+        const remainingFraction = this.normalizeRemainingFraction(
+            readNumberField(metricRecord, ['remainingFraction', 'remaining_fraction', 'fraction', 'remaining']),
+        );
+        const resetTimeRaw = readStringField(metricRecord, ['resetTime', 'reset_time', 'resetTimestamp', 'reset_timestamp']);
+        const rawBucketType = readStringOrNumberField(raw, ['quotaBucketType', 'bucketType', 'type', 'window', 'quota_bucket_type'])
+            ?? readStringOrNumberField(metricRecord, ['quotaBucketType', 'bucketType', 'type', 'window', 'quota_bucket_type']);
+        const rawId = readStringField(raw, ['id', 'key', 'quotaBucketId', 'bucketId', 'windowId']);
+        const bucketId = rawId ? sanitizeQuotaId(rawId) : '';
+        const isArgonWeekly = isArgonWeeklyBucketId(bucketId);
+        let quotaBucketType = normalizeQuotaBucketType(rawBucketType);
+        if (isArgonWeekly || /^(gemini|3p)-weekly$/.test(bucketId)) {
+            quotaBucketType = 'LONG_TERM';
+        } else if (isArgonShortBucketId(bucketId) || /^(gemini|3p)-5h$/.test(bucketId)) {
+            quotaBucketType = 'SHORT_TERM';
+        }
+        if (isArgonWeekly && remainingFraction === undefined) {
+            return null;
+        }
+
+        let resetTime = new Date(0);
+        let resetTimeValid = false;
+        if (resetTimeRaw) {
+            const parsed = new Date(resetTimeRaw);
+            if (!Number.isNaN(parsed.getTime())) {
+                resetTime = parsed;
+                resetTimeValid = parsed.getTime() > now;
+            }
+        }
+
+        const inferred = this.inferQuotaWindowIdentity(resetTime, resetTimeValid, now, quotaBucketType);
+        const rawName = readStringField(raw, ['displayName', 'name', 'label', 'windowName']);
+        const windowId = isArgonWeekly ? ARGON_WEEKLY_BUCKET_ID : (bucketId || fallbackId || inferred.windowId);
+        const windowName = isArgonWeekly ? 'Gemini 4 Argon (Weekly)' : (rawName || fallbackName || inferred.windowName);
+        const remainingPercentage = remainingFraction !== undefined ? remainingFraction * 100 : 0;
+        const timeUntilReset = resetTimeValid ? Math.max(0, resetTime.getTime() - now) : 0;
+
+        return {
+            windowId,
+            windowName,
+            remainingFraction,
+            remainingPercentage,
+            isExhausted: remainingFraction === 0,
+            resetTime,
+            timeUntilReset,
+            timeUntilResetFormatted: resetTimeValid ? this.formatDelta(timeUntilReset) : (t('dashboard.online') || 'Quota available'),
+            resetTimeDisplay: resetTimeValid ? this.formatIso(resetTime) : (t('common.unknown') || 'Unknown'),
+            resetTimeValid,
+            quotaBucketType,
+            source: quotaBucketType || rawId || rawName ? 'official' : 'inferred',
+        };
+    }
+
+    private collectQuotaWindowRecords(info: AuthorizedModelInfo): Array<{ raw: unknown; source: 'official' | 'modelQuota' }> {
+        const records: Array<{ raw: unknown; source: 'official' | 'modelQuota' }> = [];
+        const officialFields: unknown[] = [
+            info.quotaBuckets,
+            info.quotaBucket,
+            info.quotaLimits,
+            info.quotaWindows,
+            info.quotaInfos,
+        ];
+
+        for (const field of officialFields) {
+            if (Array.isArray(field)) {
+                for (const item of field) {
+                    records.push({ raw: item, source: 'official' });
+                }
+                continue;
+            }
+            if (isRecord(field)) {
+                const hasQuotaShape = readNumberField(field, ['remainingFraction', 'remaining_fraction', 'fraction', 'remaining']) !== undefined
+                    || readStringField(field, ['resetTime', 'reset_time', 'resetTimestamp', 'reset_timestamp']) !== undefined;
+                if (hasQuotaShape) {
+                    records.push({ raw: field, source: 'official' });
+                } else {
+                    for (const item of Object.values(field)) {
+                        records.push({ raw: item, source: 'official' });
+                    }
+                }
+            }
+        }
+
+        if (records.length === 0 && info.quotaInfo) {
+            records.push({ raw: info.quotaInfo, source: 'modelQuota' });
+        }
+
+        return records;
+    }
+
+    private buildQuotaWindowsForAuthorizedModel(info: AuthorizedModelInfo, now: number): QuotaWindow[] {
+        const windows: QuotaWindow[] = [];
+        const seen = new Set<string>();
+
+        for (const entry of this.collectQuotaWindowRecords(info)) {
+            const parsed = this.parseQuotaWindow(entry.raw, '', '', now);
+            if (!parsed) {
+                continue;
+            }
+            const key = `${parsed.windowId}:${parsed.resetTime.getTime()}:${parsed.remainingPercentage}`;
+            if (seen.has(key)) {
+                continue;
+            }
+            seen.add(key);
+            windows.push({
+                ...parsed,
+                source: entry.source === 'official' ? parsed.source : 'modelQuota',
+            });
+        }
+
+        windows.sort((a, b) => this.getQuotaWindowRank(a) - this.getQuotaWindowRank(b));
+        return windows;
+    }
+
+    private getQuotaWindowRank(window: QuotaWindow): number {
+        const bucketType = normalizeQuotaBucketType(window.quotaBucketType);
+        if (bucketType === 'LONG_TERM' || window.windowId === 'long-term') {
+            return 0;
+        }
+        if (bucketType === 'SHORT_TERM' || window.windowId === 'short-term') {
+            return 1;
+        }
+        return 10;
+    }
+
+    private resolveAuthorizedQuotaGroup(info: AuthorizedModelInfo): { groupId?: string; groupName?: string } {
+        const directId = info.quotaGroupId || info.quotaPoolId;
+        const directName = info.quotaGroupName || info.quotaPoolName;
+        if (directId || directName) {
+            return {
+                groupId: directId ? `official:${sanitizeQuotaId(directId)}` : undefined,
+                groupName: directName,
+            };
+        }
+
+        for (const field of [info.quotaGroup, info.quotaPool]) {
+            if (!isRecord(field)) {
+                continue;
+            }
+            const id = readStringField(field, ['id', 'groupId', 'poolId', 'key']);
+            const name = readStringField(field, ['displayName', 'name', 'label', 'groupName', 'poolName']);
+            if (id || name) {
+                return {
+                    groupId: id ? `official:${sanitizeQuotaId(id)}` : undefined,
+                    groupName: name,
+                };
+            }
+        }
+
+        return {};
+    }
+
+    private resolveQuotaGroupForModel(model: ModelQuotaInfo): { groupId: string; groupName: string; providerGroup?: string } {
+        if (model.quotaGroupId || model.quotaGroupName) {
+            const groupName = model.quotaGroupName || model.quotaGroupId || 'Model Quota';
+            return {
+                groupId: model.quotaGroupId || `official:${sanitizeQuotaId(groupName)}`,
+                groupName,
+            };
+        }
+
+        const providerText = [
+            model.modelProvider,
+            model.apiProvider,
+            model.modelId,
+            model.label,
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        if (providerText.includes('google') || providerText.includes('gemini')) {
+            return {
+                groupId: 'provider:gemini-models',
+                groupName: 'Gemini Models',
+                providerGroup: 'gemini',
+            };
+        }
+
+        if (
+            providerText.includes('anthropic')
+            || providerText.includes('claude')
+            || providerText.includes('openai')
+            || providerText.includes('gpt')
+        ) {
+            return {
+                groupId: 'provider:claude-gpt-models',
+                groupName: 'Claude and GPT models',
+                providerGroup: 'claude-gpt',
+            };
+        }
+
+        const providerName = model.modelProvider
+            ? normalizeProviderLabel(model.modelProvider)
+            : model.apiProvider
+                ? normalizeProviderLabel(model.apiProvider)
+                : 'Other';
+        return {
+            groupId: `provider:${sanitizeQuotaId(providerName)}`,
+            groupName: `${providerName} Models`,
+            providerGroup: sanitizeQuotaId(providerName),
+        };
+    }
+
+    private getQuotaSummaryFromResponse(data: AuthorizedQuotaResponse): unknown {
+        return data.quota_summary ?? data.quotaSummary;
+    }
+
+    private findArgonWeeklyBucket(summary: unknown, now?: number): UnknownRecord | undefined {
+        if (!isRecord(summary) || !Array.isArray(summary.groups)) {
+            return undefined;
+        }
+        for (const group of summary.groups) {
+            if (!isRecord(group) || !Array.isArray(group.buckets)) {
+                continue;
+            }
+            for (const bucket of group.buckets) {
+                if (!isRecord(bucket)) {
+                    continue;
+                }
+                const id = readStringField(bucket, ['bucketId', 'quotaBucketId', 'id', 'key']) ?? '';
+                if (isArgonWeeklyBucketId(sanitizeQuotaId(id))) {
+                    const window = this.parseQuotaWindow(bucket, '', '', now ?? Date.now());
+                    if (window && (now === undefined || window.resetTimeValid)) {
+                        return bucket;
+                    }
+                }
+            }
+        }
         return undefined;
     }
 
-    private resolveAutoGroupFamily(modelId: string, label?: string): AutoGroupFamily | null {
-        return resolveModelFamily(modelId, label);
+    private async readCachedArgonWeeklyBucket(email: string): Promise<UnknownRecord | undefined> {
+        const records = await Promise.all([readQuotaApiCache('authorized', email), readDesktopQuotaApiCache('authorized', email)]);
+        const now = Date.now();
+        for (const record of records.filter(record => record !== null).sort((a, b) => b.updatedAt - a.updatedAt)) {
+            if (this.normalizeAccount(record.email) !== this.normalizeAccount(email) || !isRecord(record.payload)) {
+                continue;
+            }
+            const bucket = this.findArgonWeeklyBucket(this.getQuotaSummaryFromResponse(record.payload), now);
+            if (bucket) {
+                return bucket;
+            }
+        }
+        return undefined;
     }
 
-    private buildAutoFamilyGroupMap(groupMappings: Record<string, string>): Partial<Record<AutoGroupFamily, string>> {
-        return buildFamilyGroupMap(groupMappings, modelId => this.resolveAutoGroupFamily(modelId));
+    private async resolveQuotaSummary(
+        email: string | undefined,
+        response?: AuthorizedQuotaResponse,
+    ): Promise<unknown> {
+        const responseSummary = response ? this.getQuotaSummaryFromResponse(response) : undefined;
+        if (!email || this.findArgonWeeklyBucket(responseSummary)) {
+            return responseSummary;
+        }
+
+        const desktopCache = await readDesktopQuotaApiCache('authorized', email);
+        const desktopPayload = desktopCache?.payload;
+        const desktopSummary = this.normalizeAccount(desktopCache?.email) === this.normalizeAccount(email) && isRecord(desktopPayload)
+            ? this.getQuotaSummaryFromResponse(desktopPayload)
+            : undefined;
+        if (desktopSummary && !responseSummary) {
+            logger.info('[AuthorizedQuota] Using quota_summary from desktop cache fallback');
+            return desktopSummary;
+        }
+        const argonBucket = this.findArgonWeeklyBucket(desktopSummary, Date.now());
+        if (argonBucket && isRecord(responseSummary) && Array.isArray(responseSummary.groups)) {
+            return { ...responseSummary, groups: [...responseSummary.groups, { buckets: [argonBucket] }] };
+        }
+
+        return responseSummary;
     }
 
-    private getNewModelsComparedToCache(
-        previousCache: QuotaApiCacheRecord | null,
-        latestModels: ModelQuotaInfo[],
-    ): ModelQuotaInfo[] {
-        if (!previousCache?.payload) {
+    private getQuotaSummaryGroups(quotaSummary: unknown, now: number): Array<{
+        groupId: string;
+        groupName: string;
+        description?: string;
+        quotaWindows: QuotaWindow[];
+    }> {
+        if (!isRecord(quotaSummary) || !Array.isArray(quotaSummary.groups)) {
             return [];
         }
-        try {
-            const previousModels = this.buildModelsFromAuthorizedResponse(
-                previousCache.payload as AuthorizedQuotaResponse,
-            );
-            const previousIds = new Set(
-                previousModels.map(model => model.modelId.trim().toLowerCase()),
-            );
-            const seen = new Set<string>();
-            return latestModels.filter(model => {
-                const normalizedId = model.modelId.trim().toLowerCase();
-                if (!normalizedId || seen.has(normalizedId)) {
-                    return false;
-                }
-                seen.add(normalizedId);
-                return !previousIds.has(normalizedId);
+
+        const groups: Array<{
+            groupId: string;
+            groupName: string;
+            description?: string;
+            quotaWindows: QuotaWindow[];
+        }> = [];
+        let argonWeekly: QuotaWindow | undefined;
+
+        for (const [index, rawGroup] of quotaSummary.groups.entries()) {
+            if (!isRecord(rawGroup)) {
+                continue;
+            }
+            const rawGroupName = readStringField(rawGroup, ['displayName', 'name', 'label', 'groupName'])
+                || `Model Quota ${index + 1}`;
+            const groupName = rawGroupName;
+            const rawGroupId = readStringField(rawGroup, ['id', 'groupId', 'key'])
+                || rawGroupName;
+            const description = readStringField(rawGroup, ['description']);
+            const rawBuckets = rawGroup.buckets
+                ?? rawGroup.quotaBuckets
+                ?? rawGroup.quotaWindows
+                ?? rawGroup.windows
+                ?? rawGroup.quotaLimits;
+            const bucketList = Array.isArray(rawBuckets)
+                ? rawBuckets
+                : isRecord(rawBuckets)
+                    ? Object.values(rawBuckets)
+                    : [];
+            const windows = bucketList
+                .map((bucket, bucketIndex) => this.parseQuotaWindow(
+                    bucket,
+                    `${sanitizeQuotaId(groupName)}-${bucketIndex + 1}`,
+                    '',
+                    now,
+                ))
+                .filter((window): window is QuotaWindow => window !== null && window.remainingFraction !== undefined)
+                .sort((a, b) => this.getQuotaWindowRank(a) - this.getQuotaWindowRank(b));
+            argonWeekly ??= windows.find(window => window.windowId === ARGON_WEEKLY_BUCKET_ID);
+            const quotaWindows = windows.filter(window => window.windowId !== ARGON_WEEKLY_BUCKET_ID && !isArgonShortBucketId(window.windowId));
+
+            if (quotaWindows.length === 0) {
+                continue;
+            }
+
+            groups.push({
+                groupId: `official:${sanitizeQuotaId(rawGroupId)}`,
+                groupName,
+                description,
+                quotaWindows,
             });
-        } catch (error) {
-            logger.warn(
-                `[AutoGroup] Failed to compare api cache payload: ${
-                    error instanceof Error ? error.message : String(error)
-                }`,
-            );
-            return [];
         }
+
+        if (argonWeekly) {
+            groups.push({ groupId: ARGON_GROUP_ID, groupName: ARGON_GROUP_NAME, quotaWindows: [argonWeekly] });
+        }
+
+        return groups;
     }
 
-    private async autoAssignNewModelsToExistingGroups(
-        previousCache: QuotaApiCacheRecord | null,
-        latestModels: ModelQuotaInfo[],
-    ): Promise<void> {
-        const newModels = this.getNewModelsComparedToCache(previousCache, latestModels);
-        if (newModels.length === 0) {
-            return;
+    private isModelInQuotaSummaryGroup(
+        model: ModelQuotaInfo,
+        summaryGroup: { groupId: string; groupName: string; description?: string },
+        hasArgonGroup: boolean,
+    ): boolean {
+        if (summaryGroup.groupId === ARGON_GROUP_ID) {
+            return isArgonModel(model);
+        }
+        if (hasArgonGroup && isArgonModel(model)) {
+            return false;
+        }
+        const resolved = this.resolveQuotaGroupForModel(model);
+        const groupText = `${summaryGroup.groupName} ${summaryGroup.description || ''}`.toLowerCase();
+        const modelText = [
+            model.modelProvider,
+            model.apiProvider,
+            model.modelId,
+            model.label,
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        if (groupText.includes('gemini') || groupText.includes('google')) {
+            return resolved.providerGroup === 'gemini'
+                || modelText.includes('gemini')
+                || modelText.includes('google');
         }
 
-        const config = configService.getConfig();
-        const existingMappings = config.groupMappings || {};
-        if (Object.keys(existingMappings).length === 0) {
-            logger.info('[AutoGroup] Skip auto-assign: no existing group mappings');
-            return;
+        if (
+            groupText.includes('claude')
+            || groupText.includes('gpt')
+            || groupText.includes('openai')
+            || groupText.includes('anthropic')
+        ) {
+            return resolved.providerGroup === 'claude-gpt'
+                || modelText.includes('claude')
+                || modelText.includes('gpt')
+                || modelText.includes('openai')
+                || modelText.includes('anthropic');
         }
 
-        const familyGroupMap = this.buildAutoFamilyGroupMap(existingMappings);
-        if (Object.keys(familyGroupMap).length === 0) {
-            logger.info('[AutoGroup] Skip auto-assign: no existing family groups found');
-            return;
-        }
+        return resolved.groupName.toLowerCase() === summaryGroup.groupName.toLowerCase();
+    }
 
-        let changedCount = 0;
-        const nextMappings = { ...existingMappings };
-        for (const model of newModels) {
-            if (!model.modelId || nextMappings[model.modelId]) {
-                continue;
+    private aggregateQuotaWindows(models: ModelQuotaInfo[]): QuotaWindow[] {
+        const windowsById = new Map<string, QuotaWindow>();
+
+        for (const model of models) {
+            for (const window of model.quotaWindows ?? []) {
+                const bucketType = normalizeQuotaBucketType(window.quotaBucketType);
+                const key = `${bucketType ?? window.windowId}`;
+                const existing = windowsById.get(key);
+                if (!existing) {
+                    windowsById.set(key, { ...window });
+                    continue;
+                }
+
+                const isLower = window.remainingPercentage < existing.remainingPercentage;
+                const isTieWithEarlierReset = window.remainingPercentage === existing.remainingPercentage
+                    && window.resetTime.getTime() > 0
+                    && (
+                        existing.resetTime.getTime() <= 0
+                        || window.resetTime.getTime() < existing.resetTime.getTime()
+                    );
+                if (isLower || isTieWithEarlierReset) {
+                    windowsById.set(key, { ...window });
+                }
             }
-            const family = this.resolveAutoGroupFamily(model.modelId, model.label);
-            if (!family) {
-                continue;
-            }
-            const targetGroupId = familyGroupMap[family];
-            if (!targetGroupId) {
-                continue;
-            }
-            nextMappings[model.modelId] = targetGroupId;
-            changedCount++;
-            logger.info(
-                `[AutoGroup] Assigned new model "${model.label}" (${model.modelId}) to existing group "${targetGroupId}" (family=${family})`,
-            );
         }
 
-        if (changedCount === 0) {
-            return;
+        return Array.from(windowsById.values())
+            .sort((a, b) => {
+                const rankDelta = this.getQuotaWindowRank(a) - this.getQuotaWindowRank(b);
+                if (rankDelta !== 0) {
+                    return rankDelta;
+                }
+                return a.windowName.localeCompare(b.windowName);
+            });
+    }
+
+    private buildQuotaGroups(models: ModelQuotaInfo[], quotaSummary?: unknown): QuotaGroup[] {
+        const now = Date.now();
+        const summaryGroups = this.getQuotaSummaryGroups(quotaSummary, now);
+        if (summaryGroups.length > 0) {
+            const hasArgonGroup = summaryGroups.some(group => group.groupId === ARGON_GROUP_ID);
+            const assignedModelIds = new Set<string>();
+            const officialGroups = summaryGroups
+                .map(summaryGroup => {
+                    const groupModels = models.filter(model => this.isModelInQuotaSummaryGroup(model, summaryGroup, hasArgonGroup));
+                    for (const model of groupModels) {
+                        assignedModelIds.add(model.modelId);
+                    }
+                    const primaryWindow = summaryGroup.quotaWindows.reduce((lowest, current) => (
+                        current.remainingPercentage < lowest.remainingPercentage ? current : lowest
+                    ));
+                    return {
+                        groupId: summaryGroup.groupId,
+                        groupName: summaryGroup.groupName,
+                        models: groupModels,
+                        quotaWindows: summaryGroup.quotaWindows,
+                        description: summaryGroup.description,
+                        remainingPercentage: primaryWindow.remainingPercentage,
+                        resetTime: primaryWindow.resetTime,
+                        resetTimeDisplay: primaryWindow.resetTimeDisplay,
+                        timeUntilResetFormatted: primaryWindow.timeUntilResetFormatted,
+                        isExhausted: summaryGroup.quotaWindows.some(window => window.isExhausted),
+                        providerGroup: undefined,
+                    };
+                })
+                .filter(group => group.models.length > 0 || group.groupId === ARGON_GROUP_ID);
+
+            const remainingModels = models.filter(model => !assignedModelIds.has(model.modelId));
+            const fallbackGroups = remainingModels.length > 0
+                ? this.buildProviderQuotaGroups(remainingModels)
+                : [];
+
+            return [...officialGroups, ...fallbackGroups]
+                .sort((a, b) => {
+                    const indexA = a.models.length ? models.indexOf(a.models[0]) : models.length;
+                    const indexB = b.models.length ? models.indexOf(b.models[0]) : models.length;
+                    return indexA - indexB;
+                });
         }
 
-        await configService.updateGroupMappings(nextMappings);
-        logger.info(`[AutoGroup] Auto-assigned ${changedCount} new model(s) based on api-cache diff`);
+        return this.buildProviderQuotaGroups(models);
+    }
+
+    private buildProviderQuotaGroups(models: ModelQuotaInfo[]): QuotaGroup[] {
+        const groupMap = new Map<string, {
+            groupId: string;
+            groupName: string;
+            models: ModelQuotaInfo[];
+            providerGroup?: string;
+            firstModelIndex: number;
+        }>();
+
+        models.forEach((model, index) => {
+            const resolved = this.resolveQuotaGroupForModel(model);
+            const existing = groupMap.get(resolved.groupId);
+            if (existing) {
+                existing.models.push(model);
+                return;
+            }
+            groupMap.set(resolved.groupId, {
+                groupId: resolved.groupId,
+                groupName: resolved.groupName,
+                models: [model],
+                providerGroup: resolved.providerGroup,
+                firstModelIndex: index,
+            });
+        });
+
+        return Array.from(groupMap.values())
+            .sort((a, b) => a.firstModelIndex - b.firstModelIndex)
+            .map(group => {
+                const quotaWindows = this.aggregateQuotaWindows(group.models);
+                const fallbackPercentage = Math.min(...group.models.map(model => model.remainingPercentage ?? 0));
+                const primaryWindow = quotaWindows.length > 0
+                    ? quotaWindows.reduce((lowest, current) => (
+                        current.remainingPercentage < lowest.remainingPercentage ? current : lowest
+                    ))
+                    : undefined;
+                const firstModel = group.models[0];
+
+                return {
+                    groupId: group.groupId,
+                    groupName: group.groupName,
+                    models: group.models,
+                    quotaWindows,
+                    providerGroup: group.providerGroup,
+                    remainingPercentage: primaryWindow?.remainingPercentage ?? fallbackPercentage,
+                    resetTime: primaryWindow?.resetTime ?? firstModel.resetTime,
+                    resetTimeDisplay: primaryWindow?.resetTimeDisplay ?? firstModel.resetTimeDisplay,
+                    timeUntilResetFormatted: primaryWindow?.timeUntilResetFormatted ?? firstModel.timeUntilResetFormatted,
+                    isExhausted: quotaWindows.length > 0
+                        ? quotaWindows.some(window => window.isExhausted)
+                        : group.models.some(model => model.isExhausted),
+                };
+            });
     }
 
     private async fetchAuthorizedQuotaModels(
@@ -936,7 +1685,8 @@ export class ReactorCore {
         email?: string,
         forceRefresh: boolean = false,
         isGcpTos?: boolean,
-    ): Promise<{ models: ModelQuotaInfo[]; fromApiCacheFile: boolean }> {
+    ): Promise<{ models: ModelQuotaInfo[]; quotaSummary?: unknown; fromApiCacheFile: boolean; localSnapshot: QuotaSnapshot | null }> {
+        const localSnapshot = await this.fetchMatchingLocalTelemetry(email);
         let previousCache: QuotaApiCacheRecord | null = null;
         if (email) {
             previousCache = await readQuotaApiCache('authorized', email);
@@ -944,10 +1694,17 @@ export class ReactorCore {
 
         if (email && !forceRefresh && isApiCacheValid(previousCache)) {
             try {
-                return {
-                    models: this.buildModelsFromAuthorizedResponse(previousCache!.payload as AuthorizedQuotaResponse),
-                    fromApiCacheFile: true,
-                };
+                const payload = previousCache!.payload as AuthorizedQuotaResponse;
+                const quotaSummary = await this.resolveQuotaSummary(email, payload);
+                if (quotaSummary) {
+                    return {
+                        models: mergeAuthorizedModels(this.buildModelsFromAuthorizedResponse(payload), localSnapshot, email),
+                        localSnapshot,
+                        quotaSummary,
+                        fromApiCacheFile: true,
+                    };
+                }
+                logger.info('[QuotaApiCache] Cached response has no quota_summary; refreshing official quota summary');
             } catch (error) {
                 logger.warn(`[QuotaApiCache] Cached response decode failed: ${error instanceof Error ? error.message : String(error)}`);
             }
@@ -963,14 +1720,29 @@ export class ReactorCore {
             },
         ) as AuthorizedQuotaResponse;
 
-        const models = this.buildModelsFromAuthorizedResponse(data);
+        try {
+            const quotaSummary = await cloudCodeClient.retrieveUserQuotaSummary(
+                accessToken,
+                projectId,
+                {
+                    logLabel: 'AuthorizedQuotaSummary',
+                    route: { isGcpTos },
+                },
+            );
+            data.quota_summary = quotaSummary;
+            logger.info('[AuthorizedQuota] retrieveUserQuotaSummary succeeded');
+        } catch (error) {
+            const err = error instanceof Error ? error : new Error(String(error));
+            logger.warn(`[AuthorizedQuota] retrieveUserQuotaSummary failed, continuing with per-model quotaInfo: ${err.message}`);
+        }
+
+        const models = mergeAuthorizedModels(this.buildModelsFromAuthorizedResponse(data), localSnapshot, email);
+        const quotaSummary = await this.resolveQuotaSummary(email, data);
+        if (quotaSummary) {
+            data.quota_summary = quotaSummary;
+        }
 
         if (email) {
-            try {
-                await this.autoAssignNewModelsToExistingGroups(previousCache, models);
-            } catch (error) {
-                logger.warn(`[AutoGroup] Failed to auto-assign new models: ${error instanceof Error ? error.message : String(error)}`);
-            }
             try {
                 await writeQuotaApiCache({
                     version: 1,
@@ -988,24 +1760,67 @@ export class ReactorCore {
 
         return {
             models,
+            quotaSummary,
+            localSnapshot,
             fromApiCacheFile: false,
         };
     }
 
     private buildModelsFromAuthorizedResponse(data: AuthorizedQuotaResponse): ModelQuotaInfo[] {
-        const models = mapAuthorizedResponseToModels(
-            data,
-            {
-                unknown: t('common.unknown') || 'Unknown',
-                online: t('dashboard.online') || 'Quota available',
-            },
-            message => logger.warn(message),
-            Date.now(),
-            AUTH_MODEL_BLACKLIST_ID_SET,
-        );
-        if (models.length === 0) {
-            logger.warn('[AuthorizedQuota] No model found from available models response');
+        const models: ModelQuotaInfo[] = [];
+        const now = Date.now();
+
+        if (!data.models) {
+            return models;
         }
+
+        const orderedKeys = resolveAuthorizedOrderedModelKeys(data, AUTH_MODEL_BLACKLIST_ID_SET);
+        for (const modelKey of orderedKeys) {
+            const info = data.models[modelKey];
+            if (!info) {
+                continue;
+            }
+            if (info.disabled) {
+                continue;
+            }
+
+            const quotaWindows = this.buildQuotaWindowsForAuthorizedModel(info, now);
+            const primaryWindow = quotaWindows.length > 0
+                ? quotaWindows.reduce((lowest, current) => (
+                    current.remainingPercentage < lowest.remainingPercentage ? current : lowest
+                ))
+                : undefined;
+            const remainingFraction = primaryWindow?.remainingFraction;
+            const resetTime = primaryWindow?.resetTime ?? new Date(0);
+            const resetTimeValid = primaryWindow?.resetTimeValid === true;
+            const timeUntilReset = primaryWindow?.timeUntilReset ?? 0;
+            const modelId = info.model || modelKey;
+            const label = info.displayName?.trim() || modelKey;
+            const quotaGroup = this.resolveAuthorizedQuotaGroup(info);
+
+            models.push({
+                label,
+                modelId,
+                remainingFraction,
+                remainingPercentage: remainingFraction !== undefined ? remainingFraction * 100 : undefined,
+                isExhausted: remainingFraction === 0,
+                resetTime,
+                resetTimeDisplay: primaryWindow?.resetTimeDisplay ?? (resetTimeValid ? this.formatIso(resetTime) : (t('common.unknown') || 'Unknown')),
+                timeUntilReset,
+                timeUntilResetFormatted: primaryWindow?.timeUntilResetFormatted ?? (resetTimeValid ? this.formatDelta(timeUntilReset) : (t('dashboard.online') || 'Quota available')),
+                resetTimeValid,
+                supportsImages: info.supportsImages,
+                isRecommended: info.recommended,
+                tagTitle: info.tagTitle,
+                supportedMimeTypes: info.supportedMimeTypes,
+                modelProvider: info.modelProvider,
+                apiProvider: info.apiProvider,
+                quotaWindows,
+                quotaGroupId: quotaGroup.groupId,
+                quotaGroupName: quotaGroup.groupName,
+            });
+        }
+
         this.logModelList('authorized', models);
         return models;
     }
@@ -1026,7 +1841,7 @@ export class ReactorCore {
         const quotaSource = configService.getConfig().quotaSource === 'authorized' ? 'authorized' : 'local';
         if (quotaSource === 'local' && this.lastRawResponse && this.updateHandler) {
             logger.info('Reprocessing cached local telemetry data with latest config');
-            const telemetry = this.decodeSignal(this.lastRawResponse);
+            const telemetry = this.decodeSignal(this.lastRawResponse, this.getLocalArgonSummary(this.lastRawResponse));
             this.publishTelemetry(telemetry, 'local');
             return;
         }
@@ -1038,6 +1853,7 @@ export class ReactorCore {
                 undefined,
                 undefined,
                 this.getCachedAuthorizedAvailableAICredits(),
+                this.lastAuthorizedQuotaSummary,
             );
             if (this.localAccountEmail) {
                 telemetry.localAccountEmail = this.localAccountEmail;
@@ -1053,6 +1869,7 @@ export class ReactorCore {
                 undefined,
                 undefined,
                 this.getCachedAuthorizedAvailableAICredits(),
+                this.lastAuthorizedQuotaSummary,
             );
             this.publishTelemetry(telemetry, 'authorized');
             return;
@@ -1096,7 +1913,7 @@ export class ReactorCore {
         }
 
         if (source === 'local' && this.lastRawResponse) {
-            const telemetry = this.decodeSignal(this.lastRawResponse);
+            const telemetry = this.decodeSignal(this.lastRawResponse, this.getLocalArgonSummary(this.lastRawResponse));
             this.publishTelemetry(telemetry, 'local');
             return true;
         }
@@ -1107,6 +1924,7 @@ export class ReactorCore {
                 undefined,
                 undefined,
                 this.getCachedAuthorizedAvailableAICredits(),
+                this.lastAuthorizedQuotaSummary,
             );
             if (this.localAccountEmail) {
                 telemetry.localAccountEmail = this.localAccountEmail;
@@ -1121,6 +1939,7 @@ export class ReactorCore {
                 undefined,
                 undefined,
                 this.getCachedAuthorizedAvailableAICredits(),
+                this.lastAuthorizedQuotaSummary,
             );
             this.publishTelemetry(telemetry, 'authorized');
             return true;
@@ -1134,10 +1953,15 @@ export class ReactorCore {
         return false;
     }
 
-    /**
-     * 解码服务端响应
-     */
-    private decodeSignal(data: ServerUserStatusResponse): QuotaSnapshot {
+    private getLocalArgonSummary(raw: ServerUserStatusResponse): unknown {
+        const cachedSummary = this.lastLocalArgonBucket ? { groups: [{ buckets: [this.lastLocalArgonBucket] }] } : undefined;
+        const bucket = this.findArgonWeeklyBucket(raw?.userStatus?.quotaSummary ?? raw?.quotaSummary)
+            ?? this.findArgonWeeklyBucket(cachedSummary, Date.now());
+        return bucket ? { groups: [{ buckets: [bucket] }] } : undefined;
+    }
+
+    /** 解码服务端响应 */
+    private decodeSignal(data: ServerUserStatusResponse, quotaSummary?: unknown): QuotaSnapshot {
         // 验证响应数据结构
         if (!data || !data.userStatus) {
             // 如果服务端返回了错误消息，直接透传给用户，这不属于插件 Bug
@@ -1181,7 +2005,7 @@ export class ReactorCore {
             hasAutocompleteFastMode: plan?.hasAutocompleteFastMode === true,
             monthlyPromptCredits: plan?.monthlyPromptCredits || 0,
             monthlyFlowCredits: plan?.monthlyFlowCredits || 0,
-            availablePromptCredits: status.planStatus?.availablePromptCredits || 0,
+            availablePromptCredits: credits,
             availableFlowCredits: status.planStatus?.availableFlowCredits || 0,
             cascadeWebSearchEnabled: plan?.cascadeWebSearchEnabled === true,
             canGenerateCommitMessages: plan?.canGenerateCommitMessages === true,
@@ -1213,18 +2037,82 @@ export class ReactorCore {
         const configs: ClientModelConfig[] = status.cascadeModelConfigData?.clientModelConfigs || [];
         const modelSorts = status.cascadeModelConfigData?.clientModelSorts || [];
 
-        const models = mapLocalConfigsToModels(
-            configs,
-            modelSorts,
-            {
-                unknown: t('common.unknown') || 'Unknown',
-                online: t('dashboard.online') || 'Quota available',
-            },
-            message => logger.warn(message),
-        );
+        // 构建排序顺序映射（从 clientModelSorts 获取）
+        const sortOrderMap = new Map<string, number>();
+        if (modelSorts.length > 0) {
+            // 使用第一个排序配置（通常是 "Recommended"）
+            const primarySort = modelSorts[0];
+            let index = 0;
+            for (const group of primarySort.groups) {
+                for (const label of group.modelLabels) {
+                    sortOrderMap.set(label, index++);
+                }
+            }
+        }
+
+        const models: ModelQuotaInfo[] = configs
+            .filter((m): m is ClientModelConfig & { quotaInfo: NonNullable<ClientModelConfig['quotaInfo']> } =>
+                !!m.quotaInfo,
+            )
+            .map((m) => {
+                const now = new Date();
+                const nowMs = now.getTime();
+                let reset = new Date(m.quotaInfo.resetTime);
+                let resetTimeValid = true;
+                if (Number.isNaN(reset.getTime())) {
+                    reset = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+                    resetTimeValid = false;
+                    logger.warn(`[ReactorCore] Invalid resetTime for model ${m.label}: ${m.quotaInfo.resetTime}`);
+                }
+                const delta = reset.getTime() - now.getTime();
+                const parsedWindow = this.parseQuotaWindow(m.quotaInfo, '', '', nowMs);
+                const quotaWindows = parsedWindow ? [{ ...parsedWindow, source: 'modelQuota' as const }] : [];
+
+                return {
+                    label: m.label,
+                    modelId: m.modelOrAlias?.model || 'unknown',
+                    remainingFraction: m.quotaInfo.remainingFraction,
+                    remainingPercentage: m.quotaInfo.remainingFraction !== undefined
+                        ? m.quotaInfo.remainingFraction * 100
+                        : undefined,
+                    isExhausted: m.quotaInfo.remainingFraction === 0,
+                    resetTime: reset,
+                    resetTimeDisplay: resetTimeValid ? this.formatIso(reset) : (t('common.unknown') || 'Unknown'),
+                    timeUntilReset: delta,
+                    timeUntilResetFormatted: resetTimeValid ? this.formatDelta(delta) : (t('common.unknown') || 'Unknown'),
+                    resetTimeValid,
+                    // 模型能力字段
+                    supportsImages: m.supportsImages,
+                    isRecommended: m.isRecommended,
+                    tagTitle: m.tagTitle,
+                    supportedMimeTypes: m.supportedMimeTypes,
+                    quotaWindows,
+                };
+            });
+
+        // 排序：优先使用 clientModelSorts，否则按 label 字母排序
+        models.sort((a, b) => {
+            const indexA = sortOrderMap.get(a.label);
+            const indexB = sortOrderMap.get(b.label);
+
+            // 两个都在排序列表中，按排序列表顺序
+            if (indexA !== undefined && indexB !== undefined) {
+                return indexA - indexB;
+            }
+            // 只有 a 在排序列表中，a 排前面
+            if (indexA !== undefined) {
+                return -1;
+            }
+            // 只有 b 在排序列表中，b 排前面
+            if (indexB !== undefined) {
+                return 1;
+            }
+            // 都不在排序列表中，按 label 字母排序
+            return a.label.localeCompare(b.label);
+        });
 
         this.logModelList('local', models);
-        return this.buildSnapshot(models, promptCredits, userInfo);
+        return this.buildSnapshot(models, promptCredits, userInfo, undefined, quotaSummary, 'local');
     }
 
     private logModelList(source: 'local' | 'authorized', models: ModelQuotaInfo[]): void {
@@ -1258,64 +2146,63 @@ export class ReactorCore {
         promptCredits?: PromptCreditsInfo,
         userInfo?: UserInfo,
         availableAICredits?: number,
+        quotaSummary?: unknown,
+        source: 'local' | 'authorized' = 'authorized',
     ): QuotaSnapshot {
         const config = configService.getConfig();
         const allModels = [...models];
 
-        // 官方上线新模型时（如 Gemini-4），自动将其纳入用户已自定义的可见列表
-        const adoptedVisibleModels = this.adoptNewlyDiscoveredModels(allModels);
+        const visibleModels = this.adoptNewlyDiscoveredModels(allModels) ?? config.visibleModels ?? [];
+        if (visibleModels.length > 0) {
+            const visibleSet = new Set(visibleModels);
+            const filteredModels = models.filter(model => visibleSet.has(model.modelId));
 
-        const assembly = assembleSnapshotModels(allModels, {
-            groupingEnabled: config.groupingEnabled,
-            groupMappings: config.groupMappings,
-            groupingCustomNames: config.groupingCustomNames,
-            visibleModels: adoptedVisibleModels ?? config.visibleModels ?? [],
-        });
-
-        if (assembly.resetVisibleModels) {
-            logger.warn('[buildSnapshot] Visible models filter resulted in empty list. '
-                + `Original: ${allModels.length}, resetting visible list to show all models.`);
-            void configService.updateVisibleModels([]);
-        }
-
-        if (assembly.removedMappingIds.length > 0) {
-            const newMappings = { ...config.groupMappings };
-            for (const modelId of assembly.removedMappingIds) {
-                delete newMappings[modelId];
-                logger.info(`[GroupCheck] Removing model "${modelId}" from its group due to quota mismatch`);
+            // 安全检查：如果过滤后为空但原始列表不为空，可能是配置问题
+            if (filteredModels.length === 0 && models.length > 0) {
+                logger.warn('[buildSnapshot] Visible models filter resulted in empty list. ' +
+                    `Original: ${models.length}, Visible config: ${visibleModels.length}. ` +
+                    'Showing all recommended models instead.');
+                // 不应用 visibleModels 过滤，但保留推荐模型过滤
+                void configService.updateVisibleModels([]);
+            } else {
+                models = filteredModels;
             }
-            configService.updateGroupMappings(newMappings).catch((err: unknown) => {
-                logger.warn(`Failed to save updated groupMappings: ${String(err)}`);
-            });
-            logger.info(`[GroupCheck] Removed ${assembly.removedMappingIds.length} models from groups due to quota mismatch`);
         }
 
-        if (config.groupingEnabled) {
-            logger.debug(`Grouping enabled: ${assembly.groups?.length ?? 0} groups created`);
-        }
+        const displayModels = source === 'local' ? collapseLocalQuotaVariants(models, config.pinnedModels ?? []) : models;
+        const groups = this.buildQuotaGroups(displayModels, quotaSummary);
+        logger.debug(`Official quota groups created: ${groups.length}`);
 
         // 将配额中的模型常量传递给 AutoTriggerController，用于过滤可触发模型
-        autoTriggerController.setQuotaModels(assembly.models.map(m => m.modelId));
+        const quotaModelConstants = models.map(m => m.modelId);
+        autoTriggerController.setQuotaModels(quotaModelConstants);
 
         return {
             timestamp: new Date(),
             availableAICredits,
             promptCredits,
             userInfo,
-            models: assembly.models,
+            models: displayModels,
             allModels,
-            groups: assembly.groups,
+            groups,
             isConnected: true,
         };
     }
 
-    public buildAuthorizedSnapshotFromResponse(data: unknown, updatedAt?: number): QuotaSnapshot {
-        const models = this.buildModelsFromAuthorizedResponse(data as AuthorizedQuotaResponse);
+    public buildAuthorizedSnapshotFromResponse(
+        data: unknown,
+        updatedAt?: number,
+        targetEmail?: string,
+        localSnapshot?: QuotaSnapshot | null,
+    ): QuotaSnapshot {
+        const response = data as AuthorizedQuotaResponse;
+        const models = mergeAuthorizedModels(this.buildModelsFromAuthorizedResponse(response), localSnapshot, targetEmail);
         const snapshot = this.buildSnapshot(
             models,
             undefined,
             undefined,
-            this.getCachedAuthorizedAvailableAICredits(),
+            targetEmail ? this.getCachedAuthorizedAvailableAICredits(targetEmail) : undefined,
+            this.getQuotaSummaryFromResponse(response),
         );
         if (updatedAt) {
             snapshot.timestamp = new Date(updatedAt);
@@ -1323,37 +2210,83 @@ export class ReactorCore {
         return snapshot;
     }
 
-    /**
-     * 识别官方新上线模型并自动纳入可见列表（API 模型清单更新无需等插件发版）。
-     * @returns 合并后的可见模型 ID 列表；无需变更时返回 null
-     */
-    private adoptNewlyDiscoveredModels(allModels: ModelQuotaInfo[]): string[] | null {
-        const currentIds = allModels.map(model => model.modelId);
+    public async buildCachedAuthorizedSnapshot(
+        record: QuotaApiCacheRecord,
+        email: string,
+        localSnapshot: QuotaSnapshot | null,
+    ): Promise<QuotaSnapshot> {
+        const response = record.payload as AuthorizedQuotaResponse;
+        const summary = await this.resolveQuotaSummary(email, response);
+        return this.buildAuthorizedSnapshotFromResponse({ ...response, quota_summary: summary }, record.updatedAt, email, localSnapshot);
+    }
+
+    private adoptNewlyDiscoveredModels(models: ModelQuotaInfo[]): string[] | null {
+        if (models.length === 0) {
+            return null;
+        }
         const stored = configService.getStateValue<string[]>(KNOWN_MODEL_IDS_STATE_KEY);
         const result = computeModelAdoption({
-            currentIds,
-            storedIds: Array.isArray(stored) ? stored : undefined,
+            currentIds: models.map(model => model.modelId),
+            storedIds: stored,
             visibleIds: configService.getConfig().visibleModels ?? [],
             blacklist: AUTH_MODEL_BLACKLIST_ID_SET,
         });
-
         if (stored === undefined || result.newIds.length > 0) {
             void configService.setStateValue(KNOWN_MODEL_IDS_STATE_KEY, result.nextKnownIds);
         }
-        if (result.newIds.length === 0) {
-            return null;
+        if (result.mergedVisibleIds) {
+            void configService.updateVisibleModels(result.mergedVisibleIds);
         }
-
-        logger.info(`[ModelAdoption] Detected ${result.newIds.length} new model(s) from API: ${result.newIds.join(', ')}`);
-        if (!result.mergedVisibleIds) {
-            return null;
-        }
-
-        void configService.updateVisibleModels(result.mergedVisibleIds);
-        logger.info(`[ModelAdoption] Auto-visible new model(s): ${result.newIds.join(', ')}`);
         return result.mergedVisibleIds;
     }
 
+    /**
+     * 格式化日期（自动国际化）
+     */
+    private formatIso(d: Date): string {
+        const dateStr = d.toLocaleDateString(undefined, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        });
+        const timeStr = d.toLocaleTimeString(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+        });
+        return `${dateStr} ${timeStr}`;
+    }
+
+    /**
+     * 格式化时间差
+     * - < 60分钟: 显示 Xm
+     * - < 24小时: 显示 Xh Ym
+     * - >= 24小时: 显示 Xd Yh Zm
+     */
+    private formatDelta(ms: number): string {
+        if (ms <= 0) {
+            return t('dashboard.online');
+        }
+        const totalMinutes = Math.ceil(ms / 60000);
+
+        // 小于 60 分钟：只显示分钟
+        if (totalMinutes < 60) {
+            return `${totalMinutes}m`;
+        }
+
+        const totalHours = Math.floor(totalMinutes / 60);
+        const remainingMinutes = totalMinutes % 60;
+
+        // 小于 24 小时：显示小时和分钟
+        if (totalHours < 24) {
+            return `${totalHours}h ${remainingMinutes}m`;
+        }
+
+        // >= 24 小时：显示天、小时、分钟
+        const days = Math.floor(totalHours / 24);
+        const remainingHours = totalHours % 24;
+        return `${days}d ${remainingHours}h ${remainingMinutes}m`;
+    }
 
     /**
      * 创建离线状态的快照
@@ -1367,23 +2300,6 @@ export class ReactorCore {
         };
     }
 
-    /**
-     * 计算“自动分组”同款分组结果（家族匹配 + 固定组名）
-     */
-    static calculateSmartGrouping(models: ModelQuotaInfo[]): {
-        groupMappings: Record<string, string>;
-        groupNames: Record<string, string>;
-    } {
-        return calculateSmartGrouping(models);
-    }
-
-    /**
-     * 根据当前模型列表计算分组映射（与“自动分组”一致）
-     * 返回 modelId -> groupId 的映射
-     */
-    static calculateGroupMappings(models: ModelQuotaInfo[]): Record<string, string> {
-        return calculateSmartGrouping(models).groupMappings;
-    }
 }
 
 // 保持向后兼容

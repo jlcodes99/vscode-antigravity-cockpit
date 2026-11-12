@@ -23,7 +23,10 @@ jobs:
         run: npm ci
 
       - name: Type check (tsc --noEmit)
-        run: npx tsc --noEmit
+        run: npm run typecheck
+
+      - name: Type check webview (checkJs)
+        run: npm run typecheck:webview
 
       - name: Lint
         run: npm run lint
