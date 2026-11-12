@@ -197,6 +197,9 @@ export function createHistoryModule({
             historyState.selectedModelId = data.modelId;
         }
         historyState.points = Array.isArray(data.points) ? data.points : [];
+        historyState.prediction = (data.prediction && typeof data.prediction === 'object')
+            ? data.prediction
+            : null;
         historyState.page = 1;
 
         updateHistoryAccountSelect();
@@ -340,7 +343,33 @@ export function createHistoryModule({
             summaryParts.push(`${i18n['history.countdown'] || 'Countdown'}: ${formatHistoryCountdown(latest.countdownSeconds)}`);
         }
         summaryParts.push(`${i18n['history.updatedAt'] || 'Updated'}: ${formatHistoryTimestamp(latest.timestamp)}`);
+        const predictionText = formatPredictionSummary(historyState.prediction, latest);
+        if (predictionText) {
+            summaryParts.push(predictionText);
+        }
         historySummary.textContent = summaryParts.join(' · ');
+    }
+
+    function formatPredictionSummary(prediction, latestPoint) {
+        if (!prediction || typeof prediction.projectedExhaustAt !== 'number') {
+            return '';
+        }
+        const now = Date.now();
+        const rateRounded = Math.round(prediction.burnRatePctPerHour * 10) / 10;
+        const rateLabel = `${i18n['history.burnRate'] || 'Burn rate'}: ${rateRounded}%/h`;
+
+        if (prediction.willExhaustBeforeReset) {
+            const ms = Math.max(0, prediction.projectedExhaustAt - now);
+            return `⚠️ ${rateLabel} · ${i18n['history.exhaustIn'] || 'projected to run out in'} ${formatHistoryCountdown(Math.round(ms / 1000))}`;
+        }
+
+        const remainingAtReset = typeof prediction.projectedRemainingAtReset === 'number'
+            ? Math.round(prediction.projectedRemainingAtReset)
+            : null;
+        if (remainingAtReset !== null && latestPoint) {
+            return `${rateLabel} · ${(i18n['history.lastUntilReset'] || 'lasts until reset (~{percent}%)').replace('{percent}', String(remainingAtReset))}`;
+        }
+        return rateLabel;
     }
 
     function renderHistoryChart() {
@@ -398,7 +427,17 @@ export function createHistoryModule({
         const now = Date.now();
         const rangeMs = normalizeHistoryRange(historyState.rangeDays) * 24 * 60 * 60 * 1000;
         const startTime = now - rangeMs;
-        const endTime = now;
+
+        // 若存在耗尽预测，时间轴向右延伸到"耗尽时刻"或"重置时刻"（取较早者），
+        // 延伸量最多为历史窗口的 50%，避免挤压历史曲线
+        let endTime = now;
+        const prediction = historyState.prediction;
+        if (prediction && typeof prediction.projectedExhaustAt === 'number' && prediction.projectedExhaustAt > now) {
+            const futureTarget = typeof prediction.resetAt === 'number' && prediction.resetAt > now
+                ? Math.min(prediction.projectedExhaustAt, prediction.resetAt)
+                : prediction.projectedExhaustAt;
+            endTime = now + Math.min(rangeMs * 0.5, futureTarget - now);
+        }
 
         const accent = getCssVar('--accent', '#2f81f7');
         const gridColor = getCssVar('--border-color', 'rgba(255,255,255,0.08)');
@@ -551,6 +590,36 @@ export function createHistoryModule({
         ctx.beginPath();
         ctx.arc(last.x, last.y, 3.5, 0, Math.PI * 2);
         ctx.fill();
+
+        // 预测虚线：按 burn-rate 从最新实测点延伸到耗尽/重置边界
+        if (prediction && typeof prediction.projectedExhaustAt === 'number' && prediction.projectedExhaustAt > now) {
+            let endPredictionPct;
+            let endPredictionAt;
+            if (prediction.willExhaustBeforeReset || typeof prediction.resetAt !== 'number') {
+                endPredictionPct = 0;
+                endPredictionAt = prediction.projectedExhaustAt;
+            } else {
+                endPredictionPct = Math.max(0, prediction.projectedRemainingAtReset ?? 0);
+                endPredictionAt = prediction.resetAt;
+            }
+            endPredictionAt = Math.min(endPredictionAt, endTime);
+            const endRatio = (endPredictionAt - startTime) / (endTime - startTime);
+            const endX = padding.left + Math.min(1, Math.max(0, endRatio)) * chartWidth;
+            const endY = padding.top + (1 - Math.min(100, Math.max(0, endPredictionPct)) / 100) * chartHeight;
+
+            ctx.save();
+            ctx.strokeStyle = prediction.willExhaustBeforeReset
+                ? getCssVar('--vscode-errorForeground', '#f14c4c')
+                : accent;
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([5, 4]);
+            ctx.beginPath();
+            ctx.moveTo(last.x, last.y);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
     }
 
     function renderHistoryDetails() {
