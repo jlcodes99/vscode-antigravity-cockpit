@@ -10,6 +10,12 @@
 
 ## [未发布]
 
+### 安全
+- **减少明文 Token 暴露面**：与 Cockpit Tools 双向同步账号时，改为先拉取不含 Token 的账号列表，仅在确认存在"远端有、本地无"的账号时才拉取一次明文 Token（此前每次同步都全量读取 refresh/access token）。
+- **共享文件强制属主权限**：扩展写入 `~/.antigravity_cockpit` 的缓存与同步设置统一收紧为目录 700 / 文件 600（新增 `src/shared/secure_fs.ts`），此前依赖默认 umask（多为 644），多用户机器上其他用户可读取含邮箱的缓存。
+- **WebSocket 入站指令校验**：`plugin_switch_account` 必须携带非空 `target_email` 且 payload 为对象，`plugin_set_switch_mode` 同样强制对象类型，畸形/伪造消息在 WS 边界直接丢弃（新增 8 个守卫单测）。
+- 新增 [SECURITY.md](SECURITY.md)：记录本地 WS 威胁模型；桌面端仍需实现 Origin 校验与握手共享密钥（`server.json` 写入 `auth_token`）才能阻止浏览器恶意页面/本机进程调用 `get_accounts_with_tokens` 窃取 Token，协议提案见文档。
+
 ### 新增
 - **官方新模型（如 Gemini-4）免发版即可监控**：授权配额模式以官方 `models` 清单为单一真相来源，`agentModelSorts` 排序表滞后时未列入的模型自动追加展示，不再被丢弃。
 - 官方上线新模型时自动纳入用户已自定义的可见列表（黑名单模型除外）；首次运行仅建立基线，不改变现有视图。

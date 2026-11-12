@@ -16,6 +16,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { logger } from '../shared/log_service';
+import { writePrivateFileSync } from '../shared/secure_fs';
 
 /** 共享配置目录 */
 const SHARED_DIR = path.join(os.homedir(), '.antigravity_cockpit');
@@ -92,8 +93,8 @@ export function writeSyncSetting(key: SyncSettingKey, value: string): void {
         };
         
         const filePath = getSyncSettingsPath();
-        fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf-8');
-        
+        writePrivateFileSync(filePath, JSON.stringify(settings, null, 2));
+
         logger.info(`[SyncSettings] 写入离线配置: ${key} = ${value}`);
     } catch (error) {
         logger.error('[SyncSettings] 写入同步配置失败:', error);
@@ -113,8 +114,8 @@ export function clearSyncSetting(key: SyncSettingKey): void {
             delete settings[key];
             
             const filePath = getSyncSettingsPath();
-            fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf-8');
-            
+            writePrivateFileSync(filePath, JSON.stringify(settings, null, 2));
+
             logger.info(`[SyncSettings] 清除已同步配置: ${key}`);
         }
     } catch (error) {

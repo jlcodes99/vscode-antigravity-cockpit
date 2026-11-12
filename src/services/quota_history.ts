@@ -5,6 +5,7 @@ import { createHash } from 'crypto';
 import { QuotaSnapshot } from '../shared/types';
 import { logger } from '../shared/log_service';
 import { AUTH_RECOMMENDED_MODEL_IDS } from '../shared/recommended_models';
+import { ensurePrivateDir } from '../shared/secure_fs';
 import { resolveModelFamily, type ModelFamily } from '../engine/model_family';
 
 export interface QuotaHistoryPoint {
@@ -294,10 +295,11 @@ async function readHistory(email: string): Promise<QuotaHistoryRecord | null> {
 }
 
 async function writeHistory(record: QuotaHistoryRecord): Promise<void> {
-    await fs.mkdir(HISTORY_ROOT, { recursive: true });
+    await ensurePrivateDir(HISTORY_ROOT);
     const filePath = getHistoryFilePath(record.email);
     const tempPath = `${filePath}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`;
-    await fs.writeFile(tempPath, JSON.stringify(record, null, 2), 'utf8');
+    await fs.writeFile(tempPath, JSON.stringify(record, null, 2), { encoding: 'utf8', mode: 0o600 });
+    await fs.chmod(tempPath, 0o600).catch(() => undefined);
     await fs.rename(tempPath, filePath);
 }
 
