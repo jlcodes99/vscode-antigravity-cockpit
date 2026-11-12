@@ -21,7 +21,16 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
-      
+
+      - name: Type check (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test -- --ci
+
       - name: Compile extension
         run: npm run compile
       
