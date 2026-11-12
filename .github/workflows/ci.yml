@@ -29,8 +29,11 @@ jobs:
         run: npm ci
 
       # esbuild 只转译不做类型检查，类型错误必须由 tsc 独立把关
-      - name: Type check (tsc --noEmit)
+      - name: Type check extension (tsc --noEmit)
         run: npm run typecheck
+
+      - name: Type check webview (checkJs)
+        run: npm run typecheck:webview
 
       - name: Lint
         run: npm run lint

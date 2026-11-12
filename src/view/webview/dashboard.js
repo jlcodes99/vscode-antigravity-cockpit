@@ -244,9 +244,10 @@ import { createAnnouncementModule } from './dashboard_announcements';
         const state = vscode.getState() || {};
         if (state.lastRefresh && state.refreshCooldown) {
             const now = Date.now();
-            const diff = Math.floor((now - state.lastRefresh) / 1000);
-            if (diff < state.refreshCooldown) {
-                startCooldown(state.refreshCooldown - diff);
+            const savedCooldown = Number(state.refreshCooldown);
+            const diff = Math.floor((now - Number(state.lastRefresh)) / 1000);
+            if (diff < savedCooldown) {
+                startCooldown(savedCooldown - diff);
             }
         }
         currentQuotaSource = 'authorized';
@@ -567,8 +568,8 @@ import { createAnnouncementModule } from './dashboard_announcements';
         }
 
         // 更新输入框显示钳制后的值
-        if (warningInput) warningInput.value = warningValue;
-        if (criticalInput) criticalInput.value = criticalValue;
+        if (warningInput) warningInput.value = String(warningValue);
+        if (criticalInput) criticalInput.value = String(criticalValue);
 
         saveThresholds();
     }
@@ -1266,6 +1267,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
      * @param {string} data.currentEmail - AntigravityTools 当前账户
      * @param {string} data.localEmail - 本地当前账户（switch_only 场景）
      * @param {boolean} data.autoConfirm - 是否自动确认（自动同步模式）
+     * @param {boolean} [data.autoConfirmImportOnly] - 是否自动确认但仅导入不切号
      */
     function showAntigravityToolsSyncPrompt(data) {
         const promptType = data.promptType || 'new_accounts';
@@ -2406,12 +2408,8 @@ import { createAnnouncementModule } from './dashboard_announcements';
     }
 
     /**
-     * 解析模型能力，返回图标数组
-     * @param {Object} model 模型对象
-     * @returns {string[]} 能力图标 HTML 数组
+     * 切换模型置顶状态
      */
-
-
     function togglePin(modelId) {
         vscode.postMessage({ command: 'togglePin', modelId: modelId });
     }
@@ -3077,7 +3075,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
             const selectedCount = checkedBoxes.length;
 
             // 更新计数和按钮状态
-            if (countSpan) countSpan.textContent = selectedCount;
+            if (countSpan) countSpan.textContent = String(selectedCount);
             if (confirmBtn) confirmBtn.disabled = selectedCount === 0;
 
             // 获取当前选中模型的签名（用于动态兼容性检查）
@@ -3255,7 +3253,7 @@ import { createAnnouncementModule } from './dashboard_announcements';
         customGroupingState.smartGroupCanonicalNames = smartGroupCanonicalNames;
 
         renderCustomGroupingContent();
-        const smartGroupMsg = (i18n['customGrouping.smartGroupCount'] || 'Auto Group: {count} groups').replace('{count}', customGroupingState.groups.length);
+        const smartGroupMsg = (i18n['customGrouping.smartGroupCount'] || 'Auto Group: {count} groups').replace('{count}', String(customGroupingState.groups.length));
         showToast(smartGroupMsg, 'success');
     }
 

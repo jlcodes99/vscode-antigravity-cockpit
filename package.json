@@ -334,9 +334,9 @@
     "build": "node scripts/build.js",
     "build:prod": "node scripts/build.js --production",
     "typecheck": "tsc --noEmit",
+    "typecheck:webview": "tsc -p tsconfig.webview.json --noEmit",
     "watch": "npm run watch:esbuild",
     "watch:esbuild": "node scripts/build.js --watch",
-    "copy-webview": "shx mkdir -p out/view/webview && shx cp src/view/webview/*.css src/view/webview/*.js out/view/webview/",
     "lint": "eslint src --ext ts,js",
     "lint:fix": "eslint src --ext ts,js --fix",
     "lint:webview": "eslint src/view/webview/*.js",
@@ -362,7 +362,6 @@
   },
   "dependencies": {
     "cron-parser": "^5.4.0",
-    "sql.js": "^1.13.0",
-    "shx": "^0.4.0"
+    "sql.js": "^1.13.0"
   }
 }

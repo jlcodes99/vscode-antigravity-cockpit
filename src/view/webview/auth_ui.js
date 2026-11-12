@@ -31,8 +31,8 @@
         /**
          * 渲染授权行 (Auth Row)
          * @param {HTMLElement} container 容器元素
-         * @param {Object} options 配置项
-         * @param {boolean} options.showSyncToggleInline 是否内联显示同步开关（否则显示配置按钮）
+         * @param {Object} [options] 配置项
+         * @param {boolean} [options.showSyncToggleInline] 是否内联显示同步开关（否则显示配置按钮）
          */
         renderAuthRow(container, options = {}) {
             if (!container) return;
