@@ -38,6 +38,20 @@ export function createCustomGroupsModule(deps) {
     const escapeHtml = deps.escapeHtml;
     let state = createGroupState(deps.getAllModels());
 
+    /** 当前打开的模型选择下拉及其关闭监听（用于点击外部 / Esc 关闭） */
+    let activeDropdown = null;
+    let activeDropdownDismiss = null;
+
+    function closeActiveDropdown() {
+        activeDropdown?.remove();
+        activeDropdown = null;
+        if (activeDropdownDismiss) {
+            document.removeEventListener('click', activeDropdownDismiss, true);
+            document.removeEventListener('keydown', activeDropdownDismiss, true);
+            activeDropdownDismiss = null;
+        }
+    }
+
     /**
      * @param {string} key
      * @param {string} fallback
@@ -60,6 +74,7 @@ export function createCustomGroupsModule(deps) {
     }
 
     function close() {
+        closeActiveDropdown();
         dom.modal?.classList.add('hidden');
     }
 
@@ -67,6 +82,8 @@ export function createCustomGroupsModule(deps) {
         if (!dom.list) {
             return;
         }
+        // 列表重建后旧下拉的内容已过期，先关掉
+        closeActiveDropdown();
         dom.list.innerHTML = state.groups.length === 0
             ? `<div class="empty-groups-hint">${escapeHtml(t('customGroups.noGroups', 'No custom groups yet. Click "Add Group" to create one.'))}</div>`
             : state.groups.map((group, index) => {
@@ -169,10 +186,8 @@ export function createCustomGroupsModule(deps) {
      * @param {string} groupId
      */
     function openModelPicker(anchor, groupId) {
-        const existingDropdown = document.querySelector('.model-select-dropdown');
-        if (existingDropdown) {
-            existingDropdown.remove();
-        }
+        // 切换到另一个 ➕ 时先关掉旧下拉
+        closeActiveDropdown();
 
         const group = state.groups.find(g => g.id === groupId);
         if (!group) {
@@ -222,6 +237,7 @@ export function createCustomGroupsModule(deps) {
             </div>
         `;
         document.body.appendChild(dropdown);
+        activeDropdown = dropdown;
 
         const confirmBtn = dropdown.querySelector('.btn-confirm-add');
         const countSpan = dropdown.querySelector('.selected-count');
@@ -244,9 +260,30 @@ export function createCustomGroupsModule(deps) {
             selected.forEach(modelId => {
                 state = addModelToGroup(state, groupId, modelId);
             });
-            dropdown.remove();
+            closeActiveDropdown();
             render();
         });
+
+        // 点击下拉外部或按 Esc 关闭。
+        // 异步注册：避免打开下拉的那次点击冒泡后立即触发刚注册的监听。
+        activeDropdownDismiss = (e) => {
+            if (e.type === 'keydown') {
+                if (e.key === 'Escape') {
+                    closeActiveDropdown();
+                }
+                return;
+            }
+            if (!dropdown.contains(e.target)) {
+                closeActiveDropdown();
+            }
+        };
+        setTimeout(() => {
+            if (!activeDropdownDismiss) {
+                return;
+            }
+            document.addEventListener('click', activeDropdownDismiss, true);
+            document.addEventListener('keydown', activeDropdownDismiss, true);
+        }, 0);
     }
 
     function save() {
