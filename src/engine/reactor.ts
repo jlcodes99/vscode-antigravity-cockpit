@@ -34,6 +34,7 @@ import {
     isApiCacheValid,
     type QuotaApiCacheRecord,
 } from '../services/quota_api_cache';
+import { buildCustomQuotaGroups, applyCustomGroups } from './custom_groups';
 
 
 interface AuthorizedQuotaInfo {
@@ -2170,8 +2171,18 @@ export class ReactorCore {
         }
 
         const displayModels = source === 'local' ? collapseLocalQuotaVariants(models, config.pinnedModels ?? []) : models;
-        const groups = this.buildQuotaGroups(displayModels, quotaSummary);
-        logger.debug(`Official quota groups created: ${groups.length}`);
+        const officialGroups = this.buildQuotaGroups(displayModels, quotaSummary);
+        logger.debug(`Official quota groups created: ${officialGroups.length}`);
+
+        // 用户自定义分组：被用户映射的模型从官方组移出，组成用户自建组
+        const { customGroups } = buildCustomQuotaGroups(displayModels, {
+            groupMappings: config.groupMappings ?? {},
+            groupNames: config.groupingCustomNames,
+        });
+        const groups = applyCustomGroups(officialGroups, customGroups);
+        if (customGroups.length > 0) {
+            logger.debug(`Custom user groups created: ${customGroups.length}`);
+        }
 
         // 将配额中的模型常量传递给 AutoTriggerController，用于过滤可触发模型
         const quotaModelConstants = models.map(m => m.modelId);

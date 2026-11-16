@@ -569,6 +569,8 @@ export interface DashboardConfig {
     modelCustomNames?: Record<string, string>;
     /** 分组自定义名称映射 */
     groupingCustomNames?: Record<string, string>;
+    /** 用户自定义分组映射 (modelId -> groupId)，用于用户自主建组 */
+    groupMappings?: Record<string, string>;
     /** 是否在状态栏显示分组 */
     groupingShowInStatusBar?: boolean;
     /** 可见模型列表（为空时显示全部） */

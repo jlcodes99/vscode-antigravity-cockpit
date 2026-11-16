@@ -10,6 +10,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Custom groups (user-defined quota groups)**: alongside the official quota groups, users can now create their own groups and choose which models each group monitors. A new "Groups" button opens an editor where you can create groups, rename them, add or remove models, and delete groups. Models assigned to a custom group are lifted out of their official quota group and shown in your group; unassigned models keep the official grouping. Group membership survives refreshes (persisted in `groupMappings`), and the editor is available in 16 languages.
+- New pure modules with unit tests: `shared/custom_group_editor.ts` (group editing state machine, 17 tests) and `engine/custom_groups.ts` (applying user groups on top of official groups, 10 tests); webview editor UI extracted to `view/webview/custom_groups_view.js` (type-checked via checkJs).
+
 ## [2.1.53] - 2026-11-12
 
 ### Added

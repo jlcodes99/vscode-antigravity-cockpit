@@ -246,6 +246,7 @@ export class CockpitHUD {
             groupOrder: config.groupOrder,
             modelCustomNames: config.modelCustomNames,
             groupingCustomNames: config.groupingCustomNames,
+            groupMappings: config.groupMappings,
             groupingShowInStatusBar: config.groupingShowInStatusBar,
             visibleModels: config.visibleModels,
             refreshInterval: config.refreshInterval,
@@ -707,6 +708,7 @@ export class CockpitHUD {
         const accountsOverviewStyleUri = this.getWebviewUri(webview, 'out', 'view', 'webview', 'accounts_overview.css');
         const sharedModalStyleUri = this.getWebviewUri(webview, 'out', 'view', 'webview', 'shared_modals.css');
         const autoTriggerStyleUri = this.getWebviewUri(webview, 'out', 'view', 'webview', 'auto_trigger.css');
+        const customGroupsStyleUri = this.getWebviewUri(webview, 'out', 'view', 'webview', 'custom_groups.css');
         const scriptUri = this.getWebviewUri(webview, 'out', 'view', 'webview', 'dashboard.js');
         const autoTriggerScriptUri = this.getWebviewUri(webview, 'out', 'view', 'webview', 'auto_trigger.js');
         const authUiScriptUri = this.getWebviewUri(webview, 'out', 'view', 'webview', 'auth_ui.js');
@@ -753,6 +755,7 @@ export class CockpitHUD {
     <link rel="stylesheet" href="${accountsOverviewStyleUri}">
     <link rel="stylesheet" href="${sharedModalStyleUri}">
     <link rel="stylesheet" href="${autoTriggerStyleUri}">
+    <link rel="stylesheet" href="${customGroupsStyleUri}">
 </head>
 <body>
     <header class="header">
@@ -769,6 +772,9 @@ export class CockpitHUD {
             </button>
             <button id="manage-models-btn" class="refresh-btn" title="${t('models.manageTitle')}">
                 ${t('models.manage')}
+            </button>
+            <button id="custom-groups-btn" class="refresh-btn" title="${t('customGroups.title') || 'Custom Groups'}">
+                ${t('customGroups.button') || 'Groups'}
             </button>
             <button id="toggle-profile-btn" class="refresh-btn" title="${t('profile.togglePlan')}">
                 ${t('profile.planDetails')}
@@ -1423,6 +1429,29 @@ export class CockpitHUD {
             <div class="modal-footer">
                 <button id="model-manager-cancel" class="btn-secondary">${t('common.cancel')}</button>
                 <button id="model-manager-save" class="btn-primary">${t('models.save')}</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Groups Modal (用户自建分组：自主建组 + 编辑组内模型) -->
+    <div id="custom-groups-modal" class="modal hidden">
+        <div class="modal-content modal-content-wide">
+            <div class="modal-header">
+                <h3>📦 ${t('customGroups.title') || 'Custom Groups'}</h3>
+                <button id="custom-groups-close" class="close-btn">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="model-manager-hint">${t('customGroups.hint') || 'Create your own groups and choose which models to monitor in each group. Models not assigned to a group keep their official quota group.'}</div>
+                <div class="model-manager-toolbar">
+                    <button id="custom-groups-add" class="btn-secondary">${t('customGroups.addGroup') || '+ Add Group'}</button>
+                </div>
+                <div id="custom-groups-list" class="custom-groups-list"></div>
+                <div class="custom-groups-section-title">${t('customGroups.unassigned') || 'Not in a custom group'}</div>
+                <div id="custom-groups-unassigned" class="ungrouped-models-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="custom-groups-cancel" class="btn-secondary">${t('common.cancel')}</button>
+                <button id="custom-groups-save" class="btn-primary">${t('models.save')}</button>
             </div>
         </div>
     </div>

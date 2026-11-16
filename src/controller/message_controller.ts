@@ -646,8 +646,24 @@ export class MessageController {
                     break;
 
                 case 'saveCustomGrouping': {
-                    logger.info('Ignoring legacy custom grouping save; quota groups now follow official data');
-                    this.reactor.reprocess();
+                    // 保存用户自定义分组（与官方自动分组并存：用户映射的模型走用户组）
+                    const { customGroupMappings, customGroupNames } = message;
+                    if (customGroupMappings && typeof customGroupMappings === 'object') {
+                        const mappings = customGroupMappings as Record<string, string>;
+                        logger.info(`User saved custom groups: ${Object.keys(mappings).length} models`);
+                        await configService.updateGroupMappings(mappings);
+                        if (customGroupNames && typeof customGroupNames === 'object') {
+                            await configService.updateConfig(
+                                'groupingCustomNames',
+                                customGroupNames as Record<string, string>,
+                            );
+                        }
+                        // 组 ID 可能变化，清空旧的分组置顶
+                        await configService.updateConfig('pinnedGroups', []);
+                        this.reactor.reprocess();
+                    } else {
+                        logger.warn('saveCustomGrouping signal missing customGroupMappings');
+                    }
                     break;
                 }
 

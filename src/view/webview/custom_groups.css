@@ -1,0 +1,246 @@
+/* ============ 用户自定义分组弹框 ============ */
+
+.custom-groups-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 4px 0;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.empty-groups-hint {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding: 16px;
+    text-align: center;
+    border: 1px dashed var(--border-color);
+    border-radius: 8px;
+}
+
+.custom-group-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 10px 12px;
+}
+
+.custom-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.custom-group-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    min-width: 0;
+}
+
+.custom-group-name input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 13px;
+    padding: 4px 6px;
+}
+
+.custom-group-name input:hover,
+.custom-group-name input:focus {
+    border-color: var(--border-color);
+    outline: none;
+}
+
+.custom-group-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.custom-group-actions button {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    color: var(--text-secondary);
+}
+
+.custom-group-actions button:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--danger);
+}
+
+.custom-group-models {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.custom-model-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 3px 10px;
+    font-size: 12px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.custom-model-tag.readonly {
+    cursor: default;
+    color: var(--text-secondary);
+}
+
+.custom-model-tag .model-quota {
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
+.custom-group-remove-model {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0 2px;
+    border-radius: 50%;
+}
+
+.custom-group-remove-model:hover {
+    color: var(--danger);
+}
+
+.custom-group-add-model {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: 1px dashed var(--border-color);
+    border-radius: 14px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 3px 10px;
+}
+
+.custom-group-add-model:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.custom-groups-section-title {
+    margin-top: 14px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.ungrouped-models-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 32px;
+}
+
+/* 模型选择下拉（添加成员） */
+.model-select-dropdown {
+    position: fixed;
+    z-index: 1000;
+    min-width: 300px;
+    max-width: 380px;
+    max-height: 320px;
+    display: flex;
+    flex-direction: column;
+    background: var(--card-bg, #1e1e1e);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+}
+
+.model-select-list {
+    overflow-y: auto;
+    padding: 6px;
+}
+
+.model-select-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.model-select-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.model-select-item input {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.model-select-item .model-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.model-select-item .model-quota {
+    color: var(--text-secondary);
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.model-select-item.incompatible .model-name {
+    color: var(--text-secondary);
+}
+
+.model-select-item .incompatible-reason {
+    color: var(--danger, #f14c4c);
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.model-select-footer {
+    border-top: 1px solid var(--border-color);
+    padding: 8px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.model-select-footer .btn-confirm-add {
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 6px 14px;
+}
+
+.model-select-footer .btn-confirm-add:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
