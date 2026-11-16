@@ -1432,6 +1432,7 @@ export class ReactorCore {
             quotaWindows: QuotaWindow[];
         }> = [];
         let argonWeekly: QuotaWindow | undefined;
+        let argonShort: QuotaWindow | undefined;
 
         for (const [index, rawGroup] of quotaSummary.groups.entries()) {
             if (!isRecord(rawGroup)) {
@@ -1463,6 +1464,7 @@ export class ReactorCore {
                 .filter((window): window is QuotaWindow => window !== null && window.remainingFraction !== undefined)
                 .sort((a, b) => this.getQuotaWindowRank(a) - this.getQuotaWindowRank(b));
             argonWeekly ??= windows.find(window => window.windowId === ARGON_WEEKLY_BUCKET_ID);
+            argonShort ??= windows.find(window => isArgonShortBucketId(window.windowId));
             const quotaWindows = windows.filter(window => window.windowId !== ARGON_WEEKLY_BUCKET_ID && !isArgonShortBucketId(window.windowId));
 
             if (quotaWindows.length === 0) {
@@ -1477,8 +1479,12 @@ export class ReactorCore {
             });
         }
 
-        if (argonWeekly) {
-            groups.push({ groupId: ARGON_GROUP_ID, groupName: ARGON_GROUP_NAME, quotaWindows: [argonWeekly] });
+        // Argon 组同时展示周限制与 5 小时限制（此前 5h 桶被过滤导致只剩周限制）
+        const argonWindows = [argonWeekly, argonShort]
+            .filter((window): window is QuotaWindow => !!window)
+            .sort((a, b) => this.getQuotaWindowRank(a) - this.getQuotaWindowRank(b));
+        if (argonWindows.length > 0) {
+            groups.push({ groupId: ARGON_GROUP_ID, groupName: ARGON_GROUP_NAME, quotaWindows: argonWindows });
         }
 
         return groups;

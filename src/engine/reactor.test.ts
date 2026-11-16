@@ -78,6 +78,36 @@ test('只有明确的 Argon 周配额桶会产生周配额行', () => {
     expect(result.groups?.[0].quotaWindows?.map(window => window.windowId)).toEqual(['gemini-weekly']);
 });
 
+test('Argon 组同时展示 5 小时限制与周限制', () => {
+    const argon5h = { bucketId: 'gemini-argon-5h', displayName: 'Gemini 4 Argon 5h Limit', remainingFraction: 0.42, resetTime: reset(3) };
+    const quotaSummary = { groups: [{ name: 'Gemini Models', buckets: [standardGeminiWeekly, argon5h, argonWeekly] }] };
+    const result = new ReactorCore().buildAuthorizedSnapshotFromResponse({
+        ...response, models: { old: response.models.old, added: response.models.added }, quota_summary: quotaSummary,
+    });
+    const argonGroup = result.groups?.find(group => group.groupId === 'official:gemini-4-argon');
+    expect(argonGroup).toBeDefined();
+    const windowIds = argonGroup?.quotaWindows?.map(window => window.windowId) ?? [];
+    expect(windowIds).toContain('gemini-argon-wtu-weekly');
+    expect(windowIds).toContain('gemini-argon-5h');
+    expect(argonGroup?.quotaWindows).toHaveLength(2);
+    // 组百分比取所有窗口中最低的
+    expect(argonGroup?.remainingPercentage).toBeCloseTo(42, 5);
+    // 窗口类型标注正确
+    const byId = new Map((argonGroup?.quotaWindows ?? []).map(window => [window.windowId, window]));
+    expect(byId.get('gemini-argon-wtu-weekly')?.quotaBucketType).toBe('LONG_TERM');
+    expect(byId.get('gemini-argon-5h')?.quotaBucketType).toBe('SHORT_TERM');
+});
+
+test('只有 5 小时限制（无周桶）时 Argon 组仍然展示', () => {
+    const argon5h = { bucketId: 'gemini-argon-5h', displayName: 'Gemini 4 Argon 5h Limit', remainingFraction: 0.42, resetTime: reset(3) };
+    const quotaSummary = { groups: [{ name: 'Gemini Models', buckets: [standardGeminiWeekly, argon5h] }] };
+    const result = new ReactorCore().buildAuthorizedSnapshotFromResponse({
+        ...response, models: { old: response.models.old, added: response.models.added }, quota_summary: quotaSummary,
+    });
+    const argonGroup = result.groups?.find(group => group.groupId === 'official:gemini-4-argon');
+    expect(argonGroup?.quotaWindows?.map(window => window.windowId)).toEqual(['gemini-argon-5h']);
+});
+
 test('账号总览读插件缓存时，用同账号桌面端周配额补齐 Argon 并保留常规 Gemini', async () => {
     const email = 'a@example.test';
     const desktopSummary = { groups: [{ name: 'Gemini 4 Argon', buckets: [argonWeekly] }] };
