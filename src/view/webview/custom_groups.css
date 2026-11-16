@@ -159,10 +159,12 @@
     min-height: 32px;
 }
 
-/* 模型选择下拉（添加成员） */
+/* 模型选择下拉（添加成员）。
+   z-index 必须高于 .modal（2000），否则下拉框被弹框遮住、表现为点击无反应；
+   低于图片预览 overlay（10000）。 */
 .model-select-dropdown {
     position: fixed;
-    z-index: 1000;
+    z-index: 3000;
     min-width: 300px;
     max-width: 380px;
     max-height: 320px;
