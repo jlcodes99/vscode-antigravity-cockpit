@@ -169,6 +169,41 @@ test('自定义分组继承成员的官方配额窗口（5h + 周）', () => {
     expect(remainingOfficialModels).not.toContain('gemini-pro');
 });
 
+test('跨池同名周窗口不互相吞并（远程 fallback id 碰撞场景）', () => {
+    // 复现：两个官方组的周桶都没有自定义 id → windowId 都回退为 '组名-1' 同名，
+    // Gemini 池周 30% 与 Argon 池周 6% 必须各自保留
+    const geminiWeeklyNoId = { displayName: 'Weekly', remainingFraction: 0.30, resetTime: reset(50) };
+    const argonWeeklyNoId = { displayName: 'Weekly', remainingFraction: 0.06, resetTime: reset(2) };
+    const argon5h = { bucketId: 'gemini-argon-5h', remainingFraction: 1.0, resetTime: reset(5) };
+    const quotaSummary = { groups: [
+        { name: 'Gemini Models', buckets: [geminiWeeklyNoId] },
+        { name: 'Gemini 4 Argon', buckets: [argon5h, argonWeeklyNoId] },
+    ] };
+    jest.mocked(configService.getConfig).mockReturnValue({
+        visibleModels: [],
+        groupingEnabled: true,
+        groupMappings: { 'gemini-pro': 'g1', 'gemini-argon': 'g1' },
+        groupingCustomNames: {},
+        pinnedModels: [],
+        pinnedGroups: [],
+    } as unknown as ReturnType<typeof configService.getConfig>);
+
+    const result = new ReactorCore().buildAuthorizedSnapshotFromResponse({
+        ...response, quota_summary: quotaSummary,
+    });
+
+    const customGroup = result.groups?.find(group => group.groupId.startsWith('custom:'));
+    const weeklyWindows = (customGroup?.quotaWindows ?? []).filter(window =>
+        /week/i.test(window.windowName));
+    // 两条周窗口都要在：30%（Gemini 池）与 6%（Argon 池）
+    const pcts = weeklyWindows.map(window => Math.round(window.remainingPercentage)).sort((a, b) => a - b);
+    expect(pcts).toEqual([6, 30]);
+    // 同名窗口加官方组显示名前缀区分（Argon 池的 6% 行应带组名前缀）
+    const names = weeklyWindows.map(window => window.windowName);
+    expect(names.some(name => name === 'Gemini 4 Argon · Weekly')).toBe(true);
+    expect(names.some(name => name === 'Weekly')).toBe(true);
+});
+
 test('账号总览读插件缓存时，用同账号桌面端周配额补齐 Argon 并保留常规 Gemini', async () => {
     const email = 'a@example.test';
     const desktopSummary = { groups: [{ name: 'Gemini 4 Argon', buckets: [argonWeekly] }] };

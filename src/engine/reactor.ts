@@ -1470,6 +1470,8 @@ export class ReactorCore {
         }> = [];
         let argonWeekly: QuotaWindow | undefined;
         let argonShort: QuotaWindow | undefined;
+        /** 组名/描述含 Argon 的官方组：其全部窗口（含 fallback 命名的周/5h 桶）整体归属 Argon 组 */
+        const argonNamedGroupWindows: QuotaWindow[] = [];
 
         for (const [index, rawGroup] of quotaSummary.groups.entries()) {
             if (!isRecord(rawGroup)) {
@@ -1481,6 +1483,7 @@ export class ReactorCore {
             const rawGroupId = readStringField(rawGroup, ['id', 'groupId', 'key'])
                 || rawGroupName;
             const description = readStringField(rawGroup, ['description']);
+            const isArgonNamedGroup = /argon/i.test(`${rawGroupName} ${description ?? ''}`);
             const rawBuckets = rawGroup.buckets
                 ?? rawGroup.quotaBuckets
                 ?? rawGroup.quotaWindows
@@ -1500,6 +1503,14 @@ export class ReactorCore {
                 ))
                 .filter((window): window is QuotaWindow => window !== null && window.remainingFraction !== undefined)
                 .sort((a, b) => this.getQuotaWindowRank(a) - this.getQuotaWindowRank(b));
+
+            if (isArgonNamedGroup) {
+                // 整组收编：桶 ID 可能缺失（fallback 命名"Weekly"/"Five Hour Limit"），
+                // 按桶 ID 正则挑会漏——组名本身就是归属依据
+                argonNamedGroupWindows.push(...windows);
+                continue;
+            }
+
             argonWeekly ??= windows.find(window => window.windowId === ARGON_WEEKLY_BUCKET_ID);
             argonShort ??= windows.find(window => isArgonShortBucketId(window.windowId));
             const quotaWindows = windows.filter(window => window.windowId !== ARGON_WEEKLY_BUCKET_ID && !isArgonShortBucketId(window.windowId));
@@ -1516,9 +1527,19 @@ export class ReactorCore {
             });
         }
 
-        // Argon 组同时展示周限制与 5 小时限制（此前 5h 桶被过滤导致只剩周限制）
-        const argonWindows = [argonWeekly, argonShort]
-            .filter((window): window is QuotaWindow => !!window)
+        // Argon 组同时展示 5 小时限制与周限制（此前 5h 桶被过滤导致只剩周限制）。
+        // 两条来源：组名含 Argon 的官方组整体收编（桶 ID 可能缺失）+ 旧数据按桶 ID 兜底。
+        const argonWindowsById = new Map<string, QuotaWindow>();
+        for (const window of [...argonNamedGroupWindows, argonWeekly, argonShort]) {
+            if (!window) {
+                continue;
+            }
+            const key = `${window.windowId}_${window.resetTime.getTime()}`;
+            if (!argonWindowsById.has(key)) {
+                argonWindowsById.set(key, window);
+            }
+        }
+        const argonWindows = Array.from(argonWindowsById.values())
             .sort((a, b) => this.getQuotaWindowRank(a) - this.getQuotaWindowRank(b));
         if (argonWindows.length > 0) {
             groups.push({ groupId: ARGON_GROUP_ID, groupName: ARGON_GROUP_NAME, quotaWindows: argonWindows });
@@ -2232,8 +2253,11 @@ export class ReactorCore {
         });
         if (customGroups.length > 0) {
             // 窗口继承：用户组的成员模型可能分属不同官方配额池（如 Gemini 5h 池 +
-            // Argon 周/5h 池）。从成员原属的官方组聚合配额窗口（按窗口 ID 去重），
-            // 否则用户组没有 quotaWindows，卡片/状态栏回退单窗口，周限制不可见。
+            // Argon 周/5h 池）。从成员原属的官方组聚合配额窗口。
+            // 去重键必须包含官方组 ID 与重置时间：不同池的窗口可能共用同名 windowId
+            //（远程数据桶常无自定义 ID，回退为同名 fallback），仅按 windowId 去重会让
+            // 先到的池占位、其他池的窗口（如 Gemini 周 30% vs Argon 周 6%）被吞掉。
+            // 跨池同名窗口行加官方组名前缀区分。
             const modelToOfficial = new Map<string, QuotaGroup>();
             for (const officialGroup of officialGroups) {
                 for (const model of officialGroup.models) {
@@ -2241,17 +2265,28 @@ export class ReactorCore {
                 }
             }
             for (const customGroup of customGroups) {
-                const windowsById = new Map<string, QuotaWindow>();
+                const windowsByKey = new Map<string, QuotaWindow>();
+                const usedNames = new Set<string>();
                 for (const model of customGroup.models) {
                     const officialGroup = modelToOfficial.get(model.modelId);
-                    for (const window of officialGroup?.quotaWindows ?? []) {
-                        if (!windowsById.has(window.windowId)) {
-                            windowsById.set(window.windowId, window);
+                    if (!officialGroup) {
+                        continue;
+                    }
+                    for (const window of officialGroup.quotaWindows ?? []) {
+                        const dedupeKey = `${officialGroup.groupId}::${window.windowId}_${window.resetTime.getTime()}`;
+                        if (windowsByKey.has(dedupeKey)) {
+                            continue;
                         }
+                        let windowName = window.windowName;
+                        if (usedNames.has(windowName)) {
+                            windowName = `${officialGroup.groupName} · ${window.windowName}`;
+                        }
+                        usedNames.add(windowName);
+                        windowsByKey.set(dedupeKey, { ...window, windowName });
                     }
                 }
-                if (windowsById.size > 0) {
-                    customGroup.quotaWindows = Array.from(windowsById.values());
+                if (windowsByKey.size > 0) {
+                    customGroup.quotaWindows = Array.from(windowsByKey.values());
                 }
             }
             logger.debug(`Custom user groups created: ${customGroups.length}`);
