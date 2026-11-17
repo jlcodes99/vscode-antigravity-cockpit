@@ -34,6 +34,8 @@ import {
     isApiCacheValid,
     type QuotaApiCacheRecord,
 } from '../services/quota_api_cache';
+import { buildCustomQuotaGroups, applyCustomGroups } from './custom_groups';
+import { isArgonWindowLike } from './argon_windows';
 
 
 interface AuthorizedQuotaInfo {
@@ -236,7 +238,7 @@ function findQuotaMetricRecord(record: UnknownRecord): UnknownRecord | null {
         if (!isRecord(candidate)) {
             continue;
         }
-        const hasQuotaMetric = readNumberField(candidate, ['remainingFraction', 'remaining_fraction', 'fraction', 'remaining']) !== undefined
+        const hasQuotaMetric = readNumberField(candidate, ['remainingFraction', 'remaining_fraction', 'fraction', 'remaining', 'remainingPercent', 'remaining_percent', 'usedFraction', 'used_fraction', 'usedPercent', 'used_percent']) !== undefined
             || readStringField(candidate, ['resetTime', 'reset_time', 'resetTimestamp', 'reset_timestamp']) !== undefined;
         if (hasQuotaMetric) {
             return candidate;
@@ -1108,6 +1110,40 @@ export class ReactorCore {
         return value;
     }
 
+    /**
+     * 多形态推导剩余比例。不同数据源（官方 API / 桌面端缓存 / 本地缓存）
+     * 字段命名与口径不一致：有的给 remainingFraction(0-1)，有的给
+     * remainingPercent(0-100)，有的只给已用比例。任一形态可推导即不丢窗口。
+     */
+    private resolveRemainingFraction(record: UnknownRecord): number | undefined {
+        const remaining = this.normalizeRemainingFraction(
+            readNumberField(record, ['remainingFraction', 'remaining_fraction', 'fraction', 'remaining']),
+        );
+        if (remaining !== undefined) {
+            return remaining;
+        }
+
+        // 0-100 形式
+        const percent = readNumberField(record, ['remainingPercent', 'remaining_percent', 'remainingPercentage', 'remaining_percentage']);
+        if (typeof percent === 'number' && Number.isFinite(percent) && percent >= 0 && percent <= 100) {
+            return percent / 100;
+        }
+
+        // 已用比例（0-1）取补
+        const used = readNumberField(record, ['usedFraction', 'used_fraction', 'consumedFraction', 'consumed_fraction', 'used']);
+        if (typeof used === 'number' && Number.isFinite(used) && used >= 0 && used <= 1) {
+            return 1 - used;
+        }
+
+        // 已用百分比（0-100）取补
+        const usedPercent = readNumberField(record, ['usedPercent', 'used_percent', 'consumedPercent', 'consumed_percent']);
+        if (typeof usedPercent === 'number' && Number.isFinite(usedPercent) && usedPercent >= 0 && usedPercent <= 100) {
+            return 1 - usedPercent / 100;
+        }
+
+        return undefined;
+    }
+
     private inferQuotaWindowIdentity(
         resetTime: Date,
         resetTimeValid: boolean,
@@ -1145,9 +1181,7 @@ export class ReactorCore {
             return null;
         }
 
-        const remainingFraction = this.normalizeRemainingFraction(
-            readNumberField(metricRecord, ['remainingFraction', 'remaining_fraction', 'fraction', 'remaining']),
-        );
+        const remainingFraction = this.resolveRemainingFraction(metricRecord);
         const resetTimeRaw = readStringField(metricRecord, ['resetTime', 'reset_time', 'resetTimestamp', 'reset_timestamp']);
         const rawBucketType = readStringOrNumberField(raw, ['quotaBucketType', 'bucketType', 'type', 'window', 'quota_bucket_type'])
             ?? readStringOrNumberField(metricRecord, ['quotaBucketType', 'bucketType', 'type', 'window', 'quota_bucket_type']);
@@ -1161,6 +1195,11 @@ export class ReactorCore {
             quotaBucketType = 'SHORT_TERM';
         }
         if (isArgonWeekly && remainingFraction === undefined) {
+            // 静默丢弃会让整台机器"只剩 5h 限制"且无从排查，留诊断日志
+            logger.warn(
+                `[QuotaWindow] Dropping Argon weekly bucket without remainingFraction: id=${bucketId || '(none)'}, `
+                + `fields=${Object.keys(metricRecord).join(',')}`,
+            );
             return null;
         }
 
@@ -1237,6 +1276,7 @@ export class ReactorCore {
     private buildQuotaWindowsForAuthorizedModel(info: AuthorizedModelInfo, now: number): QuotaWindow[] {
         const windows: QuotaWindow[] = [];
         const seen = new Set<string>();
+        const modelLabel = info.displayName?.trim() || info.model || '';
 
         for (const entry of this.collectQuotaWindowRecords(info)) {
             const parsed = this.parseQuotaWindow(entry.raw, '', '', now);
@@ -1248,10 +1288,19 @@ export class ReactorCore {
                 continue;
             }
             seen.add(key);
-            windows.push({
-                ...parsed,
-                source: entry.source === 'official' ? parsed.source : 'modelQuota',
-            });
+            let resolved = { ...parsed, source: entry.source === 'official' ? parsed.source : 'modelQuota' };
+            if (entry.source !== 'official' && !isArgonWindowLike(resolved)) {
+                // 模型行 quotaInfo 推断的窗口没有官方周期语义：其重置时间可能是任意
+                // 独立池周期，按时间猜成 "Weekly Limit"/"Five Hour Limit" 会误导
+                //（独立池模型显示为"周 6%"实为该模型自身配额）。按模型中性命名。
+                resolved = {
+                    ...resolved,
+                    windowId: `model:${modelLabel || parsed.windowId}`,
+                    windowName: `${modelLabel} Quota`,
+                    quotaBucketType: 'MODEL_POOL',
+                };
+            }
+            windows.push(resolved);
         }
 
         windows.sort((a, b) => this.getQuotaWindowRank(a) - this.getQuotaWindowRank(b));
@@ -1431,6 +1480,9 @@ export class ReactorCore {
             quotaWindows: QuotaWindow[];
         }> = [];
         let argonWeekly: QuotaWindow | undefined;
+        let argonShort: QuotaWindow | undefined;
+        /** 组名/描述含 Argon 的官方组：其全部窗口（含 fallback 命名的周/5h 桶）整体归属 Argon 组 */
+        const argonNamedGroupWindows: QuotaWindow[] = [];
 
         for (const [index, rawGroup] of quotaSummary.groups.entries()) {
             if (!isRecord(rawGroup)) {
@@ -1442,6 +1494,7 @@ export class ReactorCore {
             const rawGroupId = readStringField(rawGroup, ['id', 'groupId', 'key'])
                 || rawGroupName;
             const description = readStringField(rawGroup, ['description']);
+            const isArgonNamedGroup = /argon/i.test(`${rawGroupName} ${description ?? ''}`);
             const rawBuckets = rawGroup.buckets
                 ?? rawGroup.quotaBuckets
                 ?? rawGroup.quotaWindows
@@ -1461,7 +1514,16 @@ export class ReactorCore {
                 ))
                 .filter((window): window is QuotaWindow => window !== null && window.remainingFraction !== undefined)
                 .sort((a, b) => this.getQuotaWindowRank(a) - this.getQuotaWindowRank(b));
+
+            if (isArgonNamedGroup) {
+                // 整组收编：桶 ID 可能缺失（fallback 命名"Weekly"/"Five Hour Limit"），
+                // 按桶 ID 正则挑会漏——组名本身就是归属依据
+                argonNamedGroupWindows.push(...windows);
+                continue;
+            }
+
             argonWeekly ??= windows.find(window => window.windowId === ARGON_WEEKLY_BUCKET_ID);
+            argonShort ??= windows.find(window => isArgonShortBucketId(window.windowId));
             const quotaWindows = windows.filter(window => window.windowId !== ARGON_WEEKLY_BUCKET_ID && !isArgonShortBucketId(window.windowId));
 
             if (quotaWindows.length === 0) {
@@ -1476,8 +1538,22 @@ export class ReactorCore {
             });
         }
 
-        if (argonWeekly) {
-            groups.push({ groupId: ARGON_GROUP_ID, groupName: ARGON_GROUP_NAME, quotaWindows: [argonWeekly] });
+        // Argon 组同时展示 5 小时限制与周限制（此前 5h 桶被过滤导致只剩周限制）。
+        // 两条来源：组名含 Argon 的官方组整体收编（桶 ID 可能缺失）+ 旧数据按桶 ID 兜底。
+        const argonWindowsById = new Map<string, QuotaWindow>();
+        for (const window of [...argonNamedGroupWindows, argonWeekly, argonShort]) {
+            if (!window) {
+                continue;
+            }
+            const key = `${window.windowId}_${window.resetTime.getTime()}`;
+            if (!argonWindowsById.has(key)) {
+                argonWindowsById.set(key, window);
+            }
+        }
+        const argonWindows = Array.from(argonWindowsById.values())
+            .sort((a, b) => this.getQuotaWindowRank(a) - this.getQuotaWindowRank(b));
+        if (argonWindows.length > 0) {
+            groups.push({ groupId: ARGON_GROUP_ID, groupName: ARGON_GROUP_NAME, quotaWindows: argonWindows });
         }
 
         return groups;
@@ -1955,8 +2031,18 @@ export class ReactorCore {
 
     private getLocalArgonSummary(raw: ServerUserStatusResponse): unknown {
         const cachedSummary = this.lastLocalArgonBucket ? { groups: [{ buckets: [this.lastLocalArgonBucket] }] } : undefined;
-        const bucket = this.findArgonWeeklyBucket(raw?.userStatus?.quotaSummary ?? raw?.quotaSummary)
+        const summary = raw?.userStatus?.quotaSummary ?? raw?.quotaSummary;
+        const bucket = this.findArgonWeeklyBucket(summary)
             ?? this.findArgonWeeklyBucket(cachedSummary, Date.now());
+        // 无条件输出结构摘要（debug 级）：本地通道的 quotaSummary 形态是多机差异排查的关键数据
+        const digest = JSON.stringify(summary, (key, value) =>
+            key === 'clientModelConfigs' || key === 'cascadeModelConfigData' ? undefined : value)
+            ?.slice(0, 800);
+        if (!bucket) {
+            logger.debug(`[LocalQuota] No Argon weekly bucket identified; summary digest: ${digest ?? '(no quotaSummary in local response)'}`);
+        } else {
+            logger.debug(`[LocalQuota] Argon weekly bucket identified; summary digest: ${digest ?? '(no quotaSummary in local response)'}`);
+        }
         return bucket ? { groups: [{ buckets: [bucket] }] } : undefined;
     }
 
@@ -2170,8 +2256,57 @@ export class ReactorCore {
         }
 
         const displayModels = source === 'local' ? collapseLocalQuotaVariants(models, config.pinnedModels ?? []) : models;
-        const groups = this.buildQuotaGroups(displayModels, quotaSummary);
-        logger.debug(`Official quota groups created: ${groups.length}`);
+        const officialGroups = this.buildQuotaGroups(displayModels, quotaSummary);
+        logger.debug(`Official quota groups created: ${officialGroups.length}`);
+
+        // 用户自定义分组：被用户映射的模型从官方组移出，组成用户自建组
+        const { customGroups } = buildCustomQuotaGroups(displayModels, {
+            groupMappings: config.groupMappings ?? {},
+            groupNames: config.groupingCustomNames,
+        });
+        if (customGroups.length > 0) {
+            // 窗口继承：用户组的成员模型可能分属不同官方配额池（如 Gemini 5h 池 +
+            // Argon 周/5h 池）。从成员原属的官方组聚合配额窗口。
+            // 去重键必须包含官方组 ID 与重置时间：不同池的窗口可能共用同名 windowId
+            //（远程数据桶常无自定义 ID，回退为同名 fallback），仅按 windowId 去重会让
+            // 先到的池占位、其他池的窗口（如 Gemini 周 30% vs Argon 周 6%）被吞掉。
+            // 跨池同名窗口行加官方组名前缀区分。
+            const modelToOfficial = new Map<string, QuotaGroup>();
+            for (const officialGroup of officialGroups) {
+                for (const model of officialGroup.models) {
+                    modelToOfficial.set(model.modelId, officialGroup);
+                }
+            }
+            for (const customGroup of customGroups) {
+                const windowsByKey = new Map<string, QuotaWindow>();
+                const usedNames = new Set<string>();
+                for (const model of customGroup.models) {
+                    const officialGroup = modelToOfficial.get(model.modelId);
+                    if (!officialGroup) {
+                        continue;
+                    }
+                    // 整组窗口继承（独立池模型的窗口已在 buildQuotaWindowsForAuthorizedModel
+                    // 中按模型中性命名，不会冒充 "Weekly Limit"）
+                    for (const window of officialGroup.quotaWindows ?? []) {
+                        const dedupeKey = `${officialGroup.groupId}::${window.windowId}_${window.resetTime.getTime()}`;
+                        if (windowsByKey.has(dedupeKey)) {
+                            continue;
+                        }
+                        let windowName = window.windowName;
+                        if (usedNames.has(windowName)) {
+                            windowName = `${officialGroup.groupName} · ${window.windowName}`;
+                        }
+                        usedNames.add(windowName);
+                        windowsByKey.set(dedupeKey, { ...window, windowName });
+                    }
+                }
+                if (windowsByKey.size > 0) {
+                    customGroup.quotaWindows = Array.from(windowsByKey.values());
+                }
+            }
+            logger.debug(`Custom user groups created: ${customGroups.length}`);
+        }
+        const groups = applyCustomGroups(officialGroups, customGroups);
 
         // 将配额中的模型常量传递给 AutoTriggerController，用于过滤可触发模型
         const quotaModelConstants = models.map(m => m.modelId);

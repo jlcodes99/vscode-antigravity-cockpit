@@ -67,6 +67,7 @@ export class TelemetryController {
                 groupOrder: config.groupOrder,
                 modelCustomNames: config.modelCustomNames,
                 groupingCustomNames: config.groupingCustomNames,
+                groupMappings: config.groupMappings,
                 groupingShowInStatusBar: config.groupingShowInStatusBar,
                 visibleModels: config.visibleModels,
                 refreshInterval: config.refreshInterval,

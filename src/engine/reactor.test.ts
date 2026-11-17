@@ -78,6 +78,172 @@ test('只有明确的 Argon 周配额桶会产生周配额行', () => {
     expect(result.groups?.[0].quotaWindows?.map(window => window.windowId)).toEqual(['gemini-weekly']);
 });
 
+test('Argon 组同时展示 5 小时限制与周限制', () => {
+    const argon5h = { bucketId: 'gemini-argon-5h', displayName: 'Gemini 4 Argon 5h Limit', remainingFraction: 0.42, resetTime: reset(3) };
+    const quotaSummary = { groups: [{ name: 'Gemini Models', buckets: [standardGeminiWeekly, argon5h, argonWeekly] }] };
+    const result = new ReactorCore().buildAuthorizedSnapshotFromResponse({
+        ...response, models: { old: response.models.old, added: response.models.added }, quota_summary: quotaSummary,
+    });
+    const argonGroup = result.groups?.find(group => group.groupId === 'official:gemini-4-argon');
+    expect(argonGroup).toBeDefined();
+    const windowIds = argonGroup?.quotaWindows?.map(window => window.windowId) ?? [];
+    expect(windowIds).toContain('gemini-argon-wtu-weekly');
+    expect(windowIds).toContain('gemini-argon-5h');
+    expect(argonGroup?.quotaWindows).toHaveLength(2);
+    // 组百分比取所有窗口中最低的
+    expect(argonGroup?.remainingPercentage).toBeCloseTo(42, 5);
+    // 窗口类型标注正确
+    const byId = new Map((argonGroup?.quotaWindows ?? []).map(window => [window.windowId, window]));
+    expect(byId.get('gemini-argon-wtu-weekly')?.quotaBucketType).toBe('LONG_TERM');
+    expect(byId.get('gemini-argon-5h')?.quotaBucketType).toBe('SHORT_TERM');
+});
+
+test('只有 5 小时限制（无周桶）时 Argon 组仍然展示', () => {
+    const argon5h = { bucketId: 'gemini-argon-5h', displayName: 'Gemini 4 Argon 5h Limit', remainingFraction: 0.42, resetTime: reset(3) };
+    const quotaSummary = { groups: [{ name: 'Gemini Models', buckets: [standardGeminiWeekly, argon5h] }] };
+    const result = new ReactorCore().buildAuthorizedSnapshotFromResponse({
+        ...response, models: { old: response.models.old, added: response.models.added }, quota_summary: quotaSummary,
+    });
+    const argonGroup = result.groups?.find(group => group.groupId === 'official:gemini-4-argon');
+    expect(argonGroup?.quotaWindows?.map(window => window.windowId)).toEqual(['gemini-argon-5h']);
+});
+
+test('周桶用 remainingPercent(0-100) 形式也能解析（不再被丢弃）', () => {
+    const weeklyByPercent = { bucketId: 'gemini-argon-wtu-weekly', displayName: 'Weekly', remainingPercent: 88, resetTime: reset(2) };
+    const argon5h = { bucketId: 'gemini-argon-5h', remainingFraction: 0.42, resetTime: reset(3) };
+    const quotaSummary = { groups: [{ name: 'Gemini Models', buckets: [argon5h, weeklyByPercent] }] };
+    const result = new ReactorCore().buildAuthorizedSnapshotFromResponse({
+        ...response, models: { old: response.models.old, added: response.models.added }, quota_summary: quotaSummary,
+    });
+    const argonGroup = result.groups?.find(group => group.groupId === 'official:gemini-4-argon');
+    const weekly = argonGroup?.quotaWindows?.find(window => window.windowId === 'gemini-argon-wtu-weekly');
+    expect(weekly?.remainingPercentage).toBeCloseTo(88, 5);
+    expect(weekly?.quotaBucketType).toBe('LONG_TERM');
+});
+
+test('周桶只有已用比例（usedFraction）时取补解析', () => {
+    const weeklyByUsed = { bucketId: 'gemini-argon-wtu-weekly', displayName: 'Weekly', usedFraction: 0.09, resetTime: reset(2) };
+    const argon5h = { bucketId: 'gemini-argon-5h', remainingFraction: 0.42, resetTime: reset(3) };
+    const quotaSummary = { groups: [{ name: 'Gemini Models', buckets: [argon5h, weeklyByUsed] }] };
+    const result = new ReactorCore().buildAuthorizedSnapshotFromResponse({
+        ...response, models: { old: response.models.old, added: response.models.added }, quota_summary: quotaSummary,
+    });
+    const argonGroup = result.groups?.find(group => group.groupId === 'official:gemini-4-argon');
+    const weekly = argonGroup?.quotaWindows?.find(window => window.windowId === 'gemini-argon-wtu-weekly');
+    expect(weekly?.remainingPercentage).toBeCloseTo(91, 5);
+});
+
+test('自定义分组继承成员的官方配额窗口（5h + 周）', () => {
+    const argon5h = { bucketId: 'gemini-argon-5h', displayName: 'Gemini 4 Argon 5h', remainingFraction: 0.42, resetTime: reset(3) };
+    const quotaSummary = { groups: [{ name: 'Gemini Models', buckets: [standardGeminiWeekly, argon5h, argonWeekly] }] };
+    // 两个不同池的模型（gemini-pro 5h 池、gemini-argon 周池）放进同一个用户组
+    jest.mocked(configService.getConfig).mockReturnValue({
+        visibleModels: [],
+        groupingEnabled: true,
+        groupMappings: { 'gemini-pro': 'g1', 'gemini-argon': 'g1' },
+        groupingCustomNames: { 'gemini-pro': 'My Group' },
+        pinnedModels: [],
+        pinnedGroups: [],
+    } as unknown as ReturnType<typeof configService.getConfig>);
+
+    const result = new ReactorCore().buildAuthorizedSnapshotFromResponse({
+        ...response, quota_summary: quotaSummary,
+    });
+
+    const customGroup = result.groups?.find(group => group.groupId.startsWith('custom:'));
+    expect(customGroup).toBeDefined();
+    expect(customGroup?.groupName).toBe('My Group');
+    expect(customGroup?.models.map(model => model.modelId).sort()).toEqual(['gemini-argon', 'gemini-pro']);
+
+    // 关键：用户组必须带窗口明细（否则卡片/状态栏只剩单窗口，周限制不可见）
+    const windowIds = customGroup?.quotaWindows?.map(window => window.windowId) ?? [];
+    expect(windowIds).toContain('gemini-weekly');
+    expect(windowIds).toContain('gemini-argon-wtu-weekly');
+    expect(windowIds).toContain('gemini-argon-5h');
+
+    // 官方组中被接管的模型不再重复展示
+    const remainingOfficialModels = result.groups
+        ?.filter(group => !group.groupId.startsWith('custom:'))
+        .flatMap(group => group.models.map(model => model.modelId)) ?? [];
+    expect(remainingOfficialModels).not.toContain('gemini-argon');
+    expect(remainingOfficialModels).not.toContain('gemini-pro');
+});
+
+test('跨池同名周窗口不互相吞并（远程 fallback id 碰撞场景）', () => {
+    // 复现：两个官方组的周桶都没有自定义 id → windowId 都回退为 '组名-1' 同名，
+    // Gemini 池周 30% 与 Argon 池周 6% 必须各自保留
+    const geminiWeeklyNoId = { displayName: 'Weekly', remainingFraction: 0.30, resetTime: reset(50) };
+    const argonWeeklyNoId = { displayName: 'Weekly', remainingFraction: 0.06, resetTime: reset(2) };
+    const argon5h = { bucketId: 'gemini-argon-5h', remainingFraction: 1.0, resetTime: reset(5) };
+    const quotaSummary = { groups: [
+        { name: 'Gemini Models', buckets: [geminiWeeklyNoId] },
+        { name: 'Gemini 4 Argon', buckets: [argon5h, argonWeeklyNoId] },
+    ] };
+    jest.mocked(configService.getConfig).mockReturnValue({
+        visibleModels: [],
+        groupingEnabled: true,
+        groupMappings: { 'gemini-pro': 'g1', 'gemini-argon': 'g1' },
+        groupingCustomNames: {},
+        pinnedModels: [],
+        pinnedGroups: [],
+    } as unknown as ReturnType<typeof configService.getConfig>);
+
+    const result = new ReactorCore().buildAuthorizedSnapshotFromResponse({
+        ...response, quota_summary: quotaSummary,
+    });
+
+    const customGroup = result.groups?.find(group => group.groupId.startsWith('custom:'));
+    const weeklyWindows = (customGroup?.quotaWindows ?? []).filter(window =>
+        /week/i.test(window.windowName));
+    // 两条周窗口都要在：30%（Gemini 池）与 6%（Argon 池）
+    const pcts = weeklyWindows.map(window => Math.round(window.remainingPercentage)).sort((a, b) => a - b);
+    expect(pcts).toEqual([6, 30]);
+    // 同名窗口加官方组显示名前缀区分（Argon 池的 6% 行应带组名前缀）
+    const names = weeklyWindows.map(window => window.windowName);
+    expect(names.some(name => name === 'Gemini 4 Argon · Weekly')).toBe(true);
+    expect(names.some(name => name === 'Weekly')).toBe(true);
+});
+
+test('独立池模型（无官方组窗口）合成按模型命名的中性窗口', () => {
+    // 不命中任何 provider 文本的私有模型 → provider:other 兜底组 → 组无窗口 →
+    // 合成中性窗口，不猜周期类型（单模型 quotaInfo 的重置周期不一定是"周"）
+    const argon5h = { bucketId: 'gemini-argon-5h', remainingFraction: 0.42, resetTime: reset(3) };
+    const argonWeekly = { bucketId: 'gemini-argon-wtu-weekly', remainingFraction: 0.06, resetTime: reset(2) };
+    const quotaSummary = { groups: [
+        { name: 'Gemini Models', buckets: [standardGeminiWeekly, argon5h, argonWeekly] },
+    ] };
+    const responseWithPrivate = {
+        ...response,
+        models: {
+            ...response.models,
+            private1: { model: 'acme-private-model', displayName: 'Acme Private Model', quotaInfo: { remainingFraction: 0.0646, resetTime: reset(96) } },
+        },
+    };
+    jest.mocked(configService.getConfig).mockReturnValue({
+        visibleModels: [],
+        groupingEnabled: true,
+        groupMappings: { 'gemini-argon': 'g1', 'acme-private-model': 'g1' },
+        groupingCustomNames: {},
+        pinnedModels: [],
+        pinnedGroups: [],
+    } as unknown as ReturnType<typeof configService.getConfig>);
+
+    const result = new ReactorCore().buildAuthorizedSnapshotFromResponse({
+        ...responseWithPrivate, quota_summary: quotaSummary,
+    });
+
+    const customGroup = result.groups?.find(group => group.groupId.startsWith('custom:'));
+    // 独立池模型的窗口来自模型行 quotaInfo，已被中性化为模型名命名
+    const privateWindow = customGroup?.quotaWindows?.find(window => window.windowId === 'model:Acme Private Model');
+    expect(privateWindow).toBeDefined();
+    expect(privateWindow?.windowName).toBe('Acme Private Model Quota');
+    expect(privateWindow?.remainingPercentage).toBeCloseTo(6.46, 2);
+    // 不猜周期类型：窗口名不得是 Weekly Limit / Five Hour Limit
+    expect(privateWindow?.windowName).not.toMatch(/weekly|five hour/i);
+    // 同时 Argon 池的窗口（组名收编）仍在
+    expect(customGroup?.quotaWindows?.some(window => /argon/i.test(window.windowId))).toBe(true);
+});
+
 test('账号总览读插件缓存时，用同账号桌面端周配额补齐 Argon 并保留常规 Gemini', async () => {
     const email = 'a@example.test';
     const desktopSummary = { groups: [{ name: 'Gemini 4 Argon', buckets: [argonWeekly] }] };

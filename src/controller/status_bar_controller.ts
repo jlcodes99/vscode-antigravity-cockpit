@@ -5,8 +5,16 @@ import { t } from '../shared/i18n';
 import { ModelQuotaInfo, QuotaGroup, QuotaSnapshot } from '../shared/types';
 import { STATUS_BAR_FORMAT, QUOTA_THRESHOLDS } from '../shared/constants';
 import { autoTriggerController } from '../auto_trigger/controller';
+import { formatGroupStatusText, type ResolvedThresholds, type StatusBarFormat } from '../shared/status_bar_text';
 
 const CREDITS_LABEL = 'Credits';
+
+function resolveThresholds(config: CockpitConfig): ResolvedThresholds {
+    return {
+        warningThreshold: config.warningThreshold ?? QUOTA_THRESHOLDS.WARNING_DEFAULT,
+        criticalThreshold: config.criticalThreshold ?? QUOTA_THRESHOLDS.CRITICAL_DEFAULT,
+    };
+}
 
 function getCompactQuotaGroupName(groupName: string): string {
     const normalized = groupName.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -82,11 +90,13 @@ export class StatusBarController {
 
             groupsToShow.forEach(group => {
                 const pct = group.remainingPercentage;
-                const text = this.formatStatusBarText(
+                // 多窗口组（如 Argon 的 5h + 周限制）逐窗口展示，而非只显示最低值
+                const text = formatGroupStatusText(
+                    config.statusBarFormat as StatusBarFormat,
                     getConfiguredGroupName(group, config),
+                    group.quotaWindows,
                     pct,
-                    config.statusBarFormat,
-                    config,
+                    resolveThresholds(config),
                 );
                 if (text) { statusTextParts.push(text); }
                 if (pct < minPercentage) {

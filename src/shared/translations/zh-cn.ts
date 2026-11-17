@@ -175,6 +175,22 @@ export const zhCN = {
     'customGrouping.emptyGroupWarning': '存在空分组，是否继续保存？',
     'customGrouping.other': '其他',
     'customGrouping.smartGroupCount': '自动分组：共 {count} 个分组',
+    // Custom Groups (用户自建分组)
+    'customGroups.title': "自定义分组",
+    'customGroups.button': "分组",
+    'customGroups.hint': "自主创建分组并选择每个分组要监控哪些模型。未加入自定义分组的模型仍按官方配额分组展示。",
+    'customGroups.addGroup': "+ 新建分组",
+    'customGroups.groupName': "分组名称…",
+    'customGroups.unassigned': "未加入自定义分组",
+    'customGroups.allAssigned': "所有模型都已加入自定义分组",
+    'customGroups.noGroups': "还没有自定义分组，点击\"新建分组\"开始创建。",
+    'customGroups.addModel': "添加模型",
+    'customGroups.removeModel': "移除",
+    'customGroups.deleteGroup': "删除分组",
+    'customGroups.noModels': "没有可用模型",
+    'customGroups.quotaMismatch': "配额不一致",
+    'customGroups.resetMismatch': "重置时间不一致",
+    'customGroups.saved': "自定义分组已保存",
 
     // Group Node Tooltips 分组节点 Tooltip
     'groupNode.group': '分组',

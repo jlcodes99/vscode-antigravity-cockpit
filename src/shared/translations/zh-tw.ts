@@ -172,6 +172,22 @@ export const zhTW = {
     'customGrouping.emptyGroupWarning': '存在空分組，是否繼續保存？',
     'customGrouping.other': '其他',
     'customGrouping.smartGroupCount': '自動分組：共 {count} 個分組',
+    // Custom Groups (用户自建分组)
+    'customGroups.title': "自訂分組",
+    'customGroups.button': "分組",
+    'customGroups.hint': "自訂建立分組並選擇每個分組要監控哪些模型。未加入自訂分組的模型仍按官方配額分組顯示。",
+    'customGroups.addGroup': "+ 新增分組",
+    'customGroups.groupName': "分組名稱…",
+    'customGroups.unassigned': "未加入自訂分組",
+    'customGroups.allAssigned': "所有模型都已加入自訂分組",
+    'customGroups.noGroups': "還沒有自訂分組，點擊「新增分組」開始建立。",
+    'customGroups.addModel': "新增模型",
+    'customGroups.removeModel': "移除",
+    'customGroups.deleteGroup': "刪除分組",
+    'customGroups.noModels': "沒有可用模型",
+    'customGroups.quotaMismatch': "配額不一致",
+    'customGroups.resetMismatch': "重設時間不一致",
+    'customGroups.saved': "自訂分組已儲存",
 
     // 分組節點 Tooltip
     'groupNode.group': '分組',

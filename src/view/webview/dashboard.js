@@ -6,6 +6,7 @@
 import { AUTH_MODEL_BLACKLIST_IDS, AUTH_RECOMMENDED_LABELS, AUTH_RECOMMENDED_MODEL_IDS } from '../../shared/recommended_models';
 import { createHistoryModule } from './dashboard_history';
 import { createAnnouncementModule } from './dashboard_announcements';
+import { createCustomGroupsModule } from './custom_groups_view';
 
 (function () {
     'use strict';
@@ -107,6 +108,30 @@ import { createAnnouncementModule } from './dashboard_announcements';
         escapeHtml,
     });
 
+    const customGroupsModule = createCustomGroupsModule({
+        vscode,
+        i18n,
+        escapeHtml,
+        dom: {
+            modal: document.getElementById('custom-groups-modal'),
+            list: document.getElementById('custom-groups-list'),
+            unassigned: document.getElementById('custom-groups-unassigned'),
+            addBtn: document.getElementById('custom-groups-add'),
+            closeBtn: document.getElementById('custom-groups-close'),
+            cancelBtn: document.getElementById('custom-groups-cancel'),
+            saveBtn: document.getElementById('custom-groups-save'),
+        },
+        getAllModels: () => (lastSnapshot?.allModels || lastSnapshot?.models || []).map(m => ({
+            modelId: m.modelId,
+            label: m.label,
+            remainingPercentage: m.remainingPercentage,
+            resetTimeDisplay: m.resetTimeDisplay,
+        })),
+        getGroupMappings: () => currentConfig.groupMappings || {},
+        getGroupNames: () => currentConfig.groupingCustomNames || {},
+        toast: showToast,
+    });
+
     // 刷新冷却时间（秒）
     let refreshCooldown = 10;
     const NEW_TAG_BURST_MS = 5000;
@@ -159,6 +184,13 @@ import { createAnnouncementModule } from './dashboard_announcements';
         if (manageModelsBtn) {
             manageModelsBtn.addEventListener('click', openModelManagerModal);
         }
+
+        // 用户自定义分组入口
+        const customGroupsBtn = document.getElementById('custom-groups-btn');
+        if (customGroupsBtn) {
+            customGroupsBtn.addEventListener('click', () => customGroupsModule.open());
+        }
+        customGroupsModule.init();
 
         // 计划详情开关按钮
         const toggleProfileBtn = document.getElementById('toggle-profile-btn');

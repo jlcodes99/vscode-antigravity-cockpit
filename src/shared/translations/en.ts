@@ -176,6 +176,23 @@ export const en = {
     'customGrouping.other': 'Other',
     'customGrouping.smartGroupCount': 'Auto Group: {count} groups',
 
+    // Custom Groups (用户自建分组)
+    'customGroups.title': 'Custom Groups',
+    'customGroups.button': 'Groups',
+    'customGroups.hint': 'Create your own groups and choose which models to monitor in each group. Models not assigned to a custom group keep their official quota group.',
+    'customGroups.addGroup': '+ Add Group',
+    'customGroups.groupName': 'Group name...',
+    'customGroups.unassigned': 'Not in a custom group',
+    'customGroups.allAssigned': 'All models are in a custom group',
+    'customGroups.noGroups': 'No custom groups yet. Click "Add Group" to create one.',
+    'customGroups.addModel': 'Add Model',
+    'customGroups.removeModel': 'Remove',
+    'customGroups.deleteGroup': 'Delete Group',
+    'customGroups.noModels': 'No available models',
+    'customGroups.quotaMismatch': 'Quota mismatch',
+    'customGroups.resetMismatch': 'Reset time mismatch',
+    'customGroups.saved': 'Custom groups saved',
+
     // Group Node Tooltips
     'groupNode.group': 'Group',
     'groupNode.quota': 'Quota',
