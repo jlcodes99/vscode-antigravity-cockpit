@@ -133,6 +133,42 @@ test('周桶只有已用比例（usedFraction）时取补解析', () => {
     expect(weekly?.remainingPercentage).toBeCloseTo(91, 5);
 });
 
+test('自定义分组继承成员的官方配额窗口（5h + 周）', () => {
+    const argon5h = { bucketId: 'gemini-argon-5h', displayName: 'Gemini 4 Argon 5h', remainingFraction: 0.42, resetTime: reset(3) };
+    const quotaSummary = { groups: [{ name: 'Gemini Models', buckets: [standardGeminiWeekly, argon5h, argonWeekly] }] };
+    // 两个不同池的模型（gemini-pro 5h 池、gemini-argon 周池）放进同一个用户组
+    jest.mocked(configService.getConfig).mockReturnValue({
+        visibleModels: [],
+        groupingEnabled: true,
+        groupMappings: { 'gemini-pro': 'g1', 'gemini-argon': 'g1' },
+        groupingCustomNames: { 'gemini-pro': 'My Group' },
+        pinnedModels: [],
+        pinnedGroups: [],
+    } as unknown as ReturnType<typeof configService.getConfig>);
+
+    const result = new ReactorCore().buildAuthorizedSnapshotFromResponse({
+        ...response, quota_summary: quotaSummary,
+    });
+
+    const customGroup = result.groups?.find(group => group.groupId.startsWith('custom:'));
+    expect(customGroup).toBeDefined();
+    expect(customGroup?.groupName).toBe('My Group');
+    expect(customGroup?.models.map(model => model.modelId).sort()).toEqual(['gemini-argon', 'gemini-pro']);
+
+    // 关键：用户组必须带窗口明细（否则卡片/状态栏只剩单窗口，周限制不可见）
+    const windowIds = customGroup?.quotaWindows?.map(window => window.windowId) ?? [];
+    expect(windowIds).toContain('gemini-weekly');
+    expect(windowIds).toContain('gemini-argon-wtu-weekly');
+    expect(windowIds).toContain('gemini-argon-5h');
+
+    // 官方组中被接管的模型不再重复展示
+    const remainingOfficialModels = result.groups
+        ?.filter(group => !group.groupId.startsWith('custom:'))
+        .flatMap(group => group.models.map(model => model.modelId)) ?? [];
+    expect(remainingOfficialModels).not.toContain('gemini-argon');
+    expect(remainingOfficialModels).not.toContain('gemini-pro');
+});
+
 test('账号总览读插件缓存时，用同账号桌面端周配额补齐 Argon 并保留常规 Gemini', async () => {
     const email = 'a@example.test';
     const desktopSummary = { groups: [{ name: 'Gemini 4 Argon', buckets: [argonWeekly] }] };

@@ -2230,10 +2230,33 @@ export class ReactorCore {
             groupMappings: config.groupMappings ?? {},
             groupNames: config.groupingCustomNames,
         });
-        const groups = applyCustomGroups(officialGroups, customGroups);
         if (customGroups.length > 0) {
+            // 窗口继承：用户组的成员模型可能分属不同官方配额池（如 Gemini 5h 池 +
+            // Argon 周/5h 池）。从成员原属的官方组聚合配额窗口（按窗口 ID 去重），
+            // 否则用户组没有 quotaWindows，卡片/状态栏回退单窗口，周限制不可见。
+            const modelToOfficial = new Map<string, QuotaGroup>();
+            for (const officialGroup of officialGroups) {
+                for (const model of officialGroup.models) {
+                    modelToOfficial.set(model.modelId, officialGroup);
+                }
+            }
+            for (const customGroup of customGroups) {
+                const windowsById = new Map<string, QuotaWindow>();
+                for (const model of customGroup.models) {
+                    const officialGroup = modelToOfficial.get(model.modelId);
+                    for (const window of officialGroup?.quotaWindows ?? []) {
+                        if (!windowsById.has(window.windowId)) {
+                            windowsById.set(window.windowId, window);
+                        }
+                    }
+                }
+                if (windowsById.size > 0) {
+                    customGroup.quotaWindows = Array.from(windowsById.values());
+                }
+            }
             logger.debug(`Custom user groups created: ${customGroups.length}`);
         }
+        const groups = applyCustomGroups(officialGroups, customGroups);
 
         // 将配额中的模型常量传递给 AutoTriggerController，用于过滤可触发模型
         const quotaModelConstants = models.map(m => m.modelId);
