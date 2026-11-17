@@ -204,6 +204,46 @@ test('跨池同名周窗口不互相吞并（远程 fallback id 碰撞场景）'
     expect(names.some(name => name === 'Weekly')).toBe(true);
 });
 
+test('独立池模型（无官方组窗口）合成按模型命名的中性窗口', () => {
+    // 不命中任何 provider 文本的私有模型 → provider:other 兜底组 → 组无窗口 →
+    // 合成中性窗口，不猜周期类型（单模型 quotaInfo 的重置周期不一定是"周"）
+    const argon5h = { bucketId: 'gemini-argon-5h', remainingFraction: 0.42, resetTime: reset(3) };
+    const argonWeekly = { bucketId: 'gemini-argon-wtu-weekly', remainingFraction: 0.06, resetTime: reset(2) };
+    const quotaSummary = { groups: [
+        { name: 'Gemini Models', buckets: [standardGeminiWeekly, argon5h, argonWeekly] },
+    ] };
+    const responseWithPrivate = {
+        ...response,
+        models: {
+            ...response.models,
+            private1: { model: 'acme-private-model', displayName: 'Acme Private Model', quotaInfo: { remainingFraction: 0.0646, resetTime: reset(96) } },
+        },
+    };
+    jest.mocked(configService.getConfig).mockReturnValue({
+        visibleModels: [],
+        groupingEnabled: true,
+        groupMappings: { 'gemini-argon': 'g1', 'acme-private-model': 'g1' },
+        groupingCustomNames: {},
+        pinnedModels: [],
+        pinnedGroups: [],
+    } as unknown as ReturnType<typeof configService.getConfig>);
+
+    const result = new ReactorCore().buildAuthorizedSnapshotFromResponse({
+        ...responseWithPrivate, quota_summary: quotaSummary,
+    });
+
+    const customGroup = result.groups?.find(group => group.groupId.startsWith('custom:'));
+    // 独立池模型的窗口来自模型行 quotaInfo，已被中性化为模型名命名
+    const privateWindow = customGroup?.quotaWindows?.find(window => window.windowId === 'model:Acme Private Model');
+    expect(privateWindow).toBeDefined();
+    expect(privateWindow?.windowName).toBe('Acme Private Model Quota');
+    expect(privateWindow?.remainingPercentage).toBeCloseTo(6.46, 2);
+    // 不猜周期类型：窗口名不得是 Weekly Limit / Five Hour Limit
+    expect(privateWindow?.windowName).not.toMatch(/weekly|five hour/i);
+    // 同时 Argon 池的窗口（组名收编）仍在
+    expect(customGroup?.quotaWindows?.some(window => /argon/i.test(window.windowId))).toBe(true);
+});
+
 test('账号总览读插件缓存时，用同账号桌面端周配额补齐 Argon 并保留常规 Gemini', async () => {
     const email = 'a@example.test';
     const desktopSummary = { groups: [{ name: 'Gemini 4 Argon', buckets: [argonWeekly] }] };

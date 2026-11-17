@@ -35,6 +35,7 @@ import {
     type QuotaApiCacheRecord,
 } from '../services/quota_api_cache';
 import { buildCustomQuotaGroups, applyCustomGroups } from './custom_groups';
+import { isArgonWindowLike } from './argon_windows';
 
 
 interface AuthorizedQuotaInfo {
@@ -1275,6 +1276,7 @@ export class ReactorCore {
     private buildQuotaWindowsForAuthorizedModel(info: AuthorizedModelInfo, now: number): QuotaWindow[] {
         const windows: QuotaWindow[] = [];
         const seen = new Set<string>();
+        const modelLabel = info.displayName?.trim() || info.model || '';
 
         for (const entry of this.collectQuotaWindowRecords(info)) {
             const parsed = this.parseQuotaWindow(entry.raw, '', '', now);
@@ -1286,10 +1288,19 @@ export class ReactorCore {
                 continue;
             }
             seen.add(key);
-            windows.push({
-                ...parsed,
-                source: entry.source === 'official' ? parsed.source : 'modelQuota',
-            });
+            let resolved = { ...parsed, source: entry.source === 'official' ? parsed.source : 'modelQuota' };
+            if (entry.source !== 'official' && !isArgonWindowLike(resolved)) {
+                // 模型行 quotaInfo 推断的窗口没有官方周期语义：其重置时间可能是任意
+                // 独立池周期，按时间猜成 "Weekly Limit"/"Five Hour Limit" 会误导
+                //（独立池模型显示为"周 6%"实为该模型自身配额）。按模型中性命名。
+                resolved = {
+                    ...resolved,
+                    windowId: `model:${modelLabel || parsed.windowId}`,
+                    windowName: `${modelLabel} Quota`,
+                    quotaBucketType: 'MODEL_POOL',
+                };
+            }
+            windows.push(resolved);
         }
 
         windows.sort((a, b) => this.getQuotaWindowRank(a) - this.getQuotaWindowRank(b));
@@ -2274,6 +2285,8 @@ export class ReactorCore {
                     if (!officialGroup) {
                         continue;
                     }
+                    // 整组窗口继承（独立池模型的窗口已在 buildQuotaWindowsForAuthorizedModel
+                    // 中按模型中性命名，不会冒充 "Weekly Limit"）
                     for (const window of officialGroup.quotaWindows ?? []) {
                         const dedupeKey = `${officialGroup.groupId}::${window.windowId}_${window.resetTime.getTime()}`;
                         if (windowsByKey.has(dedupeKey)) {
