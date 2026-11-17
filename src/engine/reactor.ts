@@ -1999,8 +1999,16 @@ export class ReactorCore {
 
     private getLocalArgonSummary(raw: ServerUserStatusResponse): unknown {
         const cachedSummary = this.lastLocalArgonBucket ? { groups: [{ buckets: [this.lastLocalArgonBucket] }] } : undefined;
-        const bucket = this.findArgonWeeklyBucket(raw?.userStatus?.quotaSummary ?? raw?.quotaSummary)
+        const summary = raw?.userStatus?.quotaSummary ?? raw?.quotaSummary;
+        const bucket = this.findArgonWeeklyBucket(summary)
             ?? this.findArgonWeeklyBucket(cachedSummary, Date.now());
+        if (!bucket) {
+            // 本地模式周限制整组消失时的取证日志：dump 响应里 quotaSummary 的结构摘要
+            const digest = JSON.stringify(summary, (key, value) =>
+                key === 'clientModelConfigs' || key === 'cascadeModelConfigData' ? undefined : value)
+                ?.slice(0, 600);
+            logger.debug(`[LocalQuota] No Argon weekly bucket identified; summary digest: ${digest ?? '(no quotaSummary in local response)'}`);
+        }
         return bucket ? { groups: [{ buckets: [bucket] }] } : undefined;
     }
 
