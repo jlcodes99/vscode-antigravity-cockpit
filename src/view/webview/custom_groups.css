@@ -1,12 +1,24 @@
 /* ============ 用户自定义分组弹框 ============ */
 
+/* 高度约束：弹框超出视口时 header/footer 固定、body 内部滚动，
+   否则底部（保存按钮、未分组模型区）会被整体裁切且无法滚动 */
+#custom-groups-modal .modal-content {
+    max-height: calc(100vh - 48px);
+    display: flex;
+    flex-direction: column;
+}
+
+#custom-groups-modal .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
 .custom-groups-list {
     display: flex;
     flex-direction: column;
     gap: 12px;
     padding: 4px 0;
-    max-height: 320px;
-    overflow-y: auto;
 }
 
 .empty-groups-hint {
