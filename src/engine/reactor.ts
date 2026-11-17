@@ -2023,12 +2023,14 @@ export class ReactorCore {
         const summary = raw?.userStatus?.quotaSummary ?? raw?.quotaSummary;
         const bucket = this.findArgonWeeklyBucket(summary)
             ?? this.findArgonWeeklyBucket(cachedSummary, Date.now());
+        // 无条件输出结构摘要（debug 级）：本地通道的 quotaSummary 形态是多机差异排查的关键数据
+        const digest = JSON.stringify(summary, (key, value) =>
+            key === 'clientModelConfigs' || key === 'cascadeModelConfigData' ? undefined : value)
+            ?.slice(0, 800);
         if (!bucket) {
-            // 本地模式周限制整组消失时的取证日志：dump 响应里 quotaSummary 的结构摘要
-            const digest = JSON.stringify(summary, (key, value) =>
-                key === 'clientModelConfigs' || key === 'cascadeModelConfigData' ? undefined : value)
-                ?.slice(0, 600);
             logger.debug(`[LocalQuota] No Argon weekly bucket identified; summary digest: ${digest ?? '(no quotaSummary in local response)'}`);
+        } else {
+            logger.debug(`[LocalQuota] Argon weekly bucket identified; summary digest: ${digest ?? '(no quotaSummary in local response)'}`);
         }
         return bucket ? { groups: [{ buckets: [bucket] }] } : undefined;
     }
