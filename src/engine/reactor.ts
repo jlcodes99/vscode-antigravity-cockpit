@@ -237,7 +237,7 @@ function findQuotaMetricRecord(record: UnknownRecord): UnknownRecord | null {
         if (!isRecord(candidate)) {
             continue;
         }
-        const hasQuotaMetric = readNumberField(candidate, ['remainingFraction', 'remaining_fraction', 'fraction', 'remaining']) !== undefined
+        const hasQuotaMetric = readNumberField(candidate, ['remainingFraction', 'remaining_fraction', 'fraction', 'remaining', 'remainingPercent', 'remaining_percent', 'usedFraction', 'used_fraction', 'usedPercent', 'used_percent']) !== undefined
             || readStringField(candidate, ['resetTime', 'reset_time', 'resetTimestamp', 'reset_timestamp']) !== undefined;
         if (hasQuotaMetric) {
             return candidate;
@@ -1109,6 +1109,40 @@ export class ReactorCore {
         return value;
     }
 
+    /**
+     * 多形态推导剩余比例。不同数据源（官方 API / 桌面端缓存 / 本地缓存）
+     * 字段命名与口径不一致：有的给 remainingFraction(0-1)，有的给
+     * remainingPercent(0-100)，有的只给已用比例。任一形态可推导即不丢窗口。
+     */
+    private resolveRemainingFraction(record: UnknownRecord): number | undefined {
+        const remaining = this.normalizeRemainingFraction(
+            readNumberField(record, ['remainingFraction', 'remaining_fraction', 'fraction', 'remaining']),
+        );
+        if (remaining !== undefined) {
+            return remaining;
+        }
+
+        // 0-100 形式
+        const percent = readNumberField(record, ['remainingPercent', 'remaining_percent', 'remainingPercentage', 'remaining_percentage']);
+        if (typeof percent === 'number' && Number.isFinite(percent) && percent >= 0 && percent <= 100) {
+            return percent / 100;
+        }
+
+        // 已用比例（0-1）取补
+        const used = readNumberField(record, ['usedFraction', 'used_fraction', 'consumedFraction', 'consumed_fraction', 'used']);
+        if (typeof used === 'number' && Number.isFinite(used) && used >= 0 && used <= 1) {
+            return 1 - used;
+        }
+
+        // 已用百分比（0-100）取补
+        const usedPercent = readNumberField(record, ['usedPercent', 'used_percent', 'consumedPercent', 'consumed_percent']);
+        if (typeof usedPercent === 'number' && Number.isFinite(usedPercent) && usedPercent >= 0 && usedPercent <= 100) {
+            return 1 - usedPercent / 100;
+        }
+
+        return undefined;
+    }
+
     private inferQuotaWindowIdentity(
         resetTime: Date,
         resetTimeValid: boolean,
@@ -1146,9 +1180,7 @@ export class ReactorCore {
             return null;
         }
 
-        const remainingFraction = this.normalizeRemainingFraction(
-            readNumberField(metricRecord, ['remainingFraction', 'remaining_fraction', 'fraction', 'remaining']),
-        );
+        const remainingFraction = this.resolveRemainingFraction(metricRecord);
         const resetTimeRaw = readStringField(metricRecord, ['resetTime', 'reset_time', 'resetTimestamp', 'reset_timestamp']);
         const rawBucketType = readStringOrNumberField(raw, ['quotaBucketType', 'bucketType', 'type', 'window', 'quota_bucket_type'])
             ?? readStringOrNumberField(metricRecord, ['quotaBucketType', 'bucketType', 'type', 'window', 'quota_bucket_type']);
@@ -1162,6 +1194,11 @@ export class ReactorCore {
             quotaBucketType = 'SHORT_TERM';
         }
         if (isArgonWeekly && remainingFraction === undefined) {
+            // 静默丢弃会让整台机器"只剩 5h 限制"且无从排查，留诊断日志
+            logger.warn(
+                `[QuotaWindow] Dropping Argon weekly bucket without remainingFraction: id=${bucketId || '(none)'}, `
+                + `fields=${Object.keys(metricRecord).join(',')}`,
+            );
             return null;
         }
 
