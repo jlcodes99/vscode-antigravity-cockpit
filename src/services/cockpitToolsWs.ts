@@ -580,12 +580,19 @@ class CockpitToolsWsClient extends EventEmitter {
                 this.emit('disconnected');
                 this.stopPing();
                 this.rejectAllPendingRequests('连接已断开');
-                this.reconnectFailCount++;
-                this.scheduleReconnect();
+                if (!this.reconnectTimer) {
+                    this.reconnectFailCount++;
+                    this.scheduleReconnect();
+                }
             };
 
             this.ws.onerror = (error) => {
                 logger.debug('[WS] 连接错误:', error);
+                // WHATWG WebSocket 在初始握手失败时仅触发 onerror，不触发 onclose
+                if (!this._isConnected && !this.reconnectTimer) {
+                    this.reconnectFailCount++;
+                    this.scheduleReconnect();
+                }
             };
 
             this.ws.onmessage = (event) => {
@@ -770,5 +777,6 @@ class CockpitToolsWsClient extends EventEmitter {
     }
 }
 
-// 导出单例
+// 导出单例与类（供测试）
 export const cockpitToolsWs = new CockpitToolsWsClient();
+export { CockpitToolsWsClient };

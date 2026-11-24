@@ -1,4 +1,5 @@
 import { ReactorCore } from './reactor';
+import { credentialStorage } from '../auto_trigger';
 import { configService } from '../shared/config_service';
 import { ModelQuotaInfo, QuotaSnapshot } from '../shared/types';
 import { readDesktopQuotaApiCache, type QuotaApiCacheRecord } from '../services/quota_api_cache';
@@ -12,7 +13,7 @@ jest.mock('../shared/config_service', () => ({ configService: {
     updateVisibleModels: jest.fn(),
 } }));
 jest.mock('../auto_trigger/controller', () => ({ autoTriggerController: { setQuotaModels: jest.fn() } }));
-jest.mock('../auto_trigger', () => ({ oauthService: {}, credentialStorage: {} }));
+jest.mock('../auto_trigger', () => ({ oauthService: {}, credentialStorage: { hasValidCredential: jest.fn() } }));
 jest.mock('../antigravityTools_sync', () => ({ antigravityToolsSyncService: {} }));
 jest.mock('../services/quota_api_cache', () => ({
     ...jest.requireActual('../services/quota_api_cache'),
@@ -182,4 +183,27 @@ test('新增模型纳入自定义可见列表，保留已有选择', () => {
     const result = new ReactorCore().buildAuthorizedSnapshotFromResponse(response);
     expect(result.models.map(model => model.modelId)).toEqual(['gemini-pro', 'gemini-argon']);
     expect(configService.updateVisibleModels).toHaveBeenCalledWith(['gemini-pro', 'gemini-argon']);
+});
+
+test('本地进程异常时若存在有效凭据应自动回退到已授权账号配额', async () => {
+    const reactor = new ReactorCore();
+    jest.mocked(configService.getConfig).mockReturnValue({ quotaSource: 'local' } as ReturnType<typeof configService.getConfig>);
+    jest.spyOn(credentialStorage, 'hasValidCredential').mockResolvedValue(true);
+
+    const mockFallbackSnapshot = {
+        models: [{ modelId: 'fallback-model', label: 'Fallback Model', remainingPercentage: 100 }],
+        isConnected: true,
+        allModels: [],
+    };
+
+    jest.spyOn(reactor as unknown as { fetchLocalTelemetryWithRemoteFallback: () => Promise<unknown> }, 'fetchLocalTelemetryWithRemoteFallback')
+        .mockRejectedValue(new Error('Local process not found'));
+    jest.spyOn(reactor as unknown as { fetchAuthorizedTelemetry: () => Promise<unknown> }, 'fetchAuthorizedTelemetry')
+        .mockResolvedValue(mockFallbackSnapshot);
+
+    const publishSpy = jest.spyOn(reactor as unknown as { publishTelemetry: (t: unknown) => void }, 'publishTelemetry');
+
+    await (reactor as unknown as { syncTelemetryCore: () => Promise<void> }).syncTelemetryCore();
+
+    expect(publishSpy).toHaveBeenCalledWith(mockFallbackSnapshot);
 });

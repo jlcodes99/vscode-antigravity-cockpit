@@ -840,6 +840,18 @@ export class ReactorCore {
             const telemetry = await this.fetchLocalTelemetryWithRemoteFallback();
             this.publishTelemetry(telemetry, 'local');
         } catch (error) {
+            const hasAuth = await credentialStorage.hasValidCredential();
+            if (hasAuth) {
+                try {
+                    logger.info('[LocalQuota] Local process unavailable, falling back to authorized account quota');
+                    const telemetry = await this.fetchAuthorizedTelemetry();
+                    this.lastAuthorizedFetchedAt = Date.now();
+                    this.publishTelemetry(telemetry);
+                    return;
+                } catch (fallbackError) {
+                    logger.warn(`[LocalQuota] Fallback to authorized quota failed: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
+                }
+            }
             throw this.wrapSyncError(error, 'local');
         }
     }
@@ -947,12 +959,14 @@ export class ReactorCore {
             }
         }
         telemetry.activeModelId = this.activeModelId;
-        if (source === 'authorized' && telemetry.isConnected) {
+        if ((source === 'authorized' || !source) && telemetry.isConnected) {
             telemetry.quotaAccountEmail = this.lastAuthorizedModelsAccount ?? undefined;
         }
         this.lastSnapshot = telemetry; // Cache the latest snapshot
         if (source) {
             this.lastSnapshotSource = source;
+        } else {
+            this.lastSnapshotSource = 'authorized';
         }
 
         if (telemetry.models.length > 0) {
