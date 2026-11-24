@@ -1,7 +1,73 @@
 import {
+    CockpitToolsWsClient,
     isObjectPayload,
     parsePluginSwitchAccountPayload,
 } from './cockpitToolsWs';
+
+describe('WS connection error handling', () => {
+    let originalWebSocket: unknown;
+
+    beforeEach(() => {
+        originalWebSocket = global.WebSocket;
+    });
+
+    afterEach(() => {
+        global.WebSocket = originalWebSocket as typeof WebSocket;
+        jest.useRealTimers();
+    });
+
+    it('初始握手失败触发 onerror 时应调度重连，且后续 onclose 不重复递增计数', () => {
+        jest.useFakeTimers();
+
+        type MockWsInstance = {
+            onopen: (() => void) | null;
+            onclose: ((event: { code: number }) => void) | null;
+            onerror: ((error: unknown) => void) | null;
+            onmessage: ((event: { data: string }) => void) | null;
+            close: jest.Mock;
+        };
+
+        let capturedWs: MockWsInstance | null = null;
+        const MockWebSocket = jest.fn().mockImplementation(() => {
+            capturedWs = {
+                onopen: null,
+                onclose: null,
+                onerror: null,
+                onmessage: null,
+                close: jest.fn(),
+            };
+            return capturedWs;
+        });
+
+        // @ts-expect-error Mocking WebSocket
+        global.WebSocket = MockWebSocket;
+
+        const client = new CockpitToolsWsClient();
+        // 调用私有 doConnect
+        (client as unknown as { doConnect: () => void }).doConnect();
+
+        expect(capturedWs).not.toBeNull();
+        const ws = capturedWs as unknown as MockWsInstance;
+
+        // 模拟 WHATWG WebSocket 仅触发 onerror
+        ws.onerror?.(new Error('Connection refused'));
+
+        const clientPrivates = client as unknown as {
+            reconnectFailCount: number;
+            reconnectTimer: NodeJS.Timeout | null;
+            cleanup: () => void;
+        };
+
+        expect(clientPrivates.reconnectFailCount).toBe(1);
+        expect(clientPrivates.reconnectTimer).not.toBeNull();
+
+        // 模拟紧随其后的 onclose，计数不应被二次递增
+        ws.onclose?.({ code: 1006 });
+        expect(clientPrivates.reconnectFailCount).toBe(1);
+
+        clientPrivates.cleanup();
+    });
+});
 
 describe('WS inbound payload guards', () => {
     describe('isObjectPayload', () => {
